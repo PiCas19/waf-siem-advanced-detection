@@ -1,0 +1,157 @@
+package waf
+
+import (
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/caddyserver/caddy/v2"
+	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
+	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	
+	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/detector"
+	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/logger"
+)
+
+func init() {
+	caddy.RegisterModule(Middleware{})
+	httpcaddyfile.RegisterHandlerDirective("waf", parseCaddyfile)
+}
+
+// Middleware implements WAF functionality for Caddy
+type Middleware struct {
+	RulesFile   string `json:"rules_file,omitempty"`
+	LogFile     string `json:"log_file,omitempty"`
+	BlockMode   bool   `json:"block_mode,omitempty"`
+	
+	detector    *detector.Detector
+	logger      *logger.Logger
+}
+
+// CaddyModule returns the Caddy module information
+func (Middleware) CaddyModule() caddy.ModuleInfo {
+	return caddy.ModuleInfo{
+		ID:  "http.handlers.waf",
+		New: func() caddy.Module { return new(Middleware) },
+	}
+}
+
+// Provision sets up the middleware
+func (m *Middleware) Provision(ctx caddy.Context) error {
+	// Initialize detector
+	m.detector = detector.NewDetector()
+	
+	// Initialize logger
+	if m.LogFile != "" {
+		l, err := logger.NewLogger(m.LogFile)
+		if err != nil {
+			return fmt.Errorf("failed to initialize logger: %v", err)
+		}
+		m.logger = l
+	}
+	
+	return nil
+}
+
+// ServeHTTP implements the middleware handler
+func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	// Inspect the request for threats
+	threat := m.detector.Inspect(r)
+	
+	if threat != nil {
+		// Log the threat
+		if m.logger != nil {
+			entry := logger.LogEntry{
+				ThreatType:  threat.Type,
+				Severity:    threat.Severity,
+				Description: threat.Description,
+				ClientIP:    getClientIP(r),
+				Method:      r.Method,
+				URL:         r.URL.String(),
+				UserAgent:   r.UserAgent(),
+				Payload:     threat.Payload,
+			}
+			m.logger.Log(entry)
+		}
+		
+		// Block request if in block mode
+		if m.BlockMode {
+			return m.blockRequest(w, threat)
+		}
+	}
+	
+	// Continue to next handler
+	return next.ServeHTTP(w, r)
+}
+
+// blockRequest returns a 403 Forbidden response
+func (m *Middleware) blockRequest(w http.ResponseWriter, threat *detector.Threat) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusForbidden)
+	
+	response := fmt.Sprintf(`{
+		"error": "Request blocked by WAF",
+		"threat_type": "%s",
+		"severity": "%s",
+		"description": "%s"
+	}`, threat.Type, threat.Severity, threat.Description)
+	
+	w.Write([]byte(response))
+	return nil
+}
+
+// getClientIP extracts the real client IP from the request
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		ips := strings.Split(xff, ",")
+		return strings.TrimSpace(ips[0])
+	}
+	
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+	
+	// Fallback to RemoteAddr
+	ip := strings.Split(r.RemoteAddr, ":")[0]
+	return ip
+}
+
+// parseCaddyfile parses the Caddyfile configuration
+func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
+	var m Middleware
+	
+	for h.Next() {
+		for h.NextBlock(0) {
+			switch h.Val() {
+			case "rules":
+				if !h.Args(&m.RulesFile) {
+					return nil, h.ArgErr()
+				}
+			case "log_file":
+				if !h.Args(&m.LogFile) {
+					return nil, h.ArgErr()
+				}
+			case "block_mode":
+				var mode string
+				if !h.Args(&mode) {
+					return nil, h.ArgErr()
+				}
+				m.BlockMode = mode == "true"
+			default:
+				return nil, h.Errf("unknown subdirective: %s", h.Val())
+			}
+		}
+	}
+	
+	return &m, nil
+}
+
+// Interface guards
+var (
+	_ caddy.Provisioner           = (*Middleware)(nil)
+	_ caddyhttp.MiddlewareHandler = (*Middleware)(nil)
+	_ caddyfile.Unmarshaler       = (*Middleware)(nil)
+)
