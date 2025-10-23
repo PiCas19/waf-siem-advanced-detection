@@ -1,0 +1,49 @@
+# WAF Rules Configuration
+
+rules:
+  xss:
+    enabled: true
+    block_mode: true
+    severity: high
+    description: "Cross-Site Scripting detection"
+    
+  sqli:
+    enabled: true
+    block_mode: true
+    severity: critical
+    description: "SQL Injection detection"
+    
+  lfi:
+    enabled: true
+    block_mode: true
+    severity: high
+    description: "Local File Inclusion detection"
+    
+  rfi:
+    enabled: true
+    block_mode: true
+    severity: critical
+    description: "Remote File Inclusion detection"
+    
+  command_injection:
+    enabled: true
+    block_mode: true
+    severity: critical
+    description: "Command Injection detection"
+
+# Logging configuration
+logging:
+  format: json
+  file: /var/log/caddy/waf.log
+  level: info
+  
+# Blocklist configuration
+blocklist:
+  enabled: true
+  auto_block_threshold: 5
+  block_duration_seconds: 3600
+  
+# Performance settings
+performance:
+  max_body_size: 10485760  # 10MB
+  timeout_seconds: 30
