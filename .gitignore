@@ -1,0 +1,43 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+caddy
+caddy-waf
+
+# Go
+*.test
+*.out
+go.work
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Node
+node_modules/
+dist/
+.cache/
+
+# Environment
+.env
+*.env
+
+# Database
+*.db
+*.sqlite
+
+# Certificates
+*.pem
+*.key
+*.crt
