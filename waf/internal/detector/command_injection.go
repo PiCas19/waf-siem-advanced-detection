@@ -14,11 +14,11 @@ type CommandInjectionDetector struct {
 func NewCommandInjectionDetector() *CommandInjectionDetector {
 	patterns := []string{
 		// Shell metacharacters
-		`[;|&$><\`]`,
+		`[;|&$><` + "`" + `]`,
 		
 		// Command substitution
 		`\$\(.*?\)`,
-		`\`.*?\``,
+		"`" + `.*?` + "`",
 		
 		// Shell commands
 		`(?i)\b(bash|sh|cmd|powershell|pwsh)\b`,
