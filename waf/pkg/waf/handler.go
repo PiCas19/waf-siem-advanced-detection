@@ -3,8 +3,8 @@ package waf
 import (
 	"net/http"
 
-	"caddy-waf-project/waf/internal/detector"
-	"caddy-waf-project/waf/internal/logger"
+	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/detector"
+	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/logger"
 )
 
 type WAFHandler struct {
