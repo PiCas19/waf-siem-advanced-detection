@@ -2,7 +2,10 @@ package websocket
 
 import (
 	"encoding/json"
+	"net/http" 
 	"sync"
+
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
@@ -11,7 +14,10 @@ var (
 	mu        sync.RWMutex
 	broadcast = make(chan []byte, 100)
 	upgrader  = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
+		CheckOrigin: func(r *http.Request) bool {
+			_ = r.Header.Get("Origin") 
+			return true              
+		},
 	}
 )
 
