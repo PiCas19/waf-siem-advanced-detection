@@ -1,10 +1,9 @@
 # Binaries
+/caddy
 *.exe
 *.dll
 *.so
 *.dylib
-caddy
-caddy-waf
 
 # Go
 *.test
