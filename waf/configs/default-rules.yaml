@@ -1,0 +1,22 @@
+- id: xss-001
+  name: Basic XSS
+  description: Detects basic script tags
+  severity: HIGH
+  patterns:
+    - <script
+    - javascript:
+  enabled: true
+  actions:
+    - block
+    - log
+
+- id: sqli-001
+  name: Union Select
+  description: Detects UNION SELECT
+  severity: CRITICAL
+  patterns:
+    - union.*select
+  enabled: true
+  actions:
+    - block
+    - log
