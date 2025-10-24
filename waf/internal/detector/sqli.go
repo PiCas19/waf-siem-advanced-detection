@@ -13,38 +13,32 @@ type SQLiDetector struct {
 // NewSQLiDetector creates a new SQL injection detector
 func NewSQLiDetector() *SQLiDetector {
 	patterns := []string{
-		// Union-based SQLi
-		`(?i)(union\s+(all\s+)?select)`,
-		
-		// Boolean-based SQLi
+		// === BOOLEAN-BASED SQLI (MIGLIORATI) ===
+		`(?i)\b(or|and)\s*['"]?\s*\d+\s*=\s*\d+['"]?\s*`,           // or 1=1, or "1"="1", or '1'='1'
+		`(?i)\b(or|and)\s*['"]1['"]\s*=\s*['"]1['"]\s*`,             // '1'='1', "1"="1"
+		`(?i)\b(or|and)\s*['"][^'"]*['"]\s*=\s*['"][^'"]*['"]`,      // 'a'='a' generico
+
+		// === CLASSICI BOOLEANI ===
 		`(?i)(or\s+1\s*=\s*1)`,
 		`(?i)(and\s+1\s*=\s*1)`,
 		`(?i)(or\s+'1'\s*=\s*'1)`,
 		`(?i)(and\s+'1'\s*=\s*'1)`,
 		`(?i)(or\s+"1"\s*=\s*"1)`,
-		
-		// Comments
+		`(?i)(and\s+"1"\s*=\s*"1)`,
+
+		// === CON COMMENTI O CHIUSURA STRINGA ===
+		`(?i)['"]\s*(or|and)\s*['"]1['"]\s*=\s*['"]1['"]`,           // ' OR '1'='1
+		`(?i)['"]\s*(or|and)\s*1=1`,                                 // ' OR 1=1
+
+		// === UNION, COMMENTS, ETC (già presenti) ===
+		`(?i)(union\s+(all\s+)?select)`,
 		`(--|#|/\*|\*/)`,
-		
-		// SQL keywords
 		`(?i)\b(select|insert|update|delete|drop|create|alter|exec|execute)\b.*\b(from|into|table|database)\b`,
-		
-		// Stacked queries
 		`;\s*(drop|delete|update|insert)`,
-		
-		// Time-based blind SQLi
 		`(?i)(sleep\s*\(|benchmark\s*\(|waitfor\s+delay)`,
-		
-		// SQL functions
 		`(?i)(concat\s*\(|char\s*\(|ascii\s*\(|substring\s*\()`,
-		
-		// Information schema
 		`(?i)information_schema`,
-		
-		// SQL wildcards
 		`(?i)(having|group\s+by|order\s+by)`,
-		
-		// Quotes and escape sequences
 		`'.*?--`,
 		`".*?--`,
 		`\\x[0-9a-f]{2}`,
