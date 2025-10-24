@@ -9,7 +9,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	
+
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/detector"
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/logger"
 )
@@ -21,12 +21,12 @@ func init() {
 
 // Middleware implements WAF functionality for Caddy
 type Middleware struct {
-	RulesFile   string `json:"rules_file,omitempty"`
-	LogFile     string `json:"log_file,omitempty"`
-	BlockMode   bool   `json:"block_mode,omitempty"`
-	
-	detector    *detector.Detector
-	logger      *logger.Logger
+	RulesFile string `json:"rules_file,omitempty"`
+	LogFile   string `json:"log_file,omitempty"`
+	BlockMode bool   `json:"block_mode,omitempty"`
+
+	detector *detector.Detector
+	logger   *logger.Logger
 }
 
 // CaddyModule returns the Caddy module information
@@ -41,7 +41,7 @@ func (Middleware) CaddyModule() caddy.ModuleInfo {
 func (m *Middleware) Provision(ctx caddy.Context) error {
 	// Initialize detector
 	m.detector = detector.NewDetector()
-	
+
 	// Initialize logger
 	if m.LogFile != "" {
 		l, err := logger.NewLogger(m.LogFile)
@@ -50,7 +50,7 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		}
 		m.logger = l
 	}
-	
+
 	return nil
 }
 
@@ -58,7 +58,7 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	// Inspect the request for threats
 	threat := m.detector.Inspect(r)
-	
+
 	if threat != nil {
 		// Log the threat
 		if m.logger != nil {
@@ -74,13 +74,13 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			}
 			m.logger.Log(entry)
 		}
-		
+
 		// Block request if in block mode
 		if m.BlockMode {
 			return m.blockRequest(w, threat)
 		}
 	}
-	
+
 	// Continue to next handler
 	return next.ServeHTTP(w, r)
 }
@@ -89,14 +89,14 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 func (m *Middleware) blockRequest(w http.ResponseWriter, threat *detector.Threat) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusForbidden)
-	
+
 	response := fmt.Sprintf(`{
 		"error": "Request blocked by WAF",
 		"threat_type": "%s",
 		"severity": "%s",
 		"description": "%s"
 	}`, threat.Type, threat.Severity, threat.Description)
-	
+
 	w.Write([]byte(response))
 	return nil
 }
@@ -108,45 +108,49 @@ func getClientIP(r *http.Request) string {
 		ips := strings.Split(xff, ",")
 		return strings.TrimSpace(ips[0])
 	}
-	
+
 	// Check X-Real-IP header
 	if xri := r.Header.Get("X-Real-IP"); xri != "" {
 		return xri
 	}
-	
+
 	// Fallback to RemoteAddr
 	ip := strings.Split(r.RemoteAddr, ":")[0]
 	return ip
 }
 
-// parseCaddyfile parses the Caddyfile configuration
-func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	var m Middleware
-	
-	for h.Next() {
-		for h.NextBlock(0) {
-			switch h.Val() {
+// UnmarshalCaddyfile implements caddyfile.Unmarshaler
+func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+	for d.Next() {
+		for d.NextBlock(0) {
+			switch d.Val() {
 			case "rules":
-				if !h.Args(&m.RulesFile) {
-					return nil, h.ArgErr()
+				if !d.Args(&m.RulesFile) {
+					return d.ArgErr()
 				}
 			case "log_file":
-				if !h.Args(&m.LogFile) {
-					return nil, h.ArgErr()
+				if !d.Args(&m.LogFile) {
+					return d.ArgErr()
 				}
 			case "block_mode":
 				var mode string
-				if !h.Args(&mode) {
-					return nil, h.ArgErr()
+				if !d.Args(&mode) {
+					return d.ArgErr()
 				}
 				m.BlockMode = mode == "true"
 			default:
-				return nil, h.Errf("unknown subdirective: %s", h.Val())
+				return d.Errf("unknown subdirective: %s", d.Val())
 			}
 		}
 	}
-	
-	return &m, nil
+	return nil
+}
+
+// parseCaddyfile parses the Caddyfile configuration
+func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
+	var m Middleware
+	err := m.UnmarshalCaddyfile(h.Dispenser)
+	return &m, err
 }
 
 // Interface guards
