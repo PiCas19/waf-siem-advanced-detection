@@ -15,7 +15,10 @@ var (
 	mu        sync.RWMutex
 	broadcast = make(chan []byte, 100)
 	upgrader  = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true },
+		CheckOrigin: func(r *http.Request) bool {
+			_ = r.Header.Get("Origin") 
+			return true                
+		},
 	}
 )
 
