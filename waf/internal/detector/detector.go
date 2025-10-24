@@ -35,8 +35,18 @@ func NewDetector() *Detector {
 	}
 }
 
-// Inspect examines an HTTP request for security threats
+
 func (d *Detector) Inspect(r *http.Request) *Threat {
+	// 🔥 CHECK HEADERS FIRST (including User-Agent)
+	dangerousHeaders := []string{"User-Agent", "Referer", "Cookie", "X-Forwarded-For", "X-Real-IP"}
+	for _, header := range dangerousHeaders {
+		if value := r.Header.Get(header); value != "" {
+			if threat := d.checkValue(r, header, value); threat != nil {
+				return threat
+			}
+		}
+	}
+
 	// Check URL query parameters
 	for param, values := range r.URL.Query() {
 		for _, value := range values {
@@ -65,16 +75,6 @@ func (d *Detector) Inspect(r *http.Request) *Threat {
 
 			// Also check raw body
 			if threat := d.checkValue(r, "body", string(body)); threat != nil {
-				return threat
-			}
-		}
-	}
-
-	// Check headers INCLUDING User-Agent
-	dangerousHeaders := []string{"Referer", "Cookie", "User-Agent", "X-Forwarded-For", "X-Real-IP"}
-	for _, header := range dangerousHeaders {
-		if value := r.Header.Get(header); value != "" {
-			if threat := d.checkValue(r, header, value); threat != nil {
 				return threat
 			}
 		}
