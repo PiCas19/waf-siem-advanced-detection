@@ -17,11 +17,11 @@ type Threat struct {
 
 // Detector orchestrates all security detectors
 type Detector struct {
-	xss     *XSSDetector
-	sqli    *SQLiDetector
-	lfi     *LFIDetector
-	rfi     *RFIDetector
-	cmdInj  *CommandInjectionDetector
+	xss    *XSSDetector
+	sqli   *SQLiDetector
+	lfi    *LFIDetector
+	rfi    *RFIDetector
+	cmdInj *CommandInjectionDetector
 }
 
 // NewDetector creates a new Detector instance
@@ -45,14 +45,14 @@ func (d *Detector) Inspect(r *http.Request) *Threat {
 			}
 		}
 	}
-	
+
 	// Check POST form data
 	if r.Method == "POST" || r.Method == "PUT" {
 		// Read and restore body
 		body, err := io.ReadAll(r.Body)
 		if err == nil {
 			r.Body = io.NopCloser(strings.NewReader(string(body)))
-			
+
 			// Parse form
 			r.ParseForm()
 			for param, values := range r.PostForm {
@@ -62,16 +62,16 @@ func (d *Detector) Inspect(r *http.Request) *Threat {
 					}
 				}
 			}
-			
+
 			// Also check raw body
 			if threat := d.checkValue(r, "body", string(body)); threat != nil {
 				return threat
 			}
 		}
 	}
-	
-	// Check headers (excluding User-Agent which contains legitimate tool names)
-	dangerousHeaders := []string{"Referer", "Cookie"}
+
+	// Check headers INCLUDING User-Agent
+	dangerousHeaders := []string{"Referer", "Cookie", "User-Agent", "X-Forwarded-For", "X-Real-IP"}
 	for _, header := range dangerousHeaders {
 		if value := r.Header.Get(header); value != "" {
 			if threat := d.checkValue(r, header, value); threat != nil {
@@ -79,7 +79,7 @@ func (d *Detector) Inspect(r *http.Request) *Threat {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -94,7 +94,7 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 			Payload:     value,
 		}
 	}
-	
+
 	// SQL Injection Detection
 	if detected, desc := d.sqli.Detect(value); detected {
 		return &Threat{
@@ -104,7 +104,7 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 			Payload:     value,
 		}
 	}
-	
+
 	// LFI Detection
 	if detected, desc := d.lfi.Detect(value); detected {
 		return &Threat{
@@ -114,7 +114,7 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 			Payload:     value,
 		}
 	}
-	
+
 	// RFI Detection
 	if detected, desc := d.rfi.Detect(value); detected {
 		return &Threat{
@@ -124,7 +124,7 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 			Payload:     value,
 		}
 	}
-	
+
 	// Command Injection Detection
 	if detected, desc := d.cmdInj.Detect(value); detected {
 		return &Threat{
@@ -134,6 +134,6 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 			Payload:     value,
 		}
 	}
-	
+
 	return nil
 }
