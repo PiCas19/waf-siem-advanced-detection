@@ -3,8 +3,6 @@ package websocket
 import (
 	"encoding/json"
 	"sync"
-
-	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
@@ -12,7 +10,9 @@ var (
 	clients   = make(map[*websocket.Conn]bool)
 	mu        sync.RWMutex
 	broadcast = make(chan []byte, 100)
-	upgrader  = websocket.Upgrader{} // <-- NESSUN CheckOrigin, NESSUN http
+	upgrader  = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
 )
 
 type WAFEvent struct {
