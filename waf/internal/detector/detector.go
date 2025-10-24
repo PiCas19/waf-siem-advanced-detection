@@ -70,8 +70,8 @@ func (d *Detector) Inspect(r *http.Request) *Threat {
 		}
 	}
 	
-	// Check headers (excluding safe headers)
-	dangerousHeaders := []string{"User-Agent", "Referer", "Cookie", "X-Forwarded-For"}
+	// Check headers (excluding User-Agent which contains legitimate tool names)
+	dangerousHeaders := []string{"Referer", "Cookie"}
 	for _, header := range dangerousHeaders {
 		if value := r.Header.Get(header); value != "" {
 			if threat := d.checkValue(r, header, value); threat != nil {
