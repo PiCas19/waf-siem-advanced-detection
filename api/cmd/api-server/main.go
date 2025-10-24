@@ -10,7 +10,7 @@ import (
 
 func main() {
 	// Initialize database
-	db, err := database.Initialize("waf.db")
+	db, err := database.Initialize("./data/waf.db")
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
