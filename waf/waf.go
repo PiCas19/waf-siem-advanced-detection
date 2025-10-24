@@ -1,5 +1,5 @@
 package waf
 
 import (
-	_ "waf/pkg/waf"
+	_ "github.com/PiCas19/waf-siem-advanced-detection/waf/pkg/waf"
 )
