@@ -3,8 +3,10 @@ package websocket
 import (
 	"encoding/json"
 	"sync"
-	"http"
-	"gin"
+
+	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
