@@ -10,8 +10,8 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 
-	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/detector"
-	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/logger"
+	"waf/internal/detector"
+	"waf/internal/logger"
 )
 
 func init() {
