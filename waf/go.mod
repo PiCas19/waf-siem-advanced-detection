@@ -1,4 +1,4 @@
-module github.com/PiCas19/waf-siem-advanced-detection/waf
+module waf
 
 go 1.22
 
