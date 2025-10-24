@@ -1,6 +1,11 @@
 import { ResponsiveContainer } from 'recharts';
+import type { ReactElement } from 'react';
 
-export default function Chart({ children }: { children: React.ReactNode }) {
+interface ChartProps {
+  children: ReactElement;
+}
+
+export default function Chart({ children }: ChartProps) {
   return (
     <ResponsiveContainer width="100%" height={300}>
       {children}
