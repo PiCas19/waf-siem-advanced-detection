@@ -2,7 +2,6 @@ package detector
 
 import (
 	"regexp"
-	"strings"
 )
 
 // SSRFDetector detects Server-Side Request Forgery (SSRF) attacks
