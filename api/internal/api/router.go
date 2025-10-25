@@ -17,6 +17,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	{
 		public.POST("/auth/login", authHandler.Login)
 		public.POST("/auth/register", authHandler.Register)
+		public.POST("/auth/verify-otp", authHandler.VerifyOTPLogin)
 		public.POST("/waf/event", WAFEventHandler)
 	}
 
@@ -33,6 +34,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 		protected.GET("/logs", GetLogs)
 		protected.GET("/blocklist", GetBlocklist)
+
+		// 2FA endpoints
+		protected.POST("/auth/2fa/setup", authHandler.InitiateTwoFASetup)
+		protected.POST("/auth/2fa/confirm", authHandler.CompleteTwoFASetup)
+		protected.POST("/auth/2fa/disable", authHandler.DisableTwoFA)
 	}
 
 	admin := r.Group("/api/admin")

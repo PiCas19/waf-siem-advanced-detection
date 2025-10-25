@@ -1,0 +1,155 @@
+package auth
+
+import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha1"
+	"encoding/base32"
+	"encoding/json"
+	"fmt"
+	"math"
+	"math/big"
+	"time"
+
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+)
+
+// OTPConfig holds TOTP configuration
+type OTPConfig struct {
+	Secret      string
+	QRCodeURL   string
+	BackupCodes []string
+}
+
+// GenerateOTPSecret generates a new TOTP secret for 2FA
+func GenerateOTPSecret() (string, error) {
+	// Generate 32 random bytes for the secret
+	randomBytes := make([]byte, 32)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	// Encode as base32
+	secret := base32.StdEncoding.EncodeToString(randomBytes)
+	return secret, nil
+}
+
+// GenerateBackupCodes generates 10 backup codes (8 digits each)
+func GenerateBackupCodes() ([]string, error) {
+	codes := make([]string, 10)
+	for i := 0; i < 10; i++ {
+		// Generate random number between 10000000 and 99999999
+		n, err := rand.Int(rand.Reader, big.NewInt(90000000))
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate backup code: %w", err)
+		}
+		codes[i] = fmt.Sprintf("%08d", n.Int64()+10000000)
+	}
+	return codes, nil
+}
+
+// VerifyOTP verifies a TOTP code (6 digits)
+func VerifyOTP(secret string, code string) bool {
+	if len(code) != 6 {
+		return false
+	}
+
+	// Get the current time in 30-second intervals
+	counter := time.Now().Unix() / 30
+
+	// Check the current time window and adjacent windows (±1)
+	for _, timeOffset := range []int64{-1, 0, 1} {
+		if verifyTOTP(secret, code, counter+timeOffset) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// verifyTOTP verifies TOTP for a specific counter value
+func verifyTOTP(secret, code string, counter int64) bool {
+	// Decode the secret
+	decodedSecret, err := base32.StdEncoding.DecodeString(secret)
+	if err != nil {
+		return false
+	}
+
+	// Calculate HMAC-SHA1
+	hash := calculateHMAC(decodedSecret, counter)
+
+	// Get last 4 bits to determine offset
+	offset := hash[len(hash)-1] & 0xf
+	code32 := int32((hash[offset]&0x7f)<<24 | (hash[offset+1]&0xff)<<16 | (hash[offset+2]&0xff)<<8 | (hash[offset+3] & 0xff))
+	code32 = int32(math.Abs(float64(code32))) % 1000000
+
+	// Verify the code
+	return fmt.Sprintf("%06d", code32) == code
+}
+
+// calculateHMAC calculates HMAC-SHA1
+func calculateHMAC(key []byte, counter int64) []byte {
+	// Convert counter to 8-byte big-endian
+	counterBytes := make([]byte, 8)
+	for i := 7; i >= 0; i-- {
+		counterBytes[i] = byte(counter & 0xff)
+		counter >>= 8
+	}
+
+	h := hmac.New(sha1.New, key)
+	h.Write(counterBytes)
+	return h.Sum(nil)
+}
+
+// SetupTwoFA sets up 2FA for a user
+func SetupTwoFA(user *models.User) (*OTPConfig, error) {
+	secret, err := GenerateOTPSecret()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate OTP secret: %w", err)
+	}
+
+	backupCodes, err := GenerateBackupCodes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate backup codes: %w", err)
+	}
+
+	// Store backup codes as JSON
+	backupCodesJSON, err := json.Marshal(backupCodes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal backup codes: %w", err)
+	}
+
+	user.OTPSecret = secret
+	user.BackupCodes = string(backupCodesJSON)
+
+	// Generate QR code URL for TOTP setup (for apps like Google Authenticator)
+	qrCodeURL := fmt.Sprintf("otpauth://totp/WAF-Dashboard:%s?secret=%s&issuer=WAF-Dashboard", user.Email, secret)
+
+	return &OTPConfig{
+		Secret:      secret,
+		QRCodeURL:   qrCodeURL,
+		BackupCodes: backupCodes,
+	}, nil
+}
+
+// VerifyBackupCode verifies and removes a backup code
+func VerifyBackupCode(user *models.User, code string) bool {
+	var backupCodes []string
+	err := json.Unmarshal([]byte(user.BackupCodes), &backupCodes)
+	if err != nil {
+		return false
+	}
+
+	for i, bc := range backupCodes {
+		if bc == code {
+			// Remove used code
+			backupCodes = append(backupCodes[:i], backupCodes[i+1:]...)
+			backupCodesJSON, _ := json.Marshal(backupCodes)
+			user.BackupCodes = string(backupCodesJSON)
+			return true
+		}
+	}
+
+	return false
+}
