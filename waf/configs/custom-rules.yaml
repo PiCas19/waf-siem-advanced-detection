@@ -1,0 +1,167 @@
+# =========================================
+# Custom WAF Rules
+# Add your custom detection rules here
+# =========================================
+
+# This file is for user-defined custom rules.
+# Rules defined here will be loaded in addition to default-rules.yaml and owasp-crs-rules.yaml
+
+# Example custom rule:
+# - id: custom-001
+#   name: Block Specific Pattern
+#   description: Custom rule to block specific attack pattern
+#   severity: HIGH
+#   category: custom
+#   patterns:
+#     - your_pattern_here
+#   enabled: true
+#   actions:
+#     - block
+#     - log
+
+# === EXAMPLE: Block Specific User-Agent ===
+- id: custom-001
+  name: Block Malicious User-Agent
+  description: Blocks requests with known malicious user-agents
+  severity: MEDIUM
+  category: custom-scanner
+  patterns:
+    - (?i)badbot
+    - (?i)malicious_scanner
+    - (?i)evil_tool
+  enabled: false  # Set to true to enable
+  actions:
+    - block
+    - log
+
+# === EXAMPLE: Block Specific IP Patterns ===
+- id: custom-002
+  name: Block Specific File Extensions
+  description: Blocks access to sensitive file extensions
+  severity: HIGH
+  category: custom-access-control
+  patterns:
+    - (?i)\.bak$
+    - (?i)\.old$
+    - (?i)\.backup$
+    - (?i)\.swp$
+    - (?i)~$
+  enabled: false  # Set to true to enable
+  actions:
+    - block
+    - log
+
+# === EXAMPLE: API Rate Limiting Pattern ===
+- id: custom-003
+  name: API Endpoint Protection
+  description: Custom protection for specific API endpoints
+  severity: MEDIUM
+  category: custom-api
+  patterns:
+    - /api/admin/.*
+    - /api/internal/.*
+  enabled: false  # Set to true to enable
+  actions:
+    - log
+
+# === EXAMPLE: Custom XSS Pattern ===
+- id: custom-004
+  name: Custom XSS Pattern
+  description: Application-specific XSS pattern
+  severity: HIGH
+  category: custom-xss
+  patterns:
+    - (?i)your_app_specific_xss_pattern
+  enabled: false  # Set to true to enable
+  actions:
+    - block
+    - log
+    - alert
+
+# === EXAMPLE: Custom SQLi Pattern ===
+- id: custom-005
+  name: Custom SQLi Pattern
+  description: Application-specific SQL injection pattern
+  severity: CRITICAL
+  category: custom-sqli
+  patterns:
+    - your_app_specific_sqli_pattern
+  enabled: false  # Set to true to enable
+  actions:
+    - block
+    - log
+    - alert
+
+# === EXAMPLE: Geolocation-based Blocking ===
+- id: custom-006
+  name: Geographic Restriction
+  description: Block requests from specific countries (requires GeoIP)
+  severity: LOW
+  category: custom-geo
+  patterns:
+    - country:CN
+    - country:RU
+  enabled: false  # Set to true to enable
+  actions:
+    - block
+    - log
+
+# === EXAMPLE: Time-based Access Control ===
+- id: custom-007
+  name: Business Hours Only
+  description: Restrict access outside business hours
+  severity: LOW
+  category: custom-time
+  patterns:
+    - time:outside_business_hours
+  enabled: false  # Set to true to enable
+  actions:
+    - block
+    - log
+
+# === EXAMPLE: Content-Type Restriction ===
+- id: custom-008
+  name: Restrict Content-Type
+  description: Block unwanted content types
+  severity: MEDIUM
+  category: custom-content
+  patterns:
+    - (?i)content-type:.*application/x-www-form-urlencoded
+  enabled: false  # Set to true to enable
+  actions:
+    - log
+
+# === EXAMPLE: Custom Header Validation ===
+- id: custom-009
+  name: Required Header Validation
+  description: Ensure required headers are present
+  severity: MEDIUM
+  category: custom-header
+  patterns:
+    - missing_header:X-API-Key
+    - missing_header:X-CSRF-Token
+  enabled: false  # Set to true to enable
+  actions:
+    - block
+    - log
+
+# === EXAMPLE: Payload Size Restriction ===
+- id: custom-010
+  name: Large Payload Block
+  description: Block unusually large payloads
+  severity: MEDIUM
+  category: custom-payload
+  patterns:
+    - payload_size:>10MB
+  enabled: false  # Set to true to enable
+  actions:
+    - block
+    - log
+
+# =========================================
+# Notes:
+# - Set 'enabled: true' to activate a rule
+# - Severity levels: LOW, MEDIUM, HIGH, CRITICAL
+# - Actions: block, log, alert
+# - Patterns support regex (case-insensitive with (?i))
+# =========================================
