@@ -88,7 +88,7 @@ func NewSSTIDetector() *SSTIDetector {
 		`<%.*system.*%>`,
 		`<%.*eval.*%>`,
 		`<%.*exec.*%>`,
-		`<%.*\`.*\`.*%>`,
+		"<%.*`.*`.*%>",
 		`<%.*File\.read.*%>`,
 
 		// === HANDLEBARS (JavaScript) ===
