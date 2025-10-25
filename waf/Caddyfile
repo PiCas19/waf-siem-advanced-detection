@@ -1,11 +1,8 @@
 {
     email pierpaolo.casati@student.supsi.ch
     auto_https off
-
-    # WAF prima di file_server
     order waf before file_server
-
-    # Ottimizzazioni globali
+    
     servers {
         protocols h1 h2 h3
         timeouts {
@@ -21,93 +18,61 @@
 # TAILSCALE FUNNEL - WAN (porta 8080)
 #===================================
 :8080 {
-    # === 1. FILE JS ===
-    @js {
-        path /assets/*.js
-    }
-    handle @js {
-        root * /var/www/html
-        file_server
-        header Content-Type application/javascript
-    }
-
-    # === 2. FILE CSS ===
-    @css {
-        path /assets/*.css
-    }
-    handle @css {
-        root * /var/www/html
-        file_server
-        header Content-Type text/css
-    }
-
-    # === 3. ALTRI FILE STATICI (inclusi vite.svg) ===
-    @other_static {
-        path /favicon.ico
-        path /manifest.json
-        path /robots.txt
-        path /vite.svg
-        path /assets/*.png
-        path /assets/*.jpg
-        path /assets/*.jpeg
-        path /assets/*.svg
-        path /assets/*.ico
-        path /assets/*.woff
-        path /assets/*.woff2
-        path /assets/*.ttf
-        path /assets/*.webp
-    }
-    handle @other_static {
-        root * /var/www/html
-        file_server
-    }
-
-    # === 4. WAF (esclude tutti i file statici) ===
-    @protected {
-        not path /assets/*
-        not path /favicon.ico
-        not path /manifest.json
-        not path /robots.txt
-        not path /vite.svg
-    }
-    waf @protected {
-        log_file /var/log/caddy/waf_wan.log
-        block_mode true
-    }
-
-    # === 5. API PROXY ===
+    # API (prima di tutto, ha priorità)
     handle /api* {
         reverse_proxy localhost:8081
     }
-
-    # === 6. SPA ROUTING (React) ===
-    try_files {path} {path}/ /index.html
-
-    # === 7. ROOT + FILE SERVER (fallback) ===
-    root * /var/www/html
-    file_server
-
-    # === 8. COMPRESSION ===
-    encode gzip zstd {
-        match {
-            header Content-Type text/*
-            header Content-Type application/json*
-            header Content-Type application/javascript*
-            header Content-Type text/css*
+    
+    # File statici (serviti senza WAF)
+    handle /assets/* {
+        root * /var/www/html
+        file_server
+        header Cache-Control "public, max-age=31536000"
+    }
+    
+    handle /favicon.ico {
+        root * /var/www/html
+        file_server
+    }
+    
+    handle /manifest.json {
+        root * /var/www/html
+        file_server
+    }
+    
+    handle /robots.txt {
+        root * /var/www/html
+        file_server
+    }
+    
+    handle /vite.svg {
+        root * /var/www/html
+        file_server
+    }
+    
+    # Tutto il resto (HTML, routing SPA) con WAF
+    handle {
+        waf {
+            log_file /var/log/caddy/waf_wan.log
+            block_mode true
+        }
+        
+        root * /var/www/html
+        try_files {path} /index.html
+        file_server
+        
+        encode gzip zstd
+        
+        header {
+            Cache-Control "public, max-age=3600"
+            X-Content-Type-Options "nosniff"
+            X-Frame-Options "DENY"
+            X-XSS-Protection "1; mode=block"
+            Referrer-Policy "strict-origin-when-cross-origin"
+            Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' http://172.16.216.10/api https://172.16.216.10:8443/api"
         }
     }
-
-    # === 9. SECURITY HEADERS ===
-    header {
-        Cache-Control "public, max-age=3600"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
-        X-XSS-Protection "1; mode=block"
-        Referrer-Policy "strict-origin-when-cross-origin"
-        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' http://172.16.216.10/api https://172.16.216.10:8443/api"
-    }
-
-    # === 10. ACCESS LOG ===
+    
     log {
         output file /var/log/caddy/access_wan.log {
             roll_size 100mb
@@ -119,89 +84,65 @@
 }
 
 #=======================================
-# LAN - HTTPS con certificato interno (porta 8443)
+# LAN - HTTPS (porta 8443)
 #=======================================
 :8443 {
     bind 0.0.0.0
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
-
-    # === 1. JS ===
-    @js {
-        path /assets/*.js
-    }
-    handle @js {
-        root * /var/www/html
-        file_server
-        header Content-Type application/javascript
-    }
-
-    # === 2. CSS ===
-    @css {
-        path /assets/*.css
-    }
-    handle @css {
-        root * /var/www/html
-        file_server
-        header Content-Type text/css
-    }
-
-    # === 3. ALTRI STATICI ===
-    @other_static {
-        path /favicon.ico
-        path /manifest.json
-        path /robots.txt
-        path /vite.svg
-        path /assets/*.png
-        path /assets/*.jpg
-        path /assets/*.jpeg
-        path /assets/*.svg
-        path /assets/*.ico
-        path /assets/*.woff
-        path /assets/*.woff2
-        path /assets/*.ttf
-        path /assets/*.webp
-    }
-    handle @other_static {
-        root * /var/www/html
-        file_server
-    }
-
-    # === 4. WAF ===
-    @protected {
-        not path /assets/*
-        not path /favicon.ico
-        not path /manifest.json
-        not path /robots.txt
-        not path /vite.svg
-    }
-    waf @protected {
-        log_file /var/log/caddy/waf_lan.log
-        block_mode true
-    }
-
-    # === 5. API ===
+    
+    # API
     handle /api* {
         reverse_proxy localhost:8081
     }
-
-    # === 6. SPA ===
-    try_files {path} {path}/ /index.html
-
-    # === 7. ROOT + FILE SERVER ===
-    root * /var/www/html
-    file_server
-
-    # === 8. COMPRESSION ===
-    encode gzip zstd
-
-    # === 9. SECURITY HEADERS ===
-    header {
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "SAMEORIGIN"
-        X-XSS-Protection "1; mode=block"
+    
+    # File statici
+    handle /assets/* {
+        root * /var/www/html
+        file_server
+        header Cache-Control "public, max-age=31536000"
     }
-
-    # === 10. ACCESS LOG ===
+    
+    handle /favicon.ico {
+        root * /var/www/html
+        file_server
+    }
+    
+    handle /manifest.json {
+        root * /var/www/html
+        file_server
+    }
+    
+    handle /robots.txt {
+        root * /var/www/html
+        file_server
+    }
+    
+    handle /vite.svg {
+        root * /var/www/html
+        file_server
+    }
+    
+    # Resto con WAF
+    handle {
+        waf {
+            log_file /var/log/caddy/waf_lan.log
+            block_mode true
+        }
+        
+        root * /var/www/html
+        try_files {path} /index.html
+        file_server
+        
+        encode gzip zstd
+        
+        header {
+            X-Content-Type-Options "nosniff"
+            X-Frame-Options "SAMEORIGIN"
+            X-XSS-Protection "1; mode=block"
+            Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        }
+    }
+    
     log {
         output file /var/log/caddy/access_lan_https.log {
             roll_size 100mb
@@ -216,76 +157,58 @@
 # LAN - HTTP (porta 80)
 #=====================
 http://172.16.216.10 {
-    # === 1. JS ===
-    @js {
-        path /assets/*.js
-    }
-    handle @js {
-        root * /var/www/html
-        file_server
-        header Content-Type application/javascript
-    }
-
-    # === 2. CSS ===
-    @css {
-        path /assets/*.css
-    }
-    handle @css {
-        root * /var/www/html
-        file_server
-        header Content-Type text/css
-    }
-
-    # === 3. ALTRI STATICI ===
-    @other_static {
-        path /favicon.ico
-        path /manifest.json
-        path /robots.txt
-        path /vite.svg
-        path /assets/*.png
-        path /assets/*.jpg
-        path /assets/*.jpeg
-        path /assets/*.svg
-        path /assets/*.ico
-        path /assets/*.woff
-        path /assets/*.woff2
-        path /assets/*.ttf
-        path /assets/*.webp
-    }
-    handle @other_static {
-        root * /var/www/html
-        file_server
-    }
-
-    # === 4. WAF ===
-    @protected {
-        not path /assets/*
-        not path /favicon.ico
-        not path /manifest.json
-        not path /robots.txt
-        not path /vite.svg
-    }
-    waf @protected {
-        log_file /var/log/caddy/waf_lan.log
-        block_mode true
-    }
-
-    # === 5. API ===
+    # API
     handle /api* {
         reverse_proxy localhost:8081
     }
-
-    # === 6. SPA ===
-    try_files {path} {path}/ /index.html
-
-    # === 7. ROOT + FILE SERVER ===
-    root * /var/www/html
-    file_server
-
-    # === 8. COMPRESSION ===
-    encode gzip zstd
-
-    # === 9. ACCESS LOG ===
+    
+    # File statici
+    handle /assets/* {
+        root * /var/www/html
+        file_server
+        header Cache-Control "public, max-age=31536000"
+    }
+    
+    handle /favicon.ico {
+        root * /var/www/html
+        file_server
+    }
+    
+    handle /manifest.json {
+        root * /var/www/html
+        file_server
+    }
+    
+    handle /robots.txt {
+        root * /var/www/html
+        file_server
+    }
+    
+    handle /vite.svg {
+        root * /var/www/html
+        file_server
+    }
+    
+    # Resto con WAF
+    handle {
+        waf {
+            log_file /var/log/caddy/waf_lan.log
+            block_mode true
+        }
+        
+        root * /var/www/html
+        try_files {path} /index.html
+        file_server
+        
+        encode gzip zstd
+        
+        header {
+            X-Content-Type-Options "nosniff"
+            X-Frame-Options "SAMEORIGIN"
+            X-XSS-Protection "1; mode=block"
+        }
+    }
+    
     log {
         output file /var/log/caddy/access_lan_http.log {
             roll_size 100mb
