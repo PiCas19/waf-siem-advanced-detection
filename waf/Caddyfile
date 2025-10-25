@@ -55,6 +55,7 @@
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
+            api_endpoint http://localhost:8081/api/waf/event
         }
         
         root * /var/www/html
@@ -127,14 +128,15 @@
         waf {
             log_file /var/log/caddy/waf_lan.log
             block_mode true
+            api_endpoint http://localhost:8081/api/waf/event
         }
-        
+
         root * /var/www/html
         try_files {path} /index.html
         file_server
-        
+
         encode gzip zstd
-        
+
         header {
             X-Content-Type-Options "nosniff"
             X-Frame-Options "SAMEORIGIN"
@@ -142,7 +144,7 @@
             Strict-Transport-Security "max-age=31536000; includeSubDomains"
         }
     }
-    
+
     log {
         output file /var/log/caddy/access_lan_https.log {
             roll_size 100mb
@@ -194,21 +196,22 @@ http://172.16.216.10 {
         waf {
             log_file /var/log/caddy/waf_lan.log
             block_mode true
+            api_endpoint http://localhost:8081/api/waf/event
         }
-        
+
         root * /var/www/html
         try_files {path} /index.html
         file_server
-        
+
         encode gzip zstd
-        
+
         header {
             X-Content-Type-Options "nosniff"
             X-Frame-Options "SAMEORIGIN"
             X-XSS-Protection "1; mode=block"
         }
     }
-    
+
     log {
         output file /var/log/caddy/access_lan_http.log {
             roll_size 100mb
