@@ -1,4 +1,3 @@
-cat > rfi.go << 'EOF'
 package detector
 
 import (
