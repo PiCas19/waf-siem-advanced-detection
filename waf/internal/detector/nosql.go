@@ -11,29 +11,42 @@ type NoSQLInjectionDetector struct {
 
 func NewNoSQLInjectionDetector() *NoSQLInjectionDetector {
 	patterns := []string{
-		`(?i)\$where`,
-		`(?i)\$ne`,
-		`(?i)\$gt`,
-		`(?i)\$lt`,
-		`(?i)\$in`,
-		`(?i)\$or`,
-		`(?i)\$and`,
-		`(?i)\$regex`,
-		`(?i)\$set`,
-		`(?i)function\s*\(`,
-		`(?i)db\.`,
+		// MongoDB operators in JSON
+		`(?i)\{\s*["\']?\$where["\']?\s*:`,
+		`(?i)\{\s*["\']?\$ne["\']?\s*:\s*null\s*\}`,
+		`(?i)\{\s*["\']?\$gt["\']?\s*:\s*["\']?["\']?\s*\}`,
+		`(?i)\{\s*["\']?\$regex["\']?\s*:\s*["\'].*["\']`,
+		
+		// MongoDB operators in URL params
+		`\[\$ne\]=`,
+		`\[\$gt\]=`,
+		`\[\$regex\]=`,
+		`\[\$where\]=`,
+		
+		// JavaScript in queries
+		`(?i)\$where.*function`,
+		`(?i)function\s*\(\s*\)\s*\{.*return`,
+		
+		// MongoDB commands
+		`(?i)db\.[a-z]+\.(find|update|remove|drop)`,
 	}
 	
-	compiled := make([]*regexp.Regexp, len(patterns))
-	for i, p := range patterns {
-		compiled[i] = regexp.MustCompile(p)
+	compiled := make([]*regexp.Regexp, 0)
+	for _, p := range patterns {
+		re, err := regexp.Compile(p)
+		if err == nil {
+			compiled = append(compiled, re)
+		}
 	}
 	
 	return &NoSQLInjectionDetector{patterns: compiled}
 }
 
 func (d *NoSQLInjectionDetector) Detect(input string) (bool, string) {
-	if !strings.Contains(input, "$") && !strings.Contains(input, "{") {
+	// Check solo se ha operatori MongoDB
+	if !strings.Contains(input, "$") &&
+	   !strings.Contains(input, "[$") &&
+	   !strings.Contains(input, "function") {
 		return false, ""
 	}
 	

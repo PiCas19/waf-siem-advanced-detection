@@ -11,27 +11,39 @@ type XXEDetector struct {
 
 func NewXXEDetector() *XXEDetector {
 	patterns := []string{
-		`(?i)<!ENTITY`,
-		`(?i)<!DOCTYPE.*ENTITY`,
+		// DOCTYPE con ENTITY
+		`(?i)<!DOCTYPE[^>]*\[.*<!ENTITY`,
+		`(?i)<!ENTITY[^>]*SYSTEM`,
+		`(?i)<!ENTITY[^>]*PUBLIC`,
+		
+		// SYSTEM con file
 		`(?i)SYSTEM\s+["']file://`,
 		`(?i)SYSTEM\s+["']http://`,
-		`(?i)PUBLIC\s+["']`,
-		`(?i)<!ENTITY\s+%`,
+		
+		// XInclude
 		`(?i)<xi:include`,
-		`(?i)file:///etc/`,
-		`(?i)file:///var/`,
+		`(?i)xmlns:xi.*XInclude`,
+		
+		// Parameter entities
+		`(?i)<!ENTITY\s+%`,
+		`(?i)%[a-zA-Z]+;.*SYSTEM`,
 	}
 	
-	compiled := make([]*regexp.Regexp, len(patterns))
-	for i, p := range patterns {
-		compiled[i] = regexp.MustCompile(p)
+	compiled := make([]*regexp.Regexp, 0)
+	for _, p := range patterns {
+		re, err := regexp.Compile(p)
+		if err == nil {
+			compiled = append(compiled, re)
+		}
 	}
 	
 	return &XXEDetector{patterns: compiled}
 }
 
 func (d *XXEDetector) Detect(input string) (bool, string) {
-	if !strings.Contains(input, "<") {
+	// Check solo se è XML
+	if !strings.Contains(input, "<!") &&
+	   !strings.Contains(input, "<?xml") {
 		return false, ""
 	}
 	
