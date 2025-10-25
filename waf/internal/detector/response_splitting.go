@@ -2,7 +2,6 @@ package detector
 
 import (
 	"regexp"
-	"strings"
 )
 
 // ResponseSplittingDetector detects HTTP Response Splitting / CRLF Injection attacks
