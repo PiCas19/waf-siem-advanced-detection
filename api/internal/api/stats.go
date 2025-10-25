@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -26,9 +27,13 @@ var (
 func WAFEventHandler(c *gin.Context) {
 	var event websocket.WAFEvent
 	if err := c.ShouldBindJSON(&event); err != nil {
+		fmt.Printf("[ERROR] Failed to bind JSON: %v\n", err)
+		fmt.Printf("[ERROR] Request body: %v\n", c.Request.Body)
 		c.JSON(400, gin.H{"error": "invalid json"})
 		return
 	}
+
+	fmt.Printf("[INFO] Received WAF event: IP=%s, Threat=%s, Method=%s, Path=%s\n", event.IP, event.Threat, event.Method, event.Path)
 
 	event.Timestamp = time.Now().Format("2006-01-02T15:04:05Z07:00")
 
@@ -37,6 +42,8 @@ func WAFEventHandler(c *gin.Context) {
 	stats.RequestsBlocked++
 	stats.TotalRequests++
 	stats.LastSeen = time.Now().Format("15:04:05")
+
+	fmt.Printf("[INFO] Stats updated: Threats=%d, Blocked=%d, Total=%d\n", stats.ThreatsDetected, stats.RequestsBlocked, stats.TotalRequests)
 
 	if len(stats.Recent) >= 5 {
 		stats.Recent = stats.Recent[1:]

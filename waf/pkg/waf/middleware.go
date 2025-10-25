@@ -89,7 +89,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 
 		// Send event to API backend
 		if m.APIEndpoint != "" {
-			go m.sendEventToAPI(clientIP, threat)
+			go m.sendEventToAPI(r, clientIP, threat)
 		}
 
 		// Block request if in block mode
@@ -119,23 +119,28 @@ func (m *Middleware) blockRequest(w http.ResponseWriter, threat *detector.Threat
 }
 
 // sendEventToAPI sends a threat event to the backend API
-func (m *Middleware) sendEventToAPI(clientIP string, threat *detector.Threat) {
+func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *detector.Threat) {
 	eventPayload := map[string]interface{}{
-		"ip":        clientIP,
-		"type":      threat.Type,
-		"payload":   threat.Payload,
-		"timestamp": time.Now().Format(time.RFC3339),
+		"ip":         clientIP,
+		"threat":     threat.Type,
+		"method":     r.Method,
+		"path":       r.URL.Path,
+		"query":      r.URL.RawQuery,
+		"user_agent": r.UserAgent(),
+		"timestamp":  time.Now().Format(time.RFC3339),
 	}
 
 	jsonData, err := json.Marshal(eventPayload)
 	if err != nil {
-		fmt.Printf("Error marshaling event: %v\n", err)
+		fmt.Printf("[ERROR] WAF: Error marshaling event: %v\n", err)
 		return
 	}
 
+	fmt.Printf("[INFO] WAF: Sending event to %s: %s\n", m.APIEndpoint, string(jsonData))
+
 	req, err := http.NewRequest("POST", m.APIEndpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		fmt.Printf("Error creating request: %v\n", err)
+		fmt.Printf("[ERROR] WAF: Error creating request: %v\n", err)
 		return
 	}
 
@@ -143,13 +148,15 @@ func (m *Middleware) sendEventToAPI(clientIP string, threat *detector.Threat) {
 
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		fmt.Printf("Error sending event to API: %v\n", err)
+		fmt.Printf("[ERROR] WAF: Error sending event to API: %v\n", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("API returned non-OK status: %d\n", resp.StatusCode)
+		fmt.Printf("[ERROR] WAF: API returned non-OK status: %d\n", resp.StatusCode)
+	} else {
+		fmt.Printf("[INFO] WAF: Event sent successfully (HTTP %d)\n", resp.StatusCode)
 	}
 }
 
