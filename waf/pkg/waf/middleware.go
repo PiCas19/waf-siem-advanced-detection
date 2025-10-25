@@ -1,9 +1,12 @@
 package waf
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -21,12 +24,14 @@ func init() {
 
 // Middleware implements WAF functionality for Caddy
 type Middleware struct {
-	RulesFile string `json:"rules_file,omitempty"`
-	LogFile   string `json:"log_file,omitempty"`
-	BlockMode bool   `json:"block_mode,omitempty"`
+	RulesFile  string `json:"rules_file,omitempty"`
+	LogFile    string `json:"log_file,omitempty"`
+	BlockMode  bool   `json:"block_mode,omitempty"`
+	APIEndpoint string `json:"api_endpoint,omitempty"`
 
 	detector *detector.Detector
 	logger   *logger.Logger
+	httpClient *http.Client
 }
 
 // CaddyModule returns the Caddy module information
@@ -51,6 +56,11 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		m.logger = l
 	}
 
+	// Initialize HTTP client for sending events to API
+	m.httpClient = &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
 	return nil
 }
 
@@ -60,19 +70,26 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	threat := m.detector.Inspect(r)
 
 	if threat != nil {
+		clientIP := getClientIP(r)
+
 		// Log the threat
 		if m.logger != nil {
 			entry := logger.LogEntry{
 				ThreatType:  threat.Type,
 				Severity:    threat.Severity,
 				Description: threat.Description,
-				ClientIP:    getClientIP(r),
+				ClientIP:    clientIP,
 				Method:      r.Method,
 				URL:         r.URL.String(),
 				UserAgent:   r.UserAgent(),
 				Payload:     threat.Payload,
 			}
 			m.logger.Log(entry)
+		}
+
+		// Send event to API backend
+		if m.APIEndpoint != "" {
+			go m.sendEventToAPI(clientIP, threat)
 		}
 
 		// Block request if in block mode
@@ -99,6 +116,41 @@ func (m *Middleware) blockRequest(w http.ResponseWriter, threat *detector.Threat
 
 	w.Write([]byte(response))
 	return nil
+}
+
+// sendEventToAPI sends a threat event to the backend API
+func (m *Middleware) sendEventToAPI(clientIP string, threat *detector.Threat) {
+	eventPayload := map[string]interface{}{
+		"ip":        clientIP,
+		"type":      threat.Type,
+		"payload":   threat.Payload,
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+
+	jsonData, err := json.Marshal(eventPayload)
+	if err != nil {
+		fmt.Printf("Error marshaling event: %v\n", err)
+		return
+	}
+
+	req, err := http.NewRequest("POST", m.APIEndpoint, bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Printf("Error creating request: %v\n", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := m.httpClient.Do(req)
+	if err != nil {
+		fmt.Printf("Error sending event to API: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("API returned non-OK status: %d\n", resp.StatusCode)
+	}
 }
 
 // getClientIP extracts the real client IP from the request
@@ -138,6 +190,10 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 				m.BlockMode = mode == "true"
+			case "api_endpoint":
+				if !d.Args(&m.APIEndpoint) {
+					return d.ArgErr()
+				}
 			default:
 				return d.Errf("unknown subdirective: %s", d.Val())
 			}
