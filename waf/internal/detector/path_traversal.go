@@ -11,26 +11,46 @@ type PathTraversalDetector struct {
 
 func NewPathTraversalDetector() *PathTraversalDetector {
 	patterns := []string{
-		`\.\./`,
-		`\.\.\\`,
+		// Multiple traversal
+		`\.\./\.\./`,
+		`\.\.\\\.\.\\`,
+		
+		// Encoded
 		`%2e%2e/`,
 		`%252e%252e/`,
 		`%c0%ae%c0%ae/`,
-		`\\\\`,
-		`//`,
-		`%00`,
+		
+		// Absolute paths to sensitive locations
+		`^/etc/`,
+		`^/proc/`,
+		`^c:\\windows`,
+		
+		// Mixed encodings
+		`%2e\./`,
+		`\.%2e/`,
 	}
 	
-	compiled := make([]*regexp.Regexp, len(patterns))
-	for i, p := range patterns {
-		compiled[i] = regexp.MustCompile(p)
+	compiled := make([]*regexp.Regexp, 0)
+	for _, p := range patterns {
+		re, err := regexp.Compile(p)
+		if err == nil {
+			compiled = append(compiled, re)
+		}
 	}
 	
 	return &PathTraversalDetector{patterns: compiled}
 }
 
 func (d *PathTraversalDetector) Detect(input string) (bool, string) {
-	if !strings.Contains(input, "..") && !strings.Contains(input, "%2e") && !strings.Contains(input, "\\") {
+	// Check solo se ha traversal
+	if !strings.Contains(input, "..") &&
+	   !strings.Contains(input, "%2e") &&
+	   !strings.Contains(input, "%252e") {
+		return false, ""
+	}
+	
+	// Single ../ might be legitimate
+	if strings.Count(input, "../") == 1 && len(input) < 20 {
 		return false, ""
 	}
 	

@@ -11,18 +11,27 @@ type PrototypePollutionDetector struct {
 
 func NewPrototypePollutionDetector() *PrototypePollutionDetector {
 	patterns := []string{
-		`__proto__`,
-		`constructor\.prototype`,
-		`\.prototype\.`,
-		`\["prototype"\]`,
-		`\['prototype'\]`,
-		`\["__proto__"\]`,
-		`\['__proto__'\]`,
+		// __proto__ access
+		`(?i)__proto__\[`,
+		`(?i)__proto__\.`,
+		`(?i)\["__proto__"\]`,
+		`(?i)\['__proto__'\]`,
+		
+		// constructor.prototype
+		`(?i)constructor\[["']prototype["']\]`,
+		`(?i)constructor\.prototype\.`,
+		
+		// In JSON
+		`(?i)\{\s*["']__proto__["']\s*:`,
+		`(?i)\{\s*["']constructor["']\s*:.*["']prototype["']`,
 	}
 	
-	compiled := make([]*regexp.Regexp, len(patterns))
-	for i, p := range patterns {
-		compiled[i] = regexp.MustCompile(`(?i)` + p)
+	compiled := make([]*regexp.Regexp, 0)
+	for _, p := range patterns {
+		re, err := regexp.Compile(p)
+		if err == nil {
+			compiled = append(compiled, re)
+		}
 	}
 	
 	return &PrototypePollutionDetector{patterns: compiled}
@@ -30,7 +39,10 @@ func NewPrototypePollutionDetector() *PrototypePollutionDetector {
 
 func (d *PrototypePollutionDetector) Detect(input string) (bool, string) {
 	inputLower := strings.ToLower(input)
-	if !strings.Contains(inputLower, "proto") && !strings.Contains(inputLower, "constructor") {
+	
+	// Check solo se ha indicatori
+	if !strings.Contains(inputLower, "proto") &&
+	   !strings.Contains(inputLower, "constructor") {
 		return false, ""
 	}
 	
