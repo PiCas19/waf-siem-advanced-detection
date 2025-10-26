@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import Stats from './dashboard/Stats'
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth()
@@ -94,25 +95,7 @@ const Dashboard: React.FC = () => {
         {activeTab === 'stats' && (
           <div>
             <h2 className="text-2xl font-bold mb-6">Dashboard Statistics</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                <h3 className="text-lg font-semibold mb-2 text-gray-300">Threats Detected</h3>
-                <p className="text-3xl font-bold text-red-500">0</p>
-                <p className="text-sm text-gray-400 mt-2">In the last 24 hours</p>
-              </div>
-
-              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                <h3 className="text-lg font-semibold mb-2 text-gray-300">Requests Blocked</h3>
-                <p className="text-3xl font-bold text-yellow-500">0</p>
-                <p className="text-sm text-gray-400 mt-2">Total blocked requests</p>
-              </div>
-
-              <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-                <h3 className="text-lg font-semibold mb-2 text-gray-300">Total Requests</h3>
-                <p className="text-3xl font-bold text-green-500">0</p>
-                <p className="text-sm text-gray-400 mt-2">Processed today</p>
-              </div>
-            </div>
+            <Stats />
 
             <div className="mt-8 bg-gray-800 p-6 rounded-lg border border-gray-700">
               <h3 className="text-xl font-semibold mb-4">Recent Alerts</h3>
