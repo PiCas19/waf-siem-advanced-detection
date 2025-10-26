@@ -39,11 +39,13 @@ func WAFEventHandler(c *gin.Context) {
 
 	statsMu.Lock()
 	stats.ThreatsDetected++
-	stats.RequestsBlocked++
+	if event.Blocked {
+		stats.RequestsBlocked++
+	}
 	stats.TotalRequests++
 	stats.LastSeen = time.Now().Format("15:04:05")
 
-	fmt.Printf("[INFO] Stats updated: Threats=%d, Blocked=%d, Total=%d\n", stats.ThreatsDetected, stats.RequestsBlocked, stats.TotalRequests)
+	fmt.Printf("[INFO] Stats updated: Threats=%d, Blocked=%d, Total=%d (Blocked=%v)\n", stats.ThreatsDetected, stats.RequestsBlocked, stats.TotalRequests, event.Blocked)
 
 	if len(stats.Recent) >= 5 {
 		stats.Recent = stats.Recent[1:]
