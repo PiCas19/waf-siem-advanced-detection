@@ -1,16 +1,5 @@
 import { useState } from 'react';
-
-interface WAFRule {
-  id: string;
-  name: string;
-  pattern: string;
-  description: string;
-  threatType: string;
-  mode: 'block' | 'detect';
-  enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+import { WAFRule, RuleTestResult } from '../../types/waf';
 
 interface RuleTestProps {
   rule?: WAFRule;
@@ -18,10 +7,7 @@ interface RuleTestProps {
 
 export default function RuleTest({ rule }: RuleTestProps) {
   const [testInput, setTestInput] = useState('');
-  const [testResult, setTestResult] = useState<{
-    matched: boolean;
-    message: string;
-  } | null>(null);
+  const [testResult, setTestResult] = useState<RuleTestResult | null>(null);
   const [testError, setTestError] = useState('');
 
   const handleTest = () => {

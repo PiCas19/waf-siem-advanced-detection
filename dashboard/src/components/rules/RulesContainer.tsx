@@ -3,36 +3,7 @@ import AddRule from './AddRule';
 import RuleEditor from './RuleEditor';
 import RulesList from './RulesList';
 import RuleTest from './RuleTest';
-
-interface WAFRule {
-  id: string;
-  name: string;
-  pattern?: string;
-  description: string;
-  threatType?: string;
-  type?: string;
-  mode?: 'block' | 'detect';
-  action?: string;
-  enabled: boolean;
-  createdAt?: string;
-  created_at?: string;
-  updatedAt?: string;
-  updated_at?: string;
-  severity?: string;
-  examples?: string[];
-  is_default?: boolean;
-  isDefault?: boolean;
-}
-
-interface RulesResponse {
-  default_rules: WAFRule[];
-  defaultRules: WAFRule[];
-  custom_rules: WAFRule[];
-  customRules: WAFRule[];
-  rules?: WAFRule[];
-  total_rules?: number;
-  totalRules?: number;
-}
+import { WAFRule, RulesResponse } from '../../types/waf';
 
 export default function RulesContainer() {
   const [defaultRules, setDefaultRules] = useState<WAFRule[]>([]);
