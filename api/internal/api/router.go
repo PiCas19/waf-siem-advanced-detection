@@ -18,7 +18,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		public.POST("/auth/login", authHandler.Login)
 		public.POST("/auth/register", authHandler.Register)
 		public.POST("/auth/verify-otp", authHandler.VerifyOTPLogin)
-		public.POST("/waf/event", WAFEventHandler)
+		public.POST("/waf/event", NewWAFEventHandler(db))
 	}
 
 	protected := r.Group("/api")
@@ -28,14 +28,14 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 		rules := protected.Group("/rules")
 		{
-			rules.GET("", GetRules)
-			rules.POST("", CreateRule)
-			rules.PUT("/:id", UpdateRule)
-			rules.DELETE("/:id", DeleteRule)
-			rules.PATCH("/:id/toggle", ToggleRule)
+			rules.GET("", NewGetRulesHandler(db))
+			rules.POST("", NewCreateRuleHandler(db))
+			rules.PUT("/:id", NewUpdateRuleHandler(db))
+			rules.DELETE("/:id", NewDeleteRuleHandler(db))
+			rules.PATCH("/:id/toggle", NewToggleRuleHandler(db))
 		}
 
-		protected.GET("/logs", GetLogs)
+		protected.GET("/logs", NewGetLogsHandler(db))
 		protected.GET("/blocklist", GetBlocklist)
 		protected.POST("/blocklist", BlockIP)
 		protected.DELETE("/blocklist/:ip", UnblockIP)

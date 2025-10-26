@@ -128,6 +128,7 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 		"query":      r.URL.RawQuery,
 		"user_agent": r.UserAgent(),
 		"timestamp":  time.Now().Format(time.RFC3339),
+		"blocked":    m.BlockMode,
 	}
 
 	jsonData, err := json.Marshal(eventPayload)
