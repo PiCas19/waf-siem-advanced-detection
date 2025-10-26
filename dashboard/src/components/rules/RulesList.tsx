@@ -1,16 +1,5 @@
 import { useState, useEffect } from 'react';
-
-interface WAFRule {
-  id: string;
-  name: string;
-  pattern: string;
-  description: string;
-  threatType: string;
-  mode: 'block' | 'detect';
-  enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+import { WAFRule } from '../../types/waf';
 
 interface RulesListProps {
   defaultRules?: WAFRule[];
