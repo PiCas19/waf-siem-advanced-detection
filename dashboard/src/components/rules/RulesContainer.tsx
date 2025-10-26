@@ -11,7 +11,7 @@ export default function RulesContainer() {
   const [view, setView] = useState<'list' | 'add' | 'edit'>('list');
   const [selectedRule, setSelectedRule] = useState<WAFRule | null>(null);
   const [editingRule, setEditingRule] = useState<WAFRule | null>(null);
-  const [ruleForTest, setRuleForTest] = useState<WAFRule | null>(null);
+  const [ruleForTest, setRuleForTest] = useState<WAFRule | undefined>(undefined);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
 
@@ -159,7 +159,7 @@ export default function RulesContainer() {
         <AddRule
           onRuleAdded={handleAddRule}
           onCancel={() => setView('list')}
-          allRules={rules}
+          allRules={customRules}
         />
       )}
 
@@ -172,7 +172,7 @@ export default function RulesContainer() {
             setView('list');
             setEditingRule(null);
           }}
-          allRules={rules}
+          allRules={customRules}
         />
       )}
 

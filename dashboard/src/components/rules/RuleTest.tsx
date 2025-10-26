@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { WAFRule, RuleTestResult, isTestableRule } from '../../types/waf';
 
 interface RuleTestProps {
-  rule?: WAFRule;
+  rule?: WAFRule | null;
 }
 
 export default function RuleTest({ rule }: RuleTestProps) {
