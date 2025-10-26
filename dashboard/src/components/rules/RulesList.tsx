@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { WAFRule } from '../../types/waf';
+import { WAFRule, getCreatedDate } from '../../types/waf';
 
 interface RulesListProps {
   defaultRules?: WAFRule[];
@@ -242,7 +242,7 @@ export default function RulesList({
                         </button>
                       </td>
                       <td className="py-3 px-4 text-gray-400 text-xs">
-                        {new Date(rule.created_at || rule.createdAt || '').toLocaleDateString('it-IT')}
+                        {getCreatedDate(rule).split(' ')[0]}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex justify-center gap-2">
