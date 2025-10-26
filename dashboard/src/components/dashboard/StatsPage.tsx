@@ -31,6 +31,7 @@ const StatsPage: React.FC = () => {
   const [timeFilter, setTimeFilter] = useState<'1h' | '24h' | '7d'>('1h');
   const [threatFilter, setThreatFilter] = useState<string>('all');
   const [filteredAlerts, setFilteredAlerts] = useState<WAFEvent[]>([]);
+  const [blockingIP, setBlockingIP] = useState<string | null>(null);
 
   // Carica i dati iniziali
   useEffect(() => {
@@ -137,8 +138,25 @@ const StatsPage: React.FC = () => {
     ));
   }, [recentAlerts, timeFilter, threatFilter]);
 
+  // Blocca un IP
+  const handleBlockIP = async (ip: string) => {
+    setBlockingIP(ip);
+    try {
+      // TODO: Implementare API call per bloccare l'IP
+      console.log('Blocking IP:', ip);
+      // await blockIP(ip);
+      setTimeout(() => setBlockingIP(null), 1000);
+    } catch (error) {
+      console.error('Failed to block IP:', error);
+      setBlockingIP(null);
+    }
+  };
+
   const blockRate = stats.total_requests > 0 ? (stats.requests_blocked / stats.total_requests * 100).toFixed(1) : '0';
   const detectionRate = stats.total_requests > 0 ? (stats.threats_detected / stats.total_requests * 100).toFixed(1) : '0';
+
+  // Get unique threats per timeframe
+  const uniqueThreats = Array.from(new Set(filteredAlerts.map(a => a.threat)));
 
   return (
     <div className="space-y-8">
@@ -184,7 +202,18 @@ const StatsPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Threats Over Time */}
         <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Threats Timeline</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-white">Threats Timeline</h2>
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value as any)}
+              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="1h">Last 1 hour</option>
+              <option value="24h">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
+            </select>
+          </div>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={timelineData && timelineData.length > 0 ? timelineData : []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -237,39 +266,46 @@ const StatsPage: React.FC = () => {
         )}
       </div>
 
-      {/* Threat Types Chart */}
-      {threatTypeData && threatTypeData.length > 0 && (
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Threat Types Distribution</h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={threatTypeData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis dataKey="name" stroke="#9ca3af" style={{ fontSize: '12px' }} />
-            <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
-            <Tooltip
-              contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-              labelStyle={{ color: '#f3f4f6' }}
-            />
-            <Legend />
-            <Bar dataKey="value" fill="#3b82f6" name="Total Detected" />
-            <Bar dataKey="blocked" fill="#ef4444" name="Blocked" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      )}
-
-      {/* Recent Alerts */}
-      {filteredAlerts.length > 0 && (
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-semibold text-white">Recent Alerts</h2>
-          <p className="text-sm text-gray-400">{filteredAlerts.length} alerts</p>
+      {/* Threat Types & Recent Threats */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Threat Types Chart */}
+        {threatTypeData && threatTypeData.length > 0 && (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-white">Threat Types Distribution</h2>
+            <select
+              value={threatFilter}
+              onChange={(e) => setThreatFilter(e.target.value)}
+              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="all">All Types</option>
+              {uniqueThreats.map(threat => (
+                <option key={threat} value={threat}>{threat}</option>
+              ))}
+            </select>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={threatTypeData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="name" stroke="#9ca3af" style={{ fontSize: '12px' }} />
+              <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                labelStyle={{ color: '#f3f4f6' }}
+              />
+              <Legend />
+              <Bar dataKey="value" fill="#3b82f6" name="Total Detected" />
+              <Bar dataKey="blocked" fill="#ef4444" name="Blocked" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
+        )}
 
-        {/* Filters */}
-        <div className="flex gap-4 mb-6 flex-wrap">
-          <div>
-            <label className="text-sm text-gray-400 block mb-2">Timeframe</label>
+        {/* Recent Threats Table */}
+        {filteredAlerts.length > 0 && (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-white">Recent Threats</h2>
             <select
               value={timeFilter}
               onChange={(e) => setTimeFilter(e.target.value as any)}
@@ -281,22 +317,78 @@ const StatsPage: React.FC = () => {
             </select>
           </div>
 
-          <div>
-            <label className="text-sm text-gray-400 block mb-2">Threat Type</label>
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {filteredAlerts.slice(0, 10).map((alert, idx) => (
+              <div key={idx} className="bg-gray-700/50 border border-gray-600 rounded p-3 hover:bg-gray-700 transition">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-white">
+                      {alert.threat}
+                      {alert.blocked ? (
+                        <span className="ml-2 px-2 py-1 bg-red-500/20 text-red-300 rounded text-xs">🚫 Blocked</span>
+                      ) : (
+                        <span className="ml-2 px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs">⚠️ Detected</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {alert.method} {alert.path}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      IP: {alert.ip} | {new Date(alert.timestamp).toLocaleTimeString('it-IT')}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleBlockIP(alert.ip)}
+                    disabled={blockingIP === alert.ip || alert.blocked}
+                    className={`px-3 py-1 rounded text-xs font-medium transition ${
+                      alert.blocked
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : blockingIP === alert.ip
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-red-600 hover:bg-red-700 text-white'
+                    }`}
+                  >
+                    {blockingIP === alert.ip ? '...' : 'Block'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xs text-gray-500 mt-4">Showing {Math.min(10, filteredAlerts.length)} of {filteredAlerts.length} threats</p>
+        </div>
+        )}
+      </div>
+
+      {/* Recent Alerts Table */}
+      {filteredAlerts.length > 0 && (
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-lg font-semibold text-white">All Alerts</h2>
+          <div className="flex gap-4">
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value as any)}
+              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="1h">Last 1 hour</option>
+              <option value="24h">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
+            </select>
+
             <select
               value={threatFilter}
               onChange={(e) => setThreatFilter(e.target.value)}
               className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
             >
               <option value="all">All Types</option>
-              {Array.from(new Set(recentAlerts.map(a => a.threat))).map(threat => (
+              {uniqueThreats.map(threat => (
                 <option key={threat} value={threat}>{threat}</option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* Alerts Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
