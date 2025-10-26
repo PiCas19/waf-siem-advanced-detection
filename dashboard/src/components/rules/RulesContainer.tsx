@@ -7,17 +7,36 @@ import RuleTest from './RuleTest';
 interface WAFRule {
   id: string;
   name: string;
-  pattern: string;
+  pattern?: string;
   description: string;
-  threatType: string;
-  mode: 'block' | 'detect';
+  threatType?: string;
+  type?: string;
+  mode?: 'block' | 'detect';
+  action?: string;
   enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+  severity?: string;
+  examples?: string[];
+  is_default?: boolean;
+  isDefault?: boolean;
+}
+
+interface RulesResponse {
+  default_rules: WAFRule[];
+  defaultRules: WAFRule[];
+  custom_rules: WAFRule[];
+  customRules: WAFRule[];
+  rules?: WAFRule[];
+  total_rules?: number;
+  totalRules?: number;
 }
 
 export default function RulesContainer() {
-  const [rules, setRules] = useState<WAFRule[]>([]);
+  const [defaultRules, setDefaultRules] = useState<WAFRule[]>([]);
+  const [customRules, setCustomRules] = useState<WAFRule[]>([]);
   const [view, setView] = useState<'list' | 'add' | 'edit'>('list');
   const [selectedRule, setSelectedRule] = useState<WAFRule | null>(null);
   const [editingRule, setEditingRule] = useState<WAFRule | null>(null);
@@ -38,25 +57,38 @@ export default function RulesContainer() {
           'Authorization': `Bearer ${token}`,
         },
       });
-      const data = await response.json();
-      setRules(data.rules || []);
+      const data: RulesResponse = await response.json();
+
+      // Supporta sia snake_case che camelCase
+      const defaults = data.default_rules || data.defaultRules || [];
+      const customs = data.custom_rules || data.customRules || data.rules || [];
+
+      setDefaultRules(defaults);
+      setCustomRules(customs);
     } catch (error) {
       console.error('Failed to load rules:', error);
     }
   };
 
   const handleAddRule = (rule: WAFRule) => {
-    setRules([...rules, rule]);
+    setCustomRules([...customRules, rule]);
     setView('list');
   };
 
   const handleRuleUpdated = (updatedRule: WAFRule) => {
-    setRules(rules.map(r => (r.id === updatedRule.id ? updatedRule : r)));
+    setCustomRules(customRules.map(r => (r.id === updatedRule.id ? updatedRule : r)));
     setView('list');
     setEditingRule(null);
   };
 
   const handleDeleteRule = async (id: string) => {
+    // Non permettere di eliminare le regole di default
+    const isDefault = defaultRules.some(r => r.id === id);
+    if (isDefault) {
+      alert('Non è possibile eliminare le regole di default');
+      return;
+    }
+
     if (confirm('Sei sicuro di voler eliminare questa regola?')) {
       const token = localStorage.getItem('authToken');
 
@@ -69,7 +101,7 @@ export default function RulesContainer() {
         });
 
         if (response.ok) {
-          setRules(rules.filter(r => r.id !== id));
+          setCustomRules(customRules.filter(r => r.id !== id));
           setShowDetailsModal(false);
           alert('Regola eliminata con successo');
         }
@@ -81,6 +113,13 @@ export default function RulesContainer() {
   };
 
   const handleToggleRule = async (id: string) => {
+    // Non permettere di modificare le regole di default
+    const isDefault = defaultRules.some(r => r.id === id);
+    if (isDefault) {
+      alert('Non è possibile modificare le regole di default');
+      return;
+    }
+
     const token = localStorage.getItem('authToken');
 
     try {
@@ -93,8 +132,8 @@ export default function RulesContainer() {
 
       if (response.ok) {
         const data = await response.json();
-        setRules(
-          rules.map(r =>
+        setCustomRules(
+          customRules.map(r =>
             r.id === id
               ? {
                   ...r,
@@ -169,7 +208,8 @@ export default function RulesContainer() {
       {/* Rules List View */}
       {view === 'list' && (
         <RulesList
-          rules={rules}
+          defaultRules={defaultRules}
+          customRules={customRules}
           onEdit={handleEditRule}
           onDelete={handleDeleteRule}
           onToggle={handleToggleRule}
