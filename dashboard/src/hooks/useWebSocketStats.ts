@@ -62,15 +62,21 @@ export function useWebSocketStats() {
         console.log('[WebSocket] Received message:', message);
 
         // Se ricevi un evento WAF, aggiorna gli stats
-        if (message.type === 'waf_event' || message.threat) {
-          console.log('[WebSocket] Processing WAF event, blocked:', message.data?.blocked || message.blocked);
+        if (message.type === 'waf_event' && message.data) {
+          const wafEvent = message.data;
+          console.log('[WebSocket] Processing WAF event:', {
+            threat: wafEvent.threat,
+            blocked: wafEvent.blocked,
+            ip: wafEvent.ip,
+          });
+
           setStats((prevStats) => ({
             threats_detected: prevStats.threats_detected + 1,
-            requests_blocked: prevStats.requests_blocked + ((message.data?.blocked || message.blocked) ? 1 : 0),
+            requests_blocked: prevStats.requests_blocked + (wafEvent.blocked ? 1 : 0),
             total_requests: prevStats.total_requests + 1,
           }));
         } else {
-          console.log('[WebSocket] Ignoring message (not a waf_event)');
+          console.log('[WebSocket] Ignoring message - type:', message.type, 'has data:', !!message.data);
         }
       } catch (error) {
         console.error('[WebSocket] Failed to parse message:', error);
