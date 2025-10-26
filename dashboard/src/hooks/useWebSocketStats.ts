@@ -19,14 +19,24 @@ export function useWebSocketStats() {
   useEffect(() => {
     const loadInitialStats = async () => {
       try {
+        const token = localStorage.getItem('authToken');
+        console.log('[Stats Hook] Loading initial stats - Token exists:', !!token);
+
         const data = await fetchStats();
+        console.log('[Stats Hook] Stats loaded successfully:', data);
+
         setStats({
           threats_detected: data.threats_detected || 0,
           requests_blocked: data.requests_blocked || 0,
           total_requests: data.total_requests || 0,
         });
       } catch (error) {
-        console.error('Failed to load initial stats:', error);
+        console.error('[Stats Hook] Failed to load initial stats:', error);
+        console.error('[Stats Hook] Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          status: (error as any)?.response?.status,
+          statusText: (error as any)?.response?.statusText,
+        });
       }
     };
 
@@ -36,37 +46,44 @@ export function useWebSocketStats() {
   // Setup WebSocket per aggiornamenti real-time
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    console.log('[WebSocket] Attempting to connect to:', wsUrl);
+
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      console.log('[WebSocket] Connected to stats stream');
+      console.log('[WebSocket] ✅ Connected to stats stream');
       setIsConnected(true);
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
+        console.log('[WebSocket] Received message:', message);
 
         // Se ricevi un evento WAF, aggiorna gli stats
         if (message.type === 'waf_event' || message.threat) {
+          console.log('[WebSocket] Processing WAF event, blocked:', message.data?.blocked || message.blocked);
           setStats((prevStats) => ({
             threats_detected: prevStats.threats_detected + 1,
-            requests_blocked: prevStats.requests_blocked + (message.blocked ? 1 : 0),
+            requests_blocked: prevStats.requests_blocked + ((message.data?.blocked || message.blocked) ? 1 : 0),
             total_requests: prevStats.total_requests + 1,
           }));
+        } else {
+          console.log('[WebSocket] Ignoring message (not a waf_event)');
         }
       } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
+        console.error('[WebSocket] Failed to parse message:', error);
       }
     };
 
     ws.onerror = (error) => {
-      console.error('[WebSocket] Error:', error);
+      console.error('[WebSocket] ❌ Error:', error);
       setIsConnected(false);
     };
 
     ws.onclose = () => {
-      console.log('[WebSocket] Disconnected from stats stream');
+      console.log('[WebSocket] 🔴 Disconnected from stats stream');
       setIsConnected(false);
     };
 
