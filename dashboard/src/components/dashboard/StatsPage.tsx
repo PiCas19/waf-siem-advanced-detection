@@ -53,57 +53,66 @@ const StatsPage: React.FC = () => {
     for (let i = 30; i >= 0; i--) {
       const time = new Date(now.getTime() - i * 60000);
       points.push({
-        time: time.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+        time: time.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00',
         threats: 0,
         blocked: 0,
       });
     }
-    setTimelineData(points);
+    setTimelineData(points.length > 0 ? points : []);
   };
 
   // Aggiorna timeline e threat types quando arrivano nuovi eventi
   useEffect(() => {
+    if (timelineData.length === 0) return;
+
     setTimelineData((prevData) => {
+      if (!prevData || prevData.length === 0) return prevData;
+
       const newData = [...prevData];
       const now = new Date();
-      const timeStr = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+      const timeStr = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00';
 
       // Trova o crea punto per l'ora corrente
       let lastPoint = newData[newData.length - 1];
+      if (!lastPoint) return prevData;
+
       if (lastPoint.time !== timeStr) {
         newData.shift(); // Rimuovi il più vecchio
         newData.push({
           time: timeStr,
-          threats: lastPoint.threats,
-          blocked: lastPoint.blocked,
+          threats: lastPoint?.threats ?? 0,
+          blocked: lastPoint?.blocked ?? 0,
         });
         lastPoint = newData[newData.length - 1];
       }
 
       // Incrementa i valori
-      lastPoint.threats = stats.threats_detected;
-      lastPoint.blocked = stats.requests_blocked;
+      if (lastPoint) {
+        lastPoint.threats = Math.max(lastPoint.threats, stats.threats_detected);
+        lastPoint.blocked = Math.max(lastPoint.blocked, stats.requests_blocked);
+      }
 
       return newData;
     });
 
     // Aggiorna threat types
-    const threatCounts = (recentAlerts || []).reduce((acc, alert) => {
-      const existing = acc.find(t => t.name === alert.threat);
+    const threatCounts = (recentAlerts && recentAlerts.length > 0 ? recentAlerts : []).reduce((acc: any[], alert) => {
+      if (!alert || !alert.threat) return acc;
+      const existing = acc.find(t => t && t.name === alert.threat);
       if (existing) {
-        existing.value++;
-        existing.blocked += alert.blocked ? 1 : 0;
+        existing.value = (existing.value || 0) + 1;
+        existing.blocked = (existing.blocked || 0) + (alert.blocked ? 1 : 0);
       } else {
         acc.push({
-          name: alert.threat,
+          name: alert.threat || 'Unknown',
           value: 1,
           blocked: alert.blocked ? 1 : 0,
         });
       }
       return acc;
-    }, [] as any[]);
+    }, []);
 
-    setThreatTypeData(threatCounts);
+    setThreatTypeData(threatCounts && threatCounts.length > 0 ? threatCounts : []);
   }, [stats, recentAlerts]);
 
   // Applica filtri agli alert
@@ -177,7 +186,7 @@ const StatsPage: React.FC = () => {
         <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
           <h2 className="text-lg font-semibold text-white mb-4">Threats Timeline</h2>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={timelineData}>
+            <LineChart data={timelineData && timelineData.length > 0 ? timelineData : []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="time" stroke="#9ca3af" style={{ fontSize: '12px' }} />
               <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
@@ -193,14 +202,15 @@ const StatsPage: React.FC = () => {
         </div>
 
         {/* Block Rate Pie Chart */}
+        {stats.total_requests > 0 && (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <h2 className="text-lg font-semibold text-white mb-4">Block Rate</h2>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
                 data={[
-                  { name: 'Blocked', value: parseInt(blockRate) },
-                  { name: 'Allowed', value: 100 - parseInt(blockRate) }
+                  { name: 'Blocked', value: parseInt(blockRate) || 0 },
+                  { name: 'Allowed', value: Math.max(0, 100 - (parseInt(blockRate) || 0)) }
                 ]}
                 cx="50%"
                 cy="50%"
@@ -224,9 +234,11 @@ const StatsPage: React.FC = () => {
             <p className="text-sm text-gray-400">Blocked Rate</p>
           </div>
         </div>
+        )}
       </div>
 
       {/* Threat Types Chart */}
+      {threatTypeData && threatTypeData.length > 0 && (
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <h2 className="text-lg font-semibold text-white mb-4">Threat Types Distribution</h2>
         <ResponsiveContainer width="100%" height={300}>
@@ -244,8 +256,10 @@ const StatsPage: React.FC = () => {
           </BarChart>
         </ResponsiveContainer>
       </div>
+      )}
 
       {/* Recent Alerts */}
+      {filteredAlerts.length > 0 && (
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-semibold text-white">Recent Alerts</h2>
@@ -283,54 +297,48 @@ const StatsPage: React.FC = () => {
         </div>
 
         {/* Alerts Table */}
-        {filteredAlerts.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-700">
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Timestamp</th>
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">IP</th>
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Method</th>
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Path</th>
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Threat Type</th>
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-700">
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">Timestamp</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">IP</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">Method</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">Path</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">Threat Type</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAlerts.map((alert, idx) => (
+                <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700/50 transition">
+                  <td className="py-3 px-4 text-gray-300 text-xs">
+                    {new Date(alert.timestamp).toLocaleString('it-IT')}
+                  </td>
+                  <td className="py-3 px-4 text-gray-300">{alert.ip}</td>
+                  <td className="py-3 px-4">
+                    <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs font-medium">
+                      {alert.method}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-gray-300 max-w-xs truncate" title={alert.path}>
+                    {alert.path}
+                  </td>
+                  <td className="py-3 px-4 text-gray-300">{alert.threat}</td>
+                  <td className="py-3 px-4">
+                    {alert.blocked ? (
+                      <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium">🚫 Blocked</span>
+                    ) : (
+                      <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium">⚠️ Detected</span>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredAlerts.map((alert, idx) => (
-                  <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700/50 transition">
-                    <td className="py-3 px-4 text-gray-300 text-xs">
-                      {new Date(alert.timestamp).toLocaleString('it-IT')}
-                    </td>
-                    <td className="py-3 px-4 text-gray-300">{alert.ip}</td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs font-medium">
-                        {alert.method}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-gray-300 max-w-xs truncate" title={alert.path}>
-                      {alert.path}
-                    </td>
-                    <td className="py-3 px-4 text-gray-300">{alert.threat}</td>
-                    <td className="py-3 px-4">
-                      {alert.blocked ? (
-                        <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium">🚫 Blocked</span>
-                      ) : (
-                        <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium">⚠️ Detected</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-400">No alerts found</p>
-            <p className="text-sm text-gray-500 mt-2">No security incidents detected in the selected timeframe</p>
-          </div>
-        )}
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
+      )}
     </div>
   );
 };
