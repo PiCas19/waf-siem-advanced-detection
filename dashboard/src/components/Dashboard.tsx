@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import Stats from './dashboard/Stats'
 import StatsPage from './dashboard/StatsPage'
 
 const Dashboard: React.FC = () => {
