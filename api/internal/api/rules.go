@@ -2,162 +2,173 @@ package api
 
 import (
 	"fmt"
-	"sync"
-	"time"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"gorm.io/gorm"
 )
 
-type WAFRule struct {
-	ID        string    `json:"id" gorm:"primaryKey"`
-	Name      string    `json:"name" gorm:"index"`
-	Pattern   string    `json:"pattern"`
-	Description string  `json:"description"`
-	ThreatType string   `json:"threat_type" gorm:"index"`
-	Mode      string    `json:"mode"` // "block" or "detect"
-	Enabled   bool      `json:"enabled" gorm:"index"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-var (
-	rulesMu sync.RWMutex
-	rules   = make([]WAFRule, 0)
-)
-
-// GetRules - Ritorna tutte le regole WAF
-func GetRules(c *gin.Context) {
-	rulesMu.RLock()
-	defer rulesMu.RUnlock()
-
-	c.JSON(200, gin.H{
-		"rules": rules,
-		"count": len(rules),
-	})
-}
-
-// CreateRule - Crea una nuova regola WAF
-func CreateRule(c *gin.Context) {
-	var rule WAFRule
-	if err := c.ShouldBindJSON(&rule); err != nil {
-		fmt.Printf("[ERROR] Failed to parse rule: %v\n", err)
-		c.JSON(400, gin.H{"error": "Invalid rule data"})
-		return
-	}
-
-	if rule.Name == "" || rule.Pattern == "" {
-		c.JSON(400, gin.H{"error": "Name and Pattern are required"})
-		return
-	}
-
-	rule.ID = fmt.Sprintf("rule_%d", time.Now().UnixNano())
-	rule.CreatedAt = time.Now()
-	rule.UpdatedAt = time.Now()
-	rule.Enabled = true
-
-	rulesMu.Lock()
-	rules = append(rules, rule)
-	rulesMu.Unlock()
-
-	fmt.Printf("[INFO] Rule created: ID=%s, Name=%s, ThreatType=%s, Mode=%s\n", rule.ID, rule.Name, rule.ThreatType, rule.Mode)
-
-	c.JSON(201, gin.H{
-		"message": "Rule created successfully",
-		"rule": rule,
-	})
-}
-
-// UpdateRule - Modifica una regola esistente
-func UpdateRule(c *gin.Context) {
-	ruleID := c.Param("id")
-
-	var updatedRule WAFRule
-	if err := c.ShouldBindJSON(&updatedRule); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid rule data"})
-		return
-	}
-
-	rulesMu.Lock()
-	defer rulesMu.Unlock()
-
-	for i, rule := range rules {
-		if rule.ID == ruleID {
-			rules[i].Name = updatedRule.Name
-			rules[i].Pattern = updatedRule.Pattern
-			rules[i].Description = updatedRule.Description
-			rules[i].ThreatType = updatedRule.ThreatType
-			rules[i].Mode = updatedRule.Mode
-			rules[i].UpdatedAt = time.Now()
-
-			fmt.Printf("[INFO] Rule updated: ID=%s, Name=%s\n", ruleID, updatedRule.Name)
-
-			c.JSON(200, gin.H{
-				"message": "Rule updated successfully",
-				"rule": rules[i],
-			})
+// GetRules - Ritorna tutte le regole WAF dal database
+func NewGetRulesHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var rules []models.Rule
+		if err := db.Find(&rules).Error; err != nil {
+			c.JSON(500, gin.H{"error": "failed to fetch rules"})
 			return
 		}
-	}
 
-	c.JSON(404, gin.H{"error": "Rule not found"})
+		c.JSON(200, gin.H{
+			"rules": rules,
+			"count": len(rules),
+		})
+	}
 }
 
-// DeleteRule - Elimina una regola
-func DeleteRule(c *gin.Context) {
-	ruleID := c.Param("id")
-
-	rulesMu.Lock()
-	defer rulesMu.Unlock()
-
-	for i, rule := range rules {
-		if rule.ID == ruleID {
-			rules = append(rules[:i], rules[i+1:]...)
-			fmt.Printf("[INFO] Rule deleted: ID=%s\n", ruleID)
-			c.JSON(200, gin.H{"message": "Rule deleted successfully"})
+// CreateRule - Crea una nuova regola WAF nel database
+func NewCreateRuleHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var rule models.Rule
+		if err := c.ShouldBindJSON(&rule); err != nil {
+			fmt.Printf("[ERROR] Failed to parse rule: %v\n", err)
+			c.JSON(400, gin.H{"error": "Invalid rule data"})
 			return
 		}
-	}
 
-	c.JSON(404, gin.H{"error": "Rule not found"})
-}
-
-// ToggleRule - Abilita/Disabilita una regola
-func ToggleRule(c *gin.Context) {
-	ruleID := c.Param("id")
-
-	rulesMu.Lock()
-	defer rulesMu.Unlock()
-
-	for i, rule := range rules {
-		if rule.ID == ruleID {
-			rules[i].Enabled = !rules[i].Enabled
-			rules[i].UpdatedAt = time.Now()
-
-			fmt.Printf("[INFO] Rule toggled: ID=%s, Enabled=%v\n", ruleID, rules[i].Enabled)
-
-			c.JSON(200, gin.H{
-				"message": "Rule toggled successfully",
-				"enabled": rules[i].Enabled,
-			})
+		if rule.Name == "" || rule.Pattern == "" {
+			c.JSON(400, gin.H{"error": "Name and Pattern are required"})
 			return
 		}
-	}
 
-	c.JSON(404, gin.H{"error": "Rule not found"})
+		rule.Enabled = true
+		if err := db.Create(&rule).Error; err != nil {
+			fmt.Printf("[ERROR] Failed to create rule: %v\n", err)
+			c.JSON(500, gin.H{"error": "failed to create rule"})
+			return
+		}
+
+		fmt.Printf("[INFO] Rule created: ID=%d, Name=%s, Type=%s, Action=%s\n", rule.ID, rule.Name, rule.Type, rule.Action)
+
+		c.JSON(201, gin.H{
+			"message": "Rule created successfully",
+			"rule":    rule,
+		})
+	}
 }
 
-
-// GetRulesByThreatType - Ritorna le regole per un tipo di minaccia specifico
-func GetRulesByThreatType(threatType string) []WAFRule {
-	rulesMu.RLock()
-	defer rulesMu.RUnlock()
-
-	var matchingRules []WAFRule
-	for _, rule := range rules {
-		if rule.ThreatType == threatType && rule.Enabled {
-			matchingRules = append(matchingRules, rule)
+// UpdateRule - Modifica una regola esistente nel database
+func NewUpdateRuleHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ruleID := c.Param("id")
+		id, err := strconv.ParseUint(ruleID, 10, 32)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid rule ID"})
+			return
 		}
-	}
 
+		var updatedRule models.Rule
+		if err := c.ShouldBindJSON(&updatedRule); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid rule data"})
+			return
+		}
+
+		// Update the rule
+		if err := db.Model(&models.Rule{}).Where("id = ?", uint(id)).Updates(updatedRule).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(404, gin.H{"error": "Rule not found"})
+			} else {
+				fmt.Printf("[ERROR] Failed to update rule: %v\n", err)
+				c.JSON(500, gin.H{"error": "failed to update rule"})
+			}
+			return
+		}
+
+		// Fetch the updated rule
+		var rule models.Rule
+		db.First(&rule, uint(id))
+
+		fmt.Printf("[INFO] Rule updated: ID=%d, Name=%s\n", rule.ID, rule.Name)
+
+		c.JSON(200, gin.H{
+			"message": "Rule updated successfully",
+			"rule":    rule,
+		})
+	}
+}
+
+// DeleteRule - Elimina una regola dal database
+func NewDeleteRuleHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ruleID := c.Param("id")
+		id, err := strconv.ParseUint(ruleID, 10, 32)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid rule ID"})
+			return
+		}
+
+		if err := db.Delete(&models.Rule{}, uint(id)).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(404, gin.H{"error": "Rule not found"})
+			} else {
+				fmt.Printf("[ERROR] Failed to delete rule: %v\n", err)
+				c.JSON(500, gin.H{"error": "failed to delete rule"})
+			}
+			return
+		}
+
+		fmt.Printf("[INFO] Rule deleted: ID=%s\n", ruleID)
+
+		c.JSON(200, gin.H{"message": "Rule deleted successfully"})
+	}
+}
+
+// ToggleRule - Abilita/Disabilita una regola nel database
+func NewToggleRuleHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ruleID := c.Param("id")
+		id, err := strconv.ParseUint(ruleID, 10, 32)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid rule ID"})
+			return
+		}
+
+		var rule models.Rule
+		if err := db.First(&rule, uint(id)).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(404, gin.H{"error": "Rule not found"})
+			} else {
+				fmt.Printf("[ERROR] Failed to fetch rule: %v\n", err)
+				c.JSON(500, gin.H{"error": "failed to fetch rule"})
+			}
+			return
+		}
+
+		rule.Enabled = !rule.Enabled
+		if err := db.Save(&rule).Error; err != nil {
+			fmt.Printf("[ERROR] Failed to toggle rule: %v\n", err)
+			c.JSON(500, gin.H{"error": "failed to toggle rule"})
+			return
+		}
+
+		fmt.Printf("[INFO] Rule toggled: ID=%d, Enabled=%v\n", rule.ID, rule.Enabled)
+
+		c.JSON(200, gin.H{
+			"message": "Rule toggled successfully",
+			"enabled": rule.Enabled,
+		})
+	}
+}
+
+// GetRulesByType - Ritorna le regole per un tipo di minaccia specifico
+func GetRulesByType(db *gorm.DB, threatType string) []models.Rule {
+	var matchingRules []models.Rule
+	db.Where("type = ? AND enabled = ?", threatType, true).Find(&matchingRules)
 	return matchingRules
 }
+
+// Deprecated handlers for backward compatibility
+func GetRules(c *gin.Context)     { c.JSON(400, gin.H{"error": "use NewGetRulesHandler"}) }
+func CreateRule(c *gin.Context)   { c.JSON(400, gin.H{"error": "use NewCreateRuleHandler"}) }
+func UpdateRule(c *gin.Context)   { c.JSON(400, gin.H{"error": "use NewUpdateRuleHandler"}) }
+func DeleteRule(c *gin.Context)   { c.JSON(400, gin.H{"error": "use NewDeleteRuleHandler"}) }
+func ToggleRule(c *gin.Context)   { c.JSON(400, gin.H{"error": "use NewToggleRuleHandler"}) }
