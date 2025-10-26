@@ -331,7 +331,7 @@ export default function RulesContainer() {
                 ✕
               </button>
             </div>
-            <RuleTest rule={ruleForTest || undefined} />
+            <RuleTest rule={ruleForTest} />
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setShowTestModal(false)}
