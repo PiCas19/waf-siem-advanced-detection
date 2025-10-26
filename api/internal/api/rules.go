@@ -9,19 +9,33 @@ import (
 	"gorm.io/gorm"
 )
 
-// GetRules - Ritorna tutte le regole WAF dal database
+// RulesResponse contiene sia le regole default che custom
+type RulesResponse struct {
+	DefaultRules []DefaultRule  `json:"default_rules"`
+	CustomRules  []models.Rule  `json:"custom_rules"`
+	TotalRules   int            `json:"total_rules"`
+}
+
+// GetRules - Ritorna sia le regole di default che quelle custom dal database
 func NewGetRulesHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var rules []models.Rule
-		if err := db.Find(&rules).Error; err != nil {
-			c.JSON(500, gin.H{"error": "failed to fetch rules"})
-			return
+		// Leggi regole di default
+		defaultRules := GetDefaultRules()
+
+		// Leggi regole custom dal database
+		var customRules []models.Rule
+		if err := db.Find(&customRules).Error; err != nil {
+			fmt.Printf("[ERROR] Failed to fetch custom rules: %v\n", err)
+			customRules = []models.Rule{}
 		}
 
-		c.JSON(200, gin.H{
-			"rules": rules,
-			"count": len(rules),
-		})
+		response := RulesResponse{
+			DefaultRules: defaultRules,
+			CustomRules:  customRules,
+			TotalRules:   len(defaultRules) + len(customRules),
+		}
+
+		c.JSON(200, response)
 	}
 }
 

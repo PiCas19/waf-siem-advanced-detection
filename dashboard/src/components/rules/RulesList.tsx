@@ -13,7 +13,9 @@ interface WAFRule {
 }
 
 interface RulesListProps {
-  rules: WAFRule[];
+  defaultRules?: WAFRule[];
+  customRules?: WAFRule[];
+  rules?: WAFRule[];
   onEdit: (rule: WAFRule) => void;
   onDelete: (id: string) => void;
   onToggle: (id: string) => void;
@@ -21,43 +23,73 @@ interface RulesListProps {
 }
 
 export default function RulesList({
-  rules,
+  defaultRules = [],
+  customRules = [],
+  rules = [],
   onEdit,
   onDelete,
   onToggle,
   onViewDetails,
 }: RulesListProps) {
+  // Se viene passato 'rules' per compatibilità, usalo
+  const allCustomRules = customRules.length > 0 ? customRules : rules;
+  const allDefaultRules = defaultRules;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [threatTypeFilter, setThreatTypeFilter] = useState('all');
   const [modeFilter, setModeFilter] = useState('all');
-  const [filteredRules, setFilteredRules] = useState<WAFRule[]>(rules);
+  const [filteredDefaultRules, setFilteredDefaultRules] = useState<WAFRule[]>([]);
+  const [filteredCustomRules, setFilteredCustomRules] = useState<WAFRule[]>([]);
 
   useEffect(() => {
-    let filtered = [...rules];
+    // Filtra default rules
+    let filteredDefaults = [...allDefaultRules];
 
-    // Ricerca per nome e descrizione
     if (searchTerm) {
-      filtered = filtered.filter(
+      filteredDefaults = filteredDefaults.filter(
         rule =>
           rule.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           rule.description.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
-    // Filtra per tipo di minaccia
     if (threatTypeFilter !== 'all') {
-      filtered = filtered.filter(rule => rule.threatType === threatTypeFilter);
+      filteredDefaults = filteredDefaults.filter(
+        rule => (rule.type || rule.threatType) === threatTypeFilter
+      );
     }
 
-    // Filtra per modalità
+    setFilteredDefaultRules(filteredDefaults);
+
+    // Filtra custom rules
+    let filteredCustom = [...allCustomRules];
+
+    if (searchTerm) {
+      filteredCustom = filteredCustom.filter(
+        rule =>
+          rule.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          rule.description.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (threatTypeFilter !== 'all') {
+      filteredCustom = filteredCustom.filter(
+        rule => (rule.type || rule.threatType) === threatTypeFilter
+      );
+    }
+
     if (modeFilter !== 'all') {
-      filtered = filtered.filter(rule => rule.mode === modeFilter);
+      filteredCustom = filteredCustom.filter(rule => (rule.action || rule.mode) === modeFilter);
     }
 
-    setFilteredRules(filtered);
-  }, [rules, searchTerm, threatTypeFilter, modeFilter]);
+    setFilteredCustomRules(filteredCustom);
+  }, [allCustomRules, allDefaultRules, searchTerm, threatTypeFilter, modeFilter]);
 
-  const threatTypes = Array.from(new Set(rules.map(r => r.threatType)));
+  const threatTypes = Array.from(
+    new Set(
+      [...allDefaultRules, ...allCustomRules].map(r => r.type || r.threatType || '')
+    )
+  ).filter(t => t !== '');
 
   return (
     <div className="space-y-6">
@@ -110,85 +142,154 @@ export default function RulesList({
           {/* Stato */}
           <div className="flex items-end">
             <div className="text-sm text-gray-400">
-              {filteredRules.length} regola{filteredRules.length !== 1 ? 'e' : ''}
+              {filteredDefaultRules.length + filteredCustomRules.length} regola{filteredDefaultRules.length + filteredCustomRules.length !== 1 ? 'e' : ''} (
+              {filteredDefaultRules.length} default + {filteredCustomRules.length} custom)
             </div>
           </div>
         </div>
       </div>
 
-      {/* Rules Table */}
-      {filteredRules.length > 0 && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-700">
-                <tr>
-                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Nome</th>
-                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Tipo Minaccia</th>
-                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Modalità</th>
-                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Stato</th>
-                  <th className="text-left py-3 px-4 text-gray-300 font-medium">Creata</th>
-                  <th className="text-center py-3 px-4 text-gray-300 font-medium">Azioni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRules.map((rule) => (
-                  <tr key={rule.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
-                    <td className="py-3 px-4 text-gray-300 font-medium">{rule.name}</td>
-                    <td className="py-3 px-4 text-gray-400">{rule.threatType}</td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`px-3 py-1 rounded text-xs font-medium ${
-                          rule.mode === 'block'
-                            ? 'bg-red-500/20 text-red-300'
-                            : 'bg-yellow-500/20 text-yellow-300'
-                        }`}
-                      >
-                        {rule.mode === 'block' ? '🚫 Blocca' : '🔍 Rileva'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <button
-                        onClick={() => onToggle(rule.id)}
-                        className={`px-3 py-1 rounded text-xs font-medium transition ${
-                          rule.enabled
-                            ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30'
-                            : 'bg-gray-600/50 text-gray-400 hover:bg-gray-600'
-                        }`}
-                      >
-                        {rule.enabled ? '✓ Attiva' : '✕ Disattiva'}
-                      </button>
-                    </td>
-                    <td className="py-3 px-4 text-gray-400 text-xs">
-                      {new Date(rule.createdAt).toLocaleDateString('it-IT')}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex justify-center gap-2">
-                        <button
-                          onClick={() => onViewDetails(rule)}
-                          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
-                        >
-                          📋 Dettagli
-                        </button>
-                        <button
-                          onClick={() => onEdit(rule)}
-                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
-                        >
-                          ✏️ Modifica
-                        </button>
-                        <button
-                          onClick={() => onDelete(rule.id)}
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
-                        >
-                          🗑️ Elimina
-                        </button>
-                      </div>
-                    </td>
+      {/* Default Rules Table */}
+      {filteredDefaultRules.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-white">🔒 Regole di Default (Built-in)</h2>
+          <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-700">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Nome</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Tipo Minaccia</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Severità</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Stato</th>
+                    <th className="text-center py-3 px-4 text-gray-300 font-medium">Azioni</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredDefaultRules.map((rule) => (
+                    <tr key={rule.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
+                      <td className="py-3 px-4 text-gray-300 font-medium">{rule.name}</td>
+                      <td className="py-3 px-4 text-gray-400">{rule.type}</td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`px-3 py-1 rounded text-xs font-medium ${
+                            rule.severity === 'CRITICAL'
+                              ? 'bg-red-500/20 text-red-300'
+                              : rule.severity === 'HIGH'
+                              ? 'bg-orange-500/20 text-orange-300'
+                              : 'bg-yellow-500/20 text-yellow-300'
+                          }`}
+                        >
+                          {rule.severity || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="px-3 py-1 bg-green-500/20 text-green-300 rounded text-xs font-medium">
+                          ✓ Sempre Attiva
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex justify-center">
+                          <button
+                            onClick={() => onViewDetails(rule)}
+                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
+                          >
+                            📋 Dettagli
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* Custom Rules Table */}
+      {filteredCustomRules.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-white">✏️ Regole Personalizzate</h2>
+          <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-700">
+                  <tr>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Nome</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Tipo Minaccia</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Modalità</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Stato</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Creata</th>
+                    <th className="text-center py-3 px-4 text-gray-300 font-medium">Azioni</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCustomRules.map((rule) => (
+                    <tr key={rule.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
+                      <td className="py-3 px-4 text-gray-300 font-medium">{rule.name}</td>
+                      <td className="py-3 px-4 text-gray-400">{rule.type || rule.threatType}</td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`px-3 py-1 rounded text-xs font-medium ${
+                            rule.action === 'block' || rule.mode === 'block'
+                              ? 'bg-red-500/20 text-red-300'
+                              : 'bg-yellow-500/20 text-yellow-300'
+                          }`}
+                        >
+                          {rule.action === 'block' || rule.mode === 'block' ? '🚫 Blocca' : '🔍 Rileva'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => onToggle(rule.id)}
+                          className={`px-3 py-1 rounded text-xs font-medium transition ${
+                            rule.enabled
+                              ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30'
+                              : 'bg-gray-600/50 text-gray-400 hover:bg-gray-600'
+                          }`}
+                        >
+                          {rule.enabled ? '✓ Attiva' : '✕ Disattiva'}
+                        </button>
+                      </td>
+                      <td className="py-3 px-4 text-gray-400 text-xs">
+                        {new Date(rule.created_at || rule.createdAt || '').toLocaleDateString('it-IT')}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => onViewDetails(rule)}
+                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
+                          >
+                            📋 Dettagli
+                          </button>
+                          <button
+                            onClick={() => onEdit(rule)}
+                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
+                          >
+                            ✏️ Modifica
+                          </button>
+                          <button
+                            onClick={() => onDelete(rule.id)}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                          >
+                            🗑️ Elimina
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {filteredDefaultRules.length === 0 && filteredCustomRules.length === 0 && (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
+          <p className="text-gray-400">Nessuna regola trovata</p>
         </div>
       )}
     </div>
