@@ -28,10 +28,21 @@ const StatsPage: React.FC = () => {
   const [timelineData, setTimelineData] = useState<ChartDataPoint[]>([]);
   const [threatTypeData, setThreatTypeData] = useState<any[]>([]);
   const [recentAlerts, setRecentAlerts] = useState<WAFEvent[]>([]);
-  const [timeFilter, setTimeFilter] = useState<'1h' | '24h' | '7d'>('1h');
-  const [threatFilter, setThreatFilter] = useState<string>('all');
-  const [filteredAlerts, setFilteredAlerts] = useState<WAFEvent[]>([]);
   const [blockingIP, setBlockingIP] = useState<string | null>(null);
+
+  // Filtri INDIPENDENTI per ogni sezione
+  const [timelineFilter, setTimelineFilter] = useState<'1h' | '24h' | '7d'>('1h');
+
+  const [threatDistFilter, setThreatDistFilter] = useState<'1h' | '24h' | '7d'>('1h');
+
+  const [recentThreatsFilter, setRecentThreatsFilter] = useState<'1h' | '24h' | '7d'>('1h');
+
+  const [alertsTimeFilter, setAlertsTimeFilter] = useState<'1h' | '24h' | '7d'>('1h');
+  const [alertsThreatFilter, setAlertsThreatFilter] = useState<string>('all');
+
+  // Dati filtrati per ogni sezione
+  const [filteredAlertsByRecentThreats, setFilteredAlertsByRecentThreats] = useState<WAFEvent[]>([]);
+  const [filteredAlertsByAllAlerts, setFilteredAlertsByAllAlerts] = useState<WAFEvent[]>([]);
 
   // Carica i dati iniziali
   useEffect(() => {
@@ -62,7 +73,7 @@ const StatsPage: React.FC = () => {
     setTimelineData(points.length > 0 ? points : []);
   };
 
-  // Aggiorna timeline e threat types quando arrivano nuovi eventi
+  // Aggiorna timeline quando arrivano nuovi eventi
   useEffect(() => {
     if (timelineData.length === 0) return;
 
@@ -73,12 +84,11 @@ const StatsPage: React.FC = () => {
       const now = new Date();
       const timeStr = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00';
 
-      // Trova o crea punto per l'ora corrente
       let lastPoint = newData[newData.length - 1];
       if (!lastPoint) return prevData;
 
       if (lastPoint.time !== timeStr) {
-        newData.shift(); // Rimuovi il più vecchio
+        newData.shift();
         newData.push({
           time: timeStr,
           threats: lastPoint?.threats ?? 0,
@@ -87,7 +97,6 @@ const StatsPage: React.FC = () => {
         lastPoint = newData[newData.length - 1];
       }
 
-      // Incrementa i valori
       if (lastPoint) {
         lastPoint.threats = Math.max(lastPoint.threats, stats.threats_detected);
         lastPoint.blocked = Math.max(lastPoint.blocked, stats.requests_blocked);
@@ -95,9 +104,20 @@ const StatsPage: React.FC = () => {
 
       return newData;
     });
+  }, [stats]);
 
-    // Aggiorna threat types
-    const threatCounts = (recentAlerts && recentAlerts.length > 0 ? recentAlerts : []).reduce((acc: any[], alert) => {
+  // Calcola threat types solo per Threat Distribution (con suo filtro)
+  useEffect(() => {
+    let filtered = [...recentAlerts];
+
+    const now = new Date();
+    const timeMs = threatDistFilter === '1h' ? 60 * 60 * 1000 : threatDistFilter === '24h' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+    filtered = filtered.filter(alert => {
+      const alertTime = new Date(alert.timestamp).getTime();
+      return now.getTime() - alertTime < timeMs;
+    });
+
+    const threatCounts = filtered.reduce((acc: any[], alert) => {
       if (!alert || !alert.threat) return acc;
       const existing = acc.find(t => t && t.name === alert.threat);
       if (existing) {
@@ -114,40 +134,72 @@ const StatsPage: React.FC = () => {
     }, []);
 
     setThreatTypeData(threatCounts && threatCounts.length > 0 ? threatCounts : []);
-  }, [stats, recentAlerts]);
+  }, [recentAlerts, threatDistFilter]);
 
-  // Applica filtri agli alert
+  // Filtra per Recent Threats Table (solo timeframe)
   useEffect(() => {
     let filtered = [...recentAlerts];
 
-    // Filtra per threat type
-    if (threatFilter !== 'all') {
-      filtered = filtered.filter(alert => alert.threat === threatFilter);
-    }
-
-    // Filtra per timeframe
     const now = new Date();
-    const timeMs = timeFilter === '1h' ? 60 * 60 * 1000 : timeFilter === '24h' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+    const timeMs = recentThreatsFilter === '1h' ? 60 * 60 * 1000 : recentThreatsFilter === '24h' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
     filtered = filtered.filter(alert => {
       const alertTime = new Date(alert.timestamp).getTime();
       return now.getTime() - alertTime < timeMs;
     });
 
-    setFilteredAlerts(filtered.sort((a, b) =>
+    setFilteredAlertsByRecentThreats(filtered.sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     ));
-  }, [recentAlerts, timeFilter, threatFilter]);
+  }, [recentAlerts, recentThreatsFilter]);
+
+  // Filtra per All Alerts Table (timeframe + threat type)
+  useEffect(() => {
+    let filtered = [...recentAlerts];
+
+    if (alertsThreatFilter !== 'all') {
+      filtered = filtered.filter(alert => alert.threat === alertsThreatFilter);
+    }
+
+    const now = new Date();
+    const timeMs = alertsTimeFilter === '1h' ? 60 * 60 * 1000 : alertsTimeFilter === '24h' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+    filtered = filtered.filter(alert => {
+      const alertTime = new Date(alert.timestamp).getTime();
+      return now.getTime() - alertTime < timeMs;
+    });
+
+    setFilteredAlertsByAllAlerts(filtered.sort((a, b) =>
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    ));
+  }, [recentAlerts, alertsTimeFilter, alertsThreatFilter]);
 
   // Blocca un IP
   const handleBlockIP = async (ip: string) => {
     setBlockingIP(ip);
     try {
-      // TODO: Implementare API call per bloccare l'IP
-      console.log('Blocking IP:', ip);
-      // await blockIP(ip);
-      setTimeout(() => setBlockingIP(null), 1000);
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/blocklist', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ip: ip,
+          reason: 'Manually blocked from Recent Threats',
+          permanent: false,
+        }),
+      });
+
+      if (response.ok) {
+        console.log('IP blocked successfully:', ip);
+        alert(`IP ${ip} bloccato con successo (24 ore)`);
+      } else {
+        alert('Errore nel blocco dell\'IP');
+      }
     } catch (error) {
       console.error('Failed to block IP:', error);
+      alert('Errore nel blocco dell\'IP');
+    } finally {
       setBlockingIP(null);
     }
   };
@@ -155,8 +207,8 @@ const StatsPage: React.FC = () => {
   const blockRate = stats.total_requests > 0 ? (stats.requests_blocked / stats.total_requests * 100).toFixed(1) : '0';
   const detectionRate = stats.total_requests > 0 ? (stats.threats_detected / stats.total_requests * 100).toFixed(1) : '0';
 
-  // Get unique threats per timeframe
-  const uniqueThreats = Array.from(new Set(filteredAlerts.map(a => a.threat)));
+  // Get unique threats da recentAlerts
+  const allUniqueThreats = Array.from(new Set(recentAlerts.map(a => a.threat)));
 
   return (
     <div className="space-y-8">
@@ -205,8 +257,8 @@ const StatsPage: React.FC = () => {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Threats Timeline</h2>
             <select
-              value={timeFilter}
-              onChange={(e) => setTimeFilter(e.target.value as any)}
+              value={timelineFilter}
+              onChange={(e) => setTimelineFilter(e.target.value as any)}
               className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
             >
               <option value="1h">Last 1 hour</option>
@@ -274,14 +326,13 @@ const StatsPage: React.FC = () => {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Threat Types Distribution</h2>
             <select
-              value={threatFilter}
-              onChange={(e) => setThreatFilter(e.target.value)}
+              value={threatDistFilter}
+              onChange={(e) => setThreatDistFilter(e.target.value as any)}
               className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
             >
-              <option value="all">All Types</option>
-              {uniqueThreats.map(threat => (
-                <option key={threat} value={threat}>{threat}</option>
-              ))}
+              <option value="1h">Last 1 hour</option>
+              <option value="24h">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
             </select>
           </div>
           <ResponsiveContainer width="100%" height={300}>
@@ -302,13 +353,13 @@ const StatsPage: React.FC = () => {
         )}
 
         {/* Recent Threats Table */}
-        {filteredAlerts.length > 0 && (
+        {filteredAlertsByRecentThreats.length > 0 && (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Recent Threats</h2>
             <select
-              value={timeFilter}
-              onChange={(e) => setTimeFilter(e.target.value as any)}
+              value={recentThreatsFilter}
+              onChange={(e) => setRecentThreatsFilter(e.target.value as any)}
               className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
             >
               <option value="1h">Last 1 hour</option>
@@ -318,7 +369,7 @@ const StatsPage: React.FC = () => {
           </div>
 
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {filteredAlerts.slice(0, 10).map((alert, idx) => (
+            {filteredAlertsByRecentThreats.slice(0, 10).map((alert, idx) => (
               <div key={idx} className="bg-gray-700/50 border border-gray-600 rounded p-3 hover:bg-gray-700 transition">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
@@ -355,20 +406,20 @@ const StatsPage: React.FC = () => {
             ))}
           </div>
 
-          <p className="text-xs text-gray-500 mt-4">Showing {Math.min(10, filteredAlerts.length)} of {filteredAlerts.length} threats</p>
+          <p className="text-xs text-gray-500 mt-4">Showing {Math.min(10, filteredAlertsByRecentThreats.length)} of {filteredAlertsByRecentThreats.length} threats</p>
         </div>
         )}
       </div>
 
-      {/* Recent Alerts Table */}
-      {filteredAlerts.length > 0 && (
+      {/* All Alerts Table */}
+      {filteredAlertsByAllAlerts.length > 0 && (
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-semibold text-white">All Alerts</h2>
           <div className="flex gap-4">
             <select
-              value={timeFilter}
-              onChange={(e) => setTimeFilter(e.target.value as any)}
+              value={alertsTimeFilter}
+              onChange={(e) => setAlertsTimeFilter(e.target.value as any)}
               className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
             >
               <option value="1h">Last 1 hour</option>
@@ -377,12 +428,12 @@ const StatsPage: React.FC = () => {
             </select>
 
             <select
-              value={threatFilter}
-              onChange={(e) => setThreatFilter(e.target.value)}
+              value={alertsThreatFilter}
+              onChange={(e) => setAlertsThreatFilter(e.target.value)}
               className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
             >
               <option value="all">All Types</option>
-              {uniqueThreats.map(threat => (
+              {allUniqueThreats.map(threat => (
                 <option key={threat} value={threat}>{threat}</option>
               ))}
             </select>
@@ -402,7 +453,7 @@ const StatsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredAlerts.map((alert, idx) => (
+              {filteredAlertsByAllAlerts.map((alert, idx) => (
                 <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700/50 transition">
                   <td className="py-3 px-4 text-gray-300 text-xs">
                     {new Date(alert.timestamp).toLocaleString('it-IT')}
