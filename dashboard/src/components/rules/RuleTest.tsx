@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { WAFRule, RuleTestResult } from '../../types/waf';
+import { WAFRule, RuleTestResult, isTestableRule } from '../../types/waf';
 
 interface RuleTestProps {
   rule?: WAFRule;
@@ -11,8 +11,8 @@ export default function RuleTest({ rule }: RuleTestProps) {
   const [testError, setTestError] = useState('');
 
   const handleTest = () => {
-    if (!rule) {
-      setTestError('Seleziona una regola da testare');
+    if (!isTestableRule(rule)) {
+      setTestError('La regola selezionata non ha pattern e modalità definiti');
       return;
     }
 
@@ -48,12 +48,15 @@ export default function RuleTest({ rule }: RuleTestProps) {
     <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
       <h2 className="text-xl font-semibold text-white mb-6">Test Regola</h2>
 
-      {rule ? (
+      {isTestableRule(rule) ? (
         <>
           <div className="mb-6 p-4 bg-gray-700 rounded border border-gray-600">
             <p className="text-sm text-gray-400">Regola in test:</p>
             <p className="text-white font-semibold mt-1">{rule.name}</p>
-            <p className="text-gray-400 text-sm mt-1">Pattern: <code className="bg-gray-800 px-2 py-1 rounded">{rule.pattern}</code></p>
+            <p className="text-gray-400 text-sm mt-1">Pattern: <code className="bg-gray-800 px-2 py-1 rounded">{rule.pattern || 'N/A'}</code></p>
+            {rule.severity && (
+              <p className="text-gray-400 text-sm mt-1">Severità: <span className="text-yellow-400">{rule.severity}</span></p>
+            )}
           </div>
 
           <div className="space-y-6">

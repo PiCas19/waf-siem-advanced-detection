@@ -3,7 +3,7 @@ import AddRule from './AddRule';
 import RuleEditor from './RuleEditor';
 import RulesList from './RulesList';
 import RuleTest from './RuleTest';
-import { WAFRule, RulesResponse } from '../../types/waf';
+import { WAFRule, RulesResponse, getCreatedDate, getUpdatedDate } from '../../types/waf';
 
 export default function RulesContainer() {
   const [defaultRules, setDefaultRules] = useState<WAFRule[]>([]);
@@ -232,13 +232,13 @@ export default function RulesContainer() {
                 <div>
                   <p className="text-sm text-gray-400">Creata</p>
                   <p className="text-gray-300 mt-1">
-                    {new Date(selectedRule.createdAt).toLocaleString('it-IT')}
+                    {getCreatedDate(selectedRule)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-400">Ultimo Aggiornamento</p>
                   <p className="text-gray-300 mt-1">
-                    {new Date(selectedRule.updatedAt).toLocaleString('it-IT')}
+                    {getUpdatedDate(selectedRule)}
                   </p>
                 </div>
               </div>

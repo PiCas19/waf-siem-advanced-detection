@@ -23,6 +23,25 @@ export interface WAFRule {
   isDefault?: boolean;
 }
 
+// Type guard per verificare se una regola ha i campi richiesti per il test
+export function isTestableRule(rule: WAFRule | undefined): rule is WAFRule & { pattern: string; mode: 'block' | 'detect' } {
+  return Boolean(rule && rule.pattern && rule.mode);
+}
+
+// Helper per ottenere la data di creazione (supporta sia camelCase che snake_case)
+export function getCreatedDate(rule: WAFRule): string {
+  const date = rule.createdAt || rule.created_at;
+  if (!date) return 'Data sconosciuta';
+  return new Date(date).toLocaleString('it-IT');
+}
+
+// Helper per ottenere la data di aggiornamento (supporta sia camelCase che snake_case)
+export function getUpdatedDate(rule: WAFRule): string {
+  const date = rule.updatedAt || rule.updated_at;
+  if (!date) return 'Data sconosciuta';
+  return new Date(date).toLocaleString('it-IT');
+}
+
 export interface DefaultRule extends WAFRule {
   type: string;
   severity: string;
