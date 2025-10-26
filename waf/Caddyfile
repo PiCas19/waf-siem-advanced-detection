@@ -18,6 +18,14 @@
 # TAILSCALE FUNNEL - WAN (porta 8080)
 #===================================
 :8080 {
+    # WebSocket (prima di tutto, ha priorità)
+    handle /ws {
+        reverse_proxy localhost:8081 {
+            header_up Connection "Upgrade"
+            header_up Upgrade "websocket"
+        }
+    }
+
     # API (prima di tutto, ha priorità)
     handle /api* {
         reverse_proxy localhost:8081
@@ -90,7 +98,15 @@
 :8443 {
     bind 0.0.0.0
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
-    
+
+    # WebSocket (prima di tutto)
+    handle /ws {
+        reverse_proxy localhost:8081 {
+            header_up Connection "Upgrade"
+            header_up Upgrade "websocket"
+        }
+    }
+
     # API
     handle /api* {
         reverse_proxy localhost:8081
@@ -159,6 +175,14 @@
 # LAN - HTTP (porta 80)
 #=====================
 http://172.16.216.10 {
+    # WebSocket (prima di tutto)
+    handle /ws {
+        reverse_proxy localhost:8081 {
+            header_up Connection "Upgrade"
+            header_up Upgrade "websocket"
+        }
+    }
+
     # API
     handle /api* {
         reverse_proxy localhost:8081
