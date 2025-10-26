@@ -70,7 +70,11 @@ export function useWebSocketStats() {
 
       isConnecting = true;
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      // Se siamo su HTTP:80, connettiti al backend su 8081
+      // Se siamo su HTTPS:8443 (LAN), connettiti al backend su 8081
+      // Se siamo su HTTPS:443 (WAN), connettiti al backend su 8081
+      const host = window.location.hostname;
+      const wsUrl = `${protocol}//${host}:8081/ws`;
       console.log('[WebSocket] Attempting to connect to:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
