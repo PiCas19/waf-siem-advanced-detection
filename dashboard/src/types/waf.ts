@@ -24,7 +24,7 @@ export interface WAFRule {
 }
 
 // Type guard per verificare se una regola ha i campi richiesti per il test
-export function isTestableRule(rule: WAFRule | undefined): rule is WAFRule & { pattern: string; mode: 'block' | 'detect' } {
+export function isTestableRule(rule: WAFRule | null | undefined): rule is WAFRule & { pattern: string; mode: 'block' | 'detect' } {
   return Boolean(rule && rule.pattern && rule.mode);
 }
 
