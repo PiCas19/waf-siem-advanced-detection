@@ -53,14 +53,14 @@ export default function RulesContainer() {
   };
 
   const handleDeleteRule = async (id: string) => {
-    // Non permettere di eliminare le regole di default
+    // Don't allow deleting default rules
     const isDefault = defaultRules.some(r => r.id === id);
     if (isDefault) {
-      alert('Non è possibile eliminare le regole di default');
+      alert('Cannot delete default rules');
       return;
     }
 
-    if (confirm('Sei sicuro di voler eliminare questa regola?')) {
+    if (confirm('Are you sure you want to delete this rule?')) {
       const token = localStorage.getItem('authToken');
 
       try {
@@ -74,20 +74,20 @@ export default function RulesContainer() {
         if (response.ok) {
           setCustomRules(customRules.filter(r => r.id !== id));
           setShowDetailsModal(false);
-          alert('Regola eliminata con successo');
+          alert('Rule deleted successfully');
         }
       } catch (error) {
         console.error('Error deleting rule:', error);
-        alert('Errore nell\'eliminazione della regola');
+        alert('Error deleting rule');
       }
     }
   };
 
   const handleToggleRule = async (id: string) => {
-    // Non permettere di modificare le regole di default
+    // Don't allow modifying default rules
     const isDefault = defaultRules.some(r => r.id === id);
     if (isDefault) {
-      alert('Non è possibile modificare le regole di default');
+      alert('Cannot modify default rules');
       return;
     }
 
@@ -142,14 +142,14 @@ export default function RulesContainer() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">WAF Rules</h1>
-          <p className="text-gray-400">Crea e gestisci le regole personalizzate del WAF</p>
+          <p className="text-gray-400">Create and manage custom WAF rules</p>
         </div>
         {view === 'list' && (
           <button
             onClick={() => setView('add')}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
           >
-            + Add Rule
+            Add Rule
           </button>
         )}
       </div>
@@ -198,25 +198,25 @@ export default function RulesContainer() {
                 onClick={() => setShowDetailsModal(false)}
                 className="text-gray-400 hover:text-white text-2xl"
               >
-                ✕
+                ×
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-gray-400">Descrizione</p>
+                <p className="text-sm text-gray-400">Description</p>
                 <p className="text-gray-300 mt-1">{selectedRule.description}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-400">Tipo di Minaccia</p>
+                  <p className="text-sm text-gray-400">Threat Type</p>
                   <p className="text-gray-300 mt-1 font-medium">{selectedRule.threatType}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Modalità</p>
+                  <p className="text-sm text-gray-400">Mode</p>
                   <p className="text-gray-300 mt-1 font-medium">
-                    {selectedRule.mode === 'block' ? '🚫 Blocca' : '🔍 Rileva'}
+                    {selectedRule.mode === 'block' ? 'Block' : 'Detect'}
                   </p>
                 </div>
               </div>
@@ -230,13 +230,13 @@ export default function RulesContainer() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-400">Creata</p>
+                  <p className="text-sm text-gray-400">Created</p>
                   <p className="text-gray-300 mt-1">
                     {getCreatedDate(selectedRule)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-400">Ultimo Aggiornamento</p>
+                  <p className="text-sm text-gray-400">Last Updated</p>
                   <p className="text-gray-300 mt-1">
                     {getUpdatedDate(selectedRule)}
                   </p>
@@ -244,9 +244,9 @@ export default function RulesContainer() {
               </div>
 
               <div>
-                <p className="text-sm text-gray-400">Stato</p>
+                <p className="text-sm text-gray-400">Status</p>
                 <p className="text-gray-300 mt-1">
-                  {selectedRule.enabled ? '✓ Attiva' : '✕ Disattiva'}
+                  {selectedRule.enabled ? 'Enabled' : 'Disabled'}
                 </p>
               </div>
             </div>
@@ -259,7 +259,7 @@ export default function RulesContainer() {
                 }}
                 className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition"
               >
-                ✏️ Modifica
+                Edit
               </button>
               <button
                 onClick={() => {
@@ -268,7 +268,7 @@ export default function RulesContainer() {
                 }}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition"
               >
-                🧪 Testa
+                Test
               </button>
               <button
                 onClick={() => {
@@ -276,13 +276,13 @@ export default function RulesContainer() {
                 }}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition"
               >
-                🗑️ Elimina
+                Delete
               </button>
               <button
                 onClick={() => setShowDetailsModal(false)}
                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium ml-auto"
               >
-                Chiudi
+                Close
               </button>
             </div>
           </div>
@@ -294,12 +294,12 @@ export default function RulesContainer() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-gray-800 border border-gray-700 rounded-lg max-w-2xl w-full p-6 max-h-screen overflow-y-auto">
             <div className="flex justify-between items-start mb-6">
-              <h2 className="text-2xl font-bold text-white">Test Regola</h2>
+              <h2 className="text-2xl font-bold text-white">Test Rule</h2>
               <button
                 onClick={() => setShowTestModal(false)}
-                className="text-gray-400 hover:text-white text-2xl"
+                className="text-gray-400 hover:text-white text-lg font-bold"
               >
-                ✕
+                ×
               </button>
             </div>
             <RuleTest rule={ruleForTest} />
@@ -308,7 +308,7 @@ export default function RulesContainer() {
                 onClick={() => setShowTestModal(false)}
                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium"
               >
-                Chiudi
+                Close
               </button>
             </div>
           </div>

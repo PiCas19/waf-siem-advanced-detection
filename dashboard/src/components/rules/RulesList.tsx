@@ -85,27 +85,27 @@ export default function RulesList({
       {/* Filters & Search */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Ricerca */}
+          {/* Search */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Ricerca</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Search</label>
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cerca per nome..."
+              placeholder="Search by name..."
               className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
             />
           </div>
 
-          {/* Filtra per Tipo */}
+          {/* Filter by Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Tipo Minaccia</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Threat Type</label>
             <select
               value={threatTypeFilter}
               onChange={(e) => setThreatTypeFilter(e.target.value)}
               className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
             >
-              <option value="all">Tutti i tipi</option>
+              <option value="all">All types</option>
               {threatTypes.map(type => (
                 <option key={type} value={type}>
                   {type}
@@ -114,24 +114,24 @@ export default function RulesList({
             </select>
           </div>
 
-          {/* Filtra per Modalità */}
+          {/* Filter by Mode */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Modalità</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Mode</label>
             <select
               value={modeFilter}
               onChange={(e) => setModeFilter(e.target.value)}
               className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
             >
-              <option value="all">Tutte le modalità</option>
-              <option value="detect">🔍 Rileva</option>
-              <option value="block">🚫 Blocca</option>
+              <option value="all">All modes</option>
+              <option value="detect">Detect</option>
+              <option value="block">Block</option>
             </select>
           </div>
 
-          {/* Stato */}
+          {/* Summary */}
           <div className="flex items-end">
             <div className="text-sm text-gray-400">
-              {filteredDefaultRules.length + filteredCustomRules.length} regola{filteredDefaultRules.length + filteredCustomRules.length !== 1 ? 'e' : ''} (
+              {filteredDefaultRules.length + filteredCustomRules.length} rule{filteredDefaultRules.length + filteredCustomRules.length !== 1 ? 's' : ''} (
               {filteredDefaultRules.length} default + {filteredCustomRules.length} custom)
             </div>
           </div>
@@ -141,17 +141,19 @@ export default function RulesList({
       {/* Default Rules Table */}
       {filteredDefaultRules.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-white">🔒 Regole di Default (Built-in)</h2>
+          <h2 className="text-xl font-bold text-white">
+            Default Rules (Built-in)
+          </h2>
           <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-700">
                   <tr>
-                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Nome</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Tipo Minaccia</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Severità</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Stato</th>
-                    <th className="text-center py-3 px-4 text-gray-300 font-medium">Azioni</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Name</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat Type</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Severity</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Status</th>
+                    <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -174,7 +176,7 @@ export default function RulesList({
                       </td>
                       <td className="py-3 px-4">
                         <span className="px-3 py-1 bg-green-500/20 text-green-300 rounded text-xs font-medium">
-                          ✓ Sempre Attiva
+                          Always Active
                         </span>
                       </td>
                       <td className="py-3 px-4">
@@ -183,7 +185,7 @@ export default function RulesList({
                             onClick={() => onViewDetails(rule)}
                             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
                           >
-                            📋 Dettagli
+                            Details
                           </button>
                         </div>
                       </td>
@@ -199,18 +201,20 @@ export default function RulesList({
       {/* Custom Rules Table */}
       {filteredCustomRules.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-xl font-bold text-white">✏️ Regole Personalizzate</h2>
+          <h2 className="text-xl font-bold text-white">
+            Custom Rules
+          </h2>
           <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-700">
                   <tr>
-                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Nome</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Tipo Minaccia</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Modalità</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Stato</th>
-                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Creata</th>
-                    <th className="text-center py-3 px-4 text-gray-300 font-medium">Azioni</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Name</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat Type</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Mode</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Status</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Created</th>
+                    <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -226,7 +230,7 @@ export default function RulesList({
                               : 'bg-yellow-500/20 text-yellow-300'
                           }`}
                         >
-                          {rule.action === 'block' || rule.mode === 'block' ? '🚫 Blocca' : '🔍 Rileva'}
+                          {rule.action === 'block' || rule.mode === 'block' ? 'BLOCK' : 'DETECT'}
                         </span>
                       </td>
                       <td className="py-3 px-4">
@@ -238,7 +242,7 @@ export default function RulesList({
                               : 'bg-gray-600/50 text-gray-400 hover:bg-gray-600'
                           }`}
                         >
-                          {rule.enabled ? '✓ Attiva' : '✕ Disattiva'}
+                          {rule.enabled ? 'ENABLED' : 'DISABLED'}
                         </button>
                       </td>
                       <td className="py-3 px-4 text-gray-400 text-xs">
@@ -250,19 +254,19 @@ export default function RulesList({
                             onClick={() => onViewDetails(rule)}
                             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
                           >
-                            📋 Dettagli
+                            Details
                           </button>
                           <button
                             onClick={() => onEdit(rule)}
                             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
                           >
-                            ✏️ Modifica
+                            Edit
                           </button>
                           <button
                             onClick={() => onDelete(rule.id)}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
                           >
-                            🗑️ Elimina
+                            Delete
                           </button>
                         </div>
                       </td>
@@ -278,7 +282,7 @@ export default function RulesList({
       {/* Empty State */}
       {filteredDefaultRules.length === 0 && filteredCustomRules.length === 0 && (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-8 text-center">
-          <p className="text-gray-400">Nessuna regola trovata</p>
+          <p className="text-gray-400">No rules found</p>
         </div>
       )}
     </div>

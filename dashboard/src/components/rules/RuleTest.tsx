@@ -12,12 +12,12 @@ export default function RuleTest({ rule }: RuleTestProps) {
 
   const handleTest = () => {
     if (!isTestableRule(rule)) {
-      setTestError('La regola selezionata non ha pattern e modalità definiti');
+      setTestError('The selected rule does not have a pattern and mode defined');
       return;
     }
 
     if (!testInput.trim()) {
-      setTestError('Inserisci del testo da testare');
+      setTestError('Please enter some text to test');
       return;
     }
 
@@ -28,12 +28,12 @@ export default function RuleTest({ rule }: RuleTestProps) {
       setTestResult({
         matched,
         message: matched
-          ? `Pattern trovato! La regola "${rule.name}" in modalità ${rule.mode === 'block' ? 'BLOCCO' : 'RILEVAMENTO'} avrebbe ${rule.mode === 'block' ? 'BLOCCATO' : 'RILEVATO'} questa richiesta.`
-          : `Pattern non trovato. La regola non si attiverebbe per questo input.`,
+          ? `Pattern found! The rule "${rule.name}" in ${rule.mode === 'block' ? 'BLOCK' : 'DETECT'} mode would ${rule.mode === 'block' ? 'BLOCK' : 'DETECT'} this request.`
+          : `Pattern not found. This rule would not be triggered for this input.`,
       });
       setTestError('');
     } catch (error) {
-      setTestError('Errore nel pattern regex: ' + (error instanceof Error ? error.message : 'Errore sconosciuto'));
+      setTestError('Error in regex pattern: ' + (error instanceof Error ? error.message : 'Unknown error'));
       setTestResult(null);
     }
   };
@@ -46,16 +46,16 @@ export default function RuleTest({ rule }: RuleTestProps) {
 
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-      <h2 className="text-xl font-semibold text-white mb-6">Test Regola</h2>
+      <h2 className="text-xl font-semibold text-white mb-6">Test Rule</h2>
 
       {isTestableRule(rule) ? (
         <>
           <div className="mb-6 p-4 bg-gray-700 rounded border border-gray-600">
-            <p className="text-sm text-gray-400">Regola in test:</p>
+            <p className="text-sm text-gray-400">Rule under test:</p>
             <p className="text-white font-semibold mt-1">{rule.name}</p>
             <p className="text-gray-400 text-sm mt-1">Pattern: <code className="bg-gray-800 px-2 py-1 rounded">{rule.pattern || 'N/A'}</code></p>
             {rule.severity && (
-              <p className="text-gray-400 text-sm mt-1">Severità: <span className="text-yellow-400">{rule.severity}</span></p>
+              <p className="text-gray-400 text-sm mt-1">Severity: <span className="text-yellow-400">{rule.severity}</span></p>
             )}
           </div>
 
@@ -63,17 +63,17 @@ export default function RuleTest({ rule }: RuleTestProps) {
             {/* Input */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Testo da Testare
+                Test Text
               </label>
               <textarea
                 value={testInput}
                 onChange={(e) => setTestInput(e.target.value)}
-                placeholder="Inserisci il testo che vuoi testare contro questa regola..."
+                placeholder="Enter the text you want to test against this rule..."
                 rows={5}
                 className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none font-mono text-sm"
               />
               <p className="text-xs text-gray-400 mt-1">
-                Inserisci un payload di attacco (es: SELECT * FROM users WHERE id=1) per testare il pattern
+                Enter an attack payload (e.g: SELECT * FROM users WHERE id=1) to test the pattern
               </p>
             </div>
 
@@ -98,7 +98,7 @@ export default function RuleTest({ rule }: RuleTestProps) {
                     testResult.matched ? 'text-red-300' : 'text-green-300'
                   }`}
                 >
-                  {testResult.matched ? '🚨 MATCH RILEVATO' : '✓ NO MATCH'}
+                  {testResult.matched ? 'MATCH DETECTED' : 'NO MATCH'}
                 </p>
                 <p
                   className={`text-sm mt-2 ${
@@ -116,20 +116,20 @@ export default function RuleTest({ rule }: RuleTestProps) {
                 onClick={handleTest}
                 className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition"
               >
-                🧪 Testa Regola
+                Test Rule
               </button>
               <button
                 onClick={handleClear}
                 className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition"
               >
-                Cancella
+                Clear
               </button>
             </div>
           </div>
         </>
       ) : (
         <div className="text-center py-8">
-          <p className="text-gray-400">Seleziona una regola dalla lista per testarla</p>
+          <p className="text-gray-400">Select a rule from the list to test it</p>
         </div>
       )}
     </div>
