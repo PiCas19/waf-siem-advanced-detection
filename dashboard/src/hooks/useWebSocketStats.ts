@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { fetchStats } from '@/services/api';
 
 interface Stats {
@@ -7,6 +7,10 @@ interface Stats {
   total_requests: number;
 }
 
+// WebSocket globale - mantiene la connessione tra i re-render
+let globalWs: WebSocket | null = null;
+let isConnecting = false;
+
 export function useWebSocketStats() {
   const [stats, setStats] = useState<Stats>({
     threats_detected: 0,
@@ -14,6 +18,7 @@ export function useWebSocketStats() {
     total_requests: 0,
   });
   const [isConnected, setIsConnected] = useState(false);
+  const statsRef = useRef(stats);
 
   // Carica gli stats iniziali dal server
   useEffect(() => {
@@ -43,60 +48,94 @@ export function useWebSocketStats() {
     loadInitialStats();
   }, []);
 
-  // Setup WebSocket per aggiornamenti real-time
+  // Aggiorna il ref quando stats cambia
   useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    console.log('[WebSocket] Attempting to connect to:', wsUrl);
+    statsRef.current = stats;
+  }, [stats]);
 
-    const ws = new WebSocket(wsUrl);
+  // Setup WebSocket persistente per aggiornamenti real-time
+  useEffect(() => {
+    const connectWebSocket = () => {
+      // Se già connesso o connettando, non fare nulla
+      if (globalWs && (globalWs.readyState === WebSocket.OPEN || globalWs.readyState === WebSocket.CONNECTING)) {
+        console.log('[WebSocket] Already connected or connecting, skipping new connection');
+        setIsConnected(globalWs.readyState === WebSocket.OPEN);
+        return;
+      }
 
-    ws.onopen = () => {
-      console.log('[WebSocket] ✅ Connected to stats stream');
-      setIsConnected(true);
-    };
+      if (isConnecting) {
+        console.log('[WebSocket] Already attempting to connect, skipping duplicate attempt');
+        return;
+      }
 
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        console.log('[WebSocket] Received message:', message);
+      isConnecting = true;
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      console.log('[WebSocket] Attempting to connect to:', wsUrl);
 
-        // Se ricevi un evento WAF, aggiorna gli stats
-        if (message.type === 'waf_event' && message.data) {
-          const wafEvent = message.data;
-          console.log('[WebSocket] Processing WAF event:', {
-            threat: wafEvent.threat,
-            blocked: wafEvent.blocked,
-            ip: wafEvent.ip,
-          });
+      const ws = new WebSocket(wsUrl);
 
-          setStats((prevStats) => ({
-            threats_detected: prevStats.threats_detected + 1,
-            requests_blocked: prevStats.requests_blocked + (wafEvent.blocked ? 1 : 0),
-            total_requests: prevStats.total_requests + 1,
-          }));
-        } else {
-          console.log('[WebSocket] Ignoring message - type:', message.type, 'has data:', !!message.data);
+      ws.onopen = () => {
+        console.log('[WebSocket] ✅ Connected to stats stream');
+        globalWs = ws;
+        isConnecting = false;
+        setIsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          console.log('[WebSocket] Received message:', message);
+
+          // Se ricevi un evento WAF, aggiorna gli stats
+          if (message.type === 'waf_event' && message.data) {
+            const wafEvent = message.data;
+            console.log('[WebSocket] Processing WAF event:', {
+              threat: wafEvent.threat,
+              blocked: wafEvent.blocked,
+              ip: wafEvent.ip,
+            });
+
+            setStats((prevStats) => ({
+              threats_detected: prevStats.threats_detected + 1,
+              requests_blocked: prevStats.requests_blocked + (wafEvent.blocked ? 1 : 0),
+              total_requests: prevStats.total_requests + 1,
+            }));
+          } else {
+            console.log('[WebSocket] Ignoring message - type:', message.type, 'has data:', !!message.data);
+          }
+        } catch (error) {
+          console.error('[WebSocket] Failed to parse message:', error);
         }
-      } catch (error) {
-        console.error('[WebSocket] Failed to parse message:', error);
-      }
+      };
+
+      ws.onerror = (error) => {
+        console.error('[WebSocket] ❌ Error:', error);
+        isConnecting = false;
+        setIsConnected(false);
+      };
+
+      ws.onclose = () => {
+        console.log('[WebSocket] 🔴 Disconnected from stats stream. Reconnecting in 3 seconds...');
+        globalWs = null;
+        isConnecting = false;
+        setIsConnected(false);
+
+        // Reconnect automaticamente dopo 3 secondi
+        setTimeout(() => {
+          console.log('[WebSocket] Attempting automatic reconnect...');
+          connectWebSocket();
+        }, 3000);
+      };
+
+      globalWs = ws;
     };
 
-    ws.onerror = (error) => {
-      console.error('[WebSocket] ❌ Error:', error);
-      setIsConnected(false);
-    };
+    connectWebSocket();
 
-    ws.onclose = () => {
-      console.log('[WebSocket] 🔴 Disconnected from stats stream');
-      setIsConnected(false);
-    };
-
+    // Non chiudere il WebSocket - mantieni la connessione attiva
     return () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
-      }
+      console.log('[WebSocket] Component unmounted, keeping WebSocket alive');
     };
   }, []);
 
