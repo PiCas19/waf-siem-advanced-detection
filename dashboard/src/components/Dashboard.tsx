@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import StatsPage from './dashboard/StatsPage'
+import RulesContainer from './rules/RulesContainer'
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth()
@@ -98,12 +99,7 @@ const Dashboard: React.FC = () => {
 
         {/* Rules Tab */}
         {activeTab === 'rules' && (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">WAF Rules</h2>
-            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-              <p className="text-gray-400">WAF Rules management coming soon...</p>
-            </div>
-          </div>
+          <RulesContainer />
         )}
 
         {/* Logs Tab */}

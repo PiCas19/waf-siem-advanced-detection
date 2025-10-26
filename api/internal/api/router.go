@@ -30,10 +30,15 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		{
 			rules.GET("", GetRules)
 			rules.POST("", CreateRule)
+			rules.PUT("/:id", UpdateRule)
+			rules.DELETE("/:id", DeleteRule)
+			rules.PATCH("/:id/toggle", ToggleRule)
 		}
 
 		protected.GET("/logs", GetLogs)
 		protected.GET("/blocklist", GetBlocklist)
+		protected.POST("/blocklist", BlockIP)
+		protected.DELETE("/blocklist/:ip", UnblockIP)
 
 		// 2FA endpoints
 		protected.POST("/auth/2fa/setup", authHandler.InitiateTwoFASetup)
