@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import Stats from './dashboard/Stats'
+import StatsPage from './dashboard/StatsPage'
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth()
@@ -93,15 +94,7 @@ const Dashboard: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Statistics Tab */}
         {activeTab === 'stats' && (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Dashboard Statistics</h2>
-            <Stats />
-
-            <div className="mt-8 bg-gray-800 p-6 rounded-lg border border-gray-700">
-              <h3 className="text-xl font-semibold mb-4">Recent Alerts</h3>
-              <p className="text-gray-400">No alerts yet. Dashboard is ready for integration.</p>
-            </div>
-          </div>
+          <StatsPage />
         )}
 
         {/* Rules Tab */}
