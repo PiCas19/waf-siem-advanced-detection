@@ -92,8 +92,8 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			go m.sendEventToAPI(r, clientIP, threat)
 		}
 
-		// Block request if in block mode
-		if m.BlockMode {
+		// Block request if in block mode OR if it's a default rule (default rules always block)
+		if m.BlockMode || threat.IsDefault {
 			return m.blockRequest(w, threat)
 		}
 	}
@@ -120,6 +120,9 @@ func (m *Middleware) blockRequest(w http.ResponseWriter, threat *detector.Threat
 
 // sendEventToAPI sends a threat event to the backend API
 func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *detector.Threat) {
+	// Default rules always block, regardless of BlockMode setting
+	blocked := m.BlockMode || threat.IsDefault
+
 	eventPayload := map[string]interface{}{
 		"ip":         clientIP,
 		"threat":     threat.Type,
@@ -128,7 +131,7 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 		"query":      r.URL.RawQuery,
 		"user_agent": r.UserAgent(),
 		"timestamp":  time.Now().Format(time.RFC3339),
-		"blocked":    m.BlockMode,
+		"blocked":    blocked,
 	}
 
 	jsonData, err := json.Marshal(eventPayload)
