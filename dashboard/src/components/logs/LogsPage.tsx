@@ -148,7 +148,6 @@ export default function LogsPage(): React.ReactElement {
   }, [logs, filter]);
 
   const uniqueThreatTypes = Array.from(new Set(logs.map((log) => log.threat_type)));
-  const uniqueSeverities = Array.from(new Set(logs.map((log) => log.severity)));
 
   const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
   const paginatedLogs = filteredLogs.slice(
