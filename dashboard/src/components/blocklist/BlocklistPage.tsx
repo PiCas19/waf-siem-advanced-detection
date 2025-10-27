@@ -36,7 +36,6 @@ const BlocklistPage: React.FC = () => {
 
   const [showAddBlockForm, setShowAddBlockForm] = useState(false);
   const [showAddWhiteForm, setShowAddWhiteForm] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<BlockedEntry | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
