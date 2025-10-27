@@ -21,7 +21,6 @@ vendor/
 
 # Logs
 *.log
-logs/
 
 # Node
 node_modules/
