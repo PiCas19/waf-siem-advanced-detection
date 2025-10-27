@@ -10,11 +10,17 @@ interface WAFEvent {
   ip: string;
   method: string;
   path: string;
-  query: string;
-  user_agent: string;
+  query?: string;
+  user_agent?: string;
   timestamp: string;
   threat: string;
   blocked: boolean;
+  // Da API logs endpoint
+  id?: number;
+  client_ip?: string;
+  threat_type?: string;
+  created_at?: string;
+  url?: string;
 }
 
 interface ChartDataPoint {
@@ -44,13 +50,44 @@ const StatsPage: React.FC = () => {
   const [filteredAlertsByRecentThreats, setFilteredAlertsByRecentThreats] = useState<WAFEvent[]>([]);
   const [filteredAlertsByAllAlerts, setFilteredAlertsByAllAlerts] = useState<WAFEvent[]>([]);
 
+  // Pagination states
+  const [recentThreatsPage, setRecentThreatsPage] = useState(1);
+  const [allAlertsPage, setAllAlertsPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Carica i dati iniziali
   useEffect(() => {
     const loadInitialData = async () => {
       try {
+        // Carica stats per il timeline
         const data = await fetchStats();
-        setRecentAlerts(data.recent || []);
         initializeTimeline();
+
+        // Carica logs (tutte le threat) dal database
+        const token = localStorage.getItem('authToken');
+        const logsResponse = await fetch('/api/logs', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (logsResponse.ok) {
+          const logsData = await logsResponse.json();
+          // Mappa i logs al formato WAFEvent
+          const mappedLogs = logsData.logs.map((log: any) => ({
+            ip: log.client_ip,
+            method: log.method,
+            path: log.url,
+            timestamp: log.created_at || new Date().toISOString(),
+            threat: log.threat_type,
+            blocked: log.blocked,
+            user_agent: log.user_agent,
+          }));
+          setRecentAlerts(mappedLogs);
+        } else {
+          // Fallback a stats.recent se logs endpoint fallisce
+          setRecentAlerts(data.recent || []);
+        }
       } catch (error) {
         console.error('Failed to load initial stats:', error);
       }
@@ -147,6 +184,7 @@ const StatsPage: React.FC = () => {
       return now.getTime() - alertTime < timeMs;
     });
 
+    setRecentThreatsPage(1); // Reset pagination
     setFilteredAlertsByRecentThreats(filtered.sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     ));
@@ -167,6 +205,7 @@ const StatsPage: React.FC = () => {
       return now.getTime() - alertTime < timeMs;
     });
 
+    setAllAlertsPage(1); // Reset pagination
     setFilteredAlertsByAllAlerts(filtered.sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     ));
@@ -192,6 +231,14 @@ const StatsPage: React.FC = () => {
 
       if (response.ok) {
         console.log('IP blocked successfully:', ip);
+
+        // Aggiorna tutti gli alert da questo IP per marcarli come bloccati
+        setRecentAlerts(prevAlerts =>
+          prevAlerts.map(alert =>
+            alert.ip === ip ? { ...alert, blocked: true } : alert
+          )
+        );
+
         alert(`IP ${ip} bloccato con successo (24 ore)`);
       } else {
         alert('Errore nel blocco dell\'IP');
@@ -283,45 +330,50 @@ const StatsPage: React.FC = () => {
         </div>
 
         {/* Block Rate Pie Chart */}
-        {stats.total_requests > 0 && (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <h2 className="text-lg font-semibold text-white mb-4">Block Rate</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={[
-                  { name: 'Blocked', value: parseInt(blockRate) || 0 },
-                  { name: 'Allowed', value: Math.max(0, 100 - (parseInt(blockRate) || 0)) }
-                ]}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={2}
-                dataKey="value"
-              >
-                <Cell fill="#ef4444" />
-                <Cell fill="#22c55e" />
-              </Pie>
-              <Tooltip
-                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                labelStyle={{ color: '#f3f4f6' }}
-                formatter={(value) => `${value}%`}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="text-center mt-4">
-            <p className="text-2xl font-bold text-red-400">{blockRate}%</p>
-            <p className="text-sm text-gray-400">Blocked Rate</p>
-          </div>
+          {stats.total_requests > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Blocked', value: parseInt(blockRate) || 0 },
+                      { name: 'Allowed', value: Math.max(0, 100 - (parseInt(blockRate) || 0)) }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    <Cell fill="#ef4444" />
+                    <Cell fill="#22c55e" />
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                    labelStyle={{ color: '#f3f4f6' }}
+                    formatter={(value) => `${value}%`}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="text-center mt-4">
+                <p className="text-2xl font-bold text-red-400">{blockRate}%</p>
+                <p className="text-sm text-gray-400">Blocked Rate</p>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-80 text-gray-400">
+              <p>No requests yet</p>
+            </div>
+          )}
         </div>
-        )}
       </div>
 
       {/* Threat Types & Recent Threats */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Threat Types Chart */}
-        {threatTypeData && threatTypeData.length > 0 && (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Threat Types Distribution</h2>
@@ -335,25 +387,29 @@ const StatsPage: React.FC = () => {
               <option value="7d">Last 7 days</option>
             </select>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={threatTypeData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="name" stroke="#9ca3af" style={{ fontSize: '12px' }} />
-              <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                labelStyle={{ color: '#f3f4f6' }}
-              />
-              <Legend />
-              <Bar dataKey="value" fill="#3b82f6" name="Total Detected" />
-              <Bar dataKey="blocked" fill="#ef4444" name="Blocked" />
-            </BarChart>
-          </ResponsiveContainer>
+          {threatTypeData && threatTypeData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={threatTypeData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="name" stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                  labelStyle={{ color: '#f3f4f6' }}
+                />
+                <Legend />
+                <Bar dataKey="value" fill="#3b82f6" name="Total Detected" />
+                <Bar dataKey="blocked" fill="#ef4444" name="Blocked" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-80 text-gray-400">
+              <p>No threats detected yet</p>
+            </div>
+          )}
         </div>
-        )}
 
         {/* Recent Threats Table */}
-        {filteredAlertsByRecentThreats.length > 0 && (
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Recent Threats</h2>
@@ -368,51 +424,96 @@ const StatsPage: React.FC = () => {
             </select>
           </div>
 
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {filteredAlertsByRecentThreats.slice(0, 10).map((alert, idx) => (
-              <div key={idx} className="bg-gray-700/50 border border-gray-600 rounded p-3 hover:bg-gray-700 transition">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-white">
-                      {alert.threat}
-                      {alert.blocked ? (
-                        <span className="ml-2 px-2 py-1 bg-red-500/20 text-red-300 rounded text-xs">🚫 Blocked</span>
-                      ) : (
-                        <span className="ml-2 px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs">⚠️ Detected</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {alert.method} {alert.path}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      IP: {alert.ip} | {new Date(alert.timestamp).toLocaleTimeString('it-IT')}
-                    </p>
+          {filteredAlertsByRecentThreats.length > 0 ? (
+            <>
+              <div className="space-y-2">
+                {filteredAlertsByRecentThreats
+                  .slice((recentThreatsPage - 1) * itemsPerPage, recentThreatsPage * itemsPerPage)
+                  .map((alert, idx) => (
+                    <div key={idx} className="bg-gray-700/50 border border-gray-600 rounded p-3 hover:bg-gray-700 transition">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-white">
+                            {alert.threat}
+                            {alert.blocked ? (
+                              <span className="ml-2 px-2 py-1 bg-red-500/20 text-red-300 rounded text-xs">🚫 Blocked</span>
+                            ) : (
+                              <span className="ml-2 px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs">⚠️ Detected</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {alert.method} {alert.path}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            IP: {alert.ip} | {new Date(alert.timestamp).toLocaleTimeString('it-IT')}
+                          </p>
+                        </div>
+                        {/* Mostra pulsante Block solo se la threat NON è bloccata */}
+                        {!alert.blocked && (
+                          <button
+                            onClick={() => handleBlockIP(alert.ip)}
+                            disabled={blockingIP === alert.ip}
+                            className={`px-3 py-1 rounded text-xs font-medium transition ${
+                              blockingIP === alert.ip
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-red-600 hover:bg-red-700 text-white'
+                            }`}
+                          >
+                            {blockingIP === alert.ip ? '...' : 'Block'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="mt-6 flex items-center justify-between">
+                <p className="text-xs text-gray-500">
+                  Showing {(recentThreatsPage - 1) * itemsPerPage + 1} to {Math.min(recentThreatsPage * itemsPerPage, filteredAlertsByRecentThreats.length)} of {filteredAlertsByRecentThreats.length} threats
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setRecentThreatsPage(prev => Math.max(1, prev - 1))}
+                    disabled={recentThreatsPage === 1}
+                    className="px-3 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-300 transition"
+                  >
+                    ← Previous
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.ceil(filteredAlertsByRecentThreats.length / itemsPerPage) }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setRecentThreatsPage(page)}
+                        className={`px-3 py-1 rounded text-xs font-medium transition ${
+                          recentThreatsPage === page
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
                   </div>
                   <button
-                    onClick={() => handleBlockIP(alert.ip)}
-                    disabled={blockingIP === alert.ip || alert.blocked}
-                    className={`px-3 py-1 rounded text-xs font-medium transition ${
-                      alert.blocked
-                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                        : blockingIP === alert.ip
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-red-600 hover:bg-red-700 text-white'
-                    }`}
+                    onClick={() => setRecentThreatsPage(prev => Math.min(Math.ceil(filteredAlertsByRecentThreats.length / itemsPerPage), prev + 1))}
+                    disabled={recentThreatsPage === Math.ceil(filteredAlertsByRecentThreats.length / itemsPerPage)}
+                    className="px-3 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-300 transition"
                   >
-                    {blockingIP === alert.ip ? '...' : 'Block'}
+                    Next →
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-
-          <p className="text-xs text-gray-500 mt-4">Showing {Math.min(10, filteredAlertsByRecentThreats.length)} of {filteredAlertsByRecentThreats.length} threats</p>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-80 text-gray-400">
+              <p>No recent threats detected</p>
+            </div>
+          )}
         </div>
-        )}
       </div>
 
       {/* All Alerts Table */}
-      {filteredAlertsByAllAlerts.length > 0 && (
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-semibold text-white">All Alerts</h2>
@@ -440,48 +541,111 @@ const StatsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-700">
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Timestamp</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">IP</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Method</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Path</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Threat Type</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAlertsByAllAlerts.map((alert, idx) => (
-                <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700/50 transition">
-                  <td className="py-3 px-4 text-gray-300 text-xs">
-                    {new Date(alert.timestamp).toLocaleString('it-IT')}
-                  </td>
-                  <td className="py-3 px-4 text-gray-300">{alert.ip}</td>
-                  <td className="py-3 px-4">
-                    <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs font-medium">
-                      {alert.method}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-gray-300 max-w-xs truncate" title={alert.path}>
-                    {alert.path}
-                  </td>
-                  <td className="py-3 px-4 text-gray-300">{alert.threat}</td>
-                  <td className="py-3 px-4">
-                    {alert.blocked ? (
-                      <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium">🚫 Blocked</span>
-                    ) : (
-                      <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium">⚠️ Detected</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {filteredAlertsByAllAlerts.length > 0 ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-700">
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Timestamp</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">IP</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Method</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Path</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Threat Type</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAlertsByAllAlerts
+                    .slice((allAlertsPage - 1) * itemsPerPage, allAlertsPage * itemsPerPage)
+                    .map((alert, idx) => (
+                      <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700/50 transition">
+                        <td className="py-3 px-4 text-gray-300 text-xs">
+                          {new Date(alert.timestamp).toLocaleString('it-IT')}
+                        </td>
+                        <td className="py-3 px-4 text-gray-300">{alert.ip}</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs font-medium">
+                            {alert.method}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-gray-300 max-w-xs truncate" title={alert.path}>
+                          {alert.path}
+                        </td>
+                        <td className="py-3 px-4 text-gray-300">{alert.threat}</td>
+                        <td className="py-3 px-4">
+                          {alert.blocked ? (
+                            <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium">🚫 Blocked</span>
+                          ) : (
+                            <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium">⚠️ Detected</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {!alert.blocked && (
+                            <button
+                              onClick={() => handleBlockIP(alert.ip)}
+                              disabled={blockingIP === alert.ip}
+                              className={`px-2 py-1 rounded text-xs font-medium transition ${
+                                blockingIP === alert.ip
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-red-600 hover:bg-red-700 text-white'
+                              }`}
+                            >
+                              {blockingIP === alert.ip ? '...' : 'Block'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="mt-6 flex items-center justify-between">
+              <p className="text-xs text-gray-500">
+                Showing {(allAlertsPage - 1) * itemsPerPage + 1} to {Math.min(allAlertsPage * itemsPerPage, filteredAlertsByAllAlerts.length)} of {filteredAlertsByAllAlerts.length} alerts
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setAllAlertsPage(prev => Math.max(1, prev - 1))}
+                  disabled={allAlertsPage === 1}
+                  className="px-3 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-300 transition"
+                >
+                  ← Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.ceil(filteredAlertsByAllAlerts.length / itemsPerPage) }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setAllAlertsPage(page)}
+                      className={`px-3 py-1 rounded text-xs font-medium transition ${
+                        allAlertsPage === page
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setAllAlertsPage(prev => Math.min(Math.ceil(filteredAlertsByAllAlerts.length / itemsPerPage), prev + 1))}
+                  disabled={allAlertsPage === Math.ceil(filteredAlertsByAllAlerts.length / itemsPerPage)}
+                  className="px-3 py-1 rounded text-xs font-medium bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-300 transition"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-center h-80 text-gray-400">
+            <p>No alerts found</p>
+          </div>
+        )}
       </div>
-      )}
     </div>
   );
 };

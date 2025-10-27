@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import StatsPage from './dashboard/StatsPage'
 import RulesContainer from './rules/RulesContainer'
+import BlocklistPage from './blocklist/BlocklistPage'
+import LogsPage from './logs/LogsPage'
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth()
@@ -74,7 +76,7 @@ const Dashboard: React.FC = () => {
                   : 'border-transparent text-gray-400 hover:text-white'
               }`}
             >
-              Blocklist
+              Access Control
             </button>
             <button
               onClick={() => setActiveTab('settings')}
@@ -104,22 +106,12 @@ const Dashboard: React.FC = () => {
 
         {/* Logs Tab */}
         {activeTab === 'logs' && (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Security Logs</h2>
-            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-              <p className="text-gray-400">Security logs coming soon...</p>
-            </div>
-          </div>
+          <LogsPage />
         )}
 
         {/* Blocklist Tab */}
         {activeTab === 'blocklist' && (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Blocked IPs</h2>
-            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-              <p className="text-gray-400">Blocklist management coming soon...</p>
-            </div>
-          </div>
+          <BlocklistPage />
         )}
 
         {/* Settings Tab */}

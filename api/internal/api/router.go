@@ -36,9 +36,22 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		}
 
 		protected.GET("/logs", NewGetLogsHandler(db))
+
+		// Blocklist endpoints
 		protected.GET("/blocklist", GetBlocklist)
 		protected.POST("/blocklist", BlockIP)
 		protected.DELETE("/blocklist/:ip", UnblockIP)
+
+		// Whitelist endpoints
+		protected.GET("/whitelist", NewGetWhitelistHandler(db))
+		protected.POST("/whitelist", NewAddToWhitelistHandler(db))
+		protected.DELETE("/whitelist/:id", NewRemoveFromWhitelistHandler(db))
+
+		// False Positives endpoints
+		protected.GET("/false-positives", NewGetFalsePositivesHandler(db))
+		protected.POST("/false-positives", NewReportFalsePositiveHandler(db))
+		protected.PATCH("/false-positives/:id", NewUpdateFalsePositiveStatusHandler(db))
+		protected.DELETE("/false-positives/:id", NewDeleteFalsePositiveHandler(db))
 
 		// 2FA endpoints
 		protected.POST("/auth/2fa/setup", authHandler.InitiateTwoFASetup)
