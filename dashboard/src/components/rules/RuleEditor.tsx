@@ -13,8 +13,9 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel, allRules }: 
     name: rule.name,
     pattern: rule.pattern,
     description: rule.description,
-    threatType: rule.threatType,
-    mode: rule.mode,
+    threatType: rule.threatType || rule.type,
+    // Map action 'log' -> 'detect', 'block' -> 'block'
+    mode: (rule.action === 'log' ? 'detect' : rule.mode || 'block') as 'detect' | 'block',
   });
 
   const threatTypes = Array.from(new Set(allRules.map(r => r.threatType)));
@@ -30,6 +31,13 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel, allRules }: 
 
     const token = localStorage.getItem('authToken');
 
+    // Map mode to action: 'detect' -> 'log', 'block' -> 'block'
+    const payload = {
+      ...formData,
+      type: formData.threatType,
+      action: formData.mode === 'detect' ? 'log' : 'block',
+    };
+
     try {
       const response = await fetch(`/api/rules/${rule.id}`, {
         method: 'PUT',
@@ -37,7 +45,7 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel, allRules }: 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {

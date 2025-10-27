@@ -216,7 +216,9 @@ export default function RulesContainer() {
                 <div>
                   <p className="text-sm text-gray-400">Mode</p>
                   <p className="text-gray-300 mt-1 font-medium">
-                    {defaultRules.some(r => r.id === selectedRule.id) ? 'Detect & Block' : (selectedRule.mode === 'block' ? 'Block' : 'Detect')}
+                    {defaultRules.some(r => r.id === selectedRule.id)
+                      ? 'Detect & Block'
+                      : (selectedRule.action === 'block' || selectedRule.mode === 'block' ? 'Block' : 'Detect')}
                   </p>
                 </div>
               </div>

@@ -29,6 +29,13 @@ export default function AddRule({ onRuleAdded, onCancel, allRules }: AddRuleProp
 
     const token = localStorage.getItem('authToken');
 
+    // Map mode to action: 'detect' -> 'log', 'block' -> 'block'
+    const payload = {
+      ...formData,
+      type: formData.threatType,
+      action: formData.mode === 'detect' ? 'log' : 'block',
+    };
+
     try {
       const response = await fetch('/api/rules', {
         method: 'POST',
@@ -36,7 +43,7 @@ export default function AddRule({ onRuleAdded, onCancel, allRules }: AddRuleProp
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
