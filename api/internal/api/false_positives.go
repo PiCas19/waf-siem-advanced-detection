@@ -101,7 +101,7 @@ func NewUpdateFalsePositiveStatusHandler(db *gorm.DB) gin.HandlerFunc {
 			"reviewed_at":  &now,
 		}
 
-		if err := db.Model(&models.FalsePositive{}, uint(idUint)).Updates(update).Error; err != nil {
+		if err := db.Model(&models.FalsePositive{}).Where("id = ?", uint(idUint)).Updates(update).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				c.JSON(404, gin.H{"error": "Entry not found"})
 			} else {
