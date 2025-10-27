@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import StatsPage from './dashboard/StatsPage'
 import RulesContainer from './rules/RulesContainer'
 import BlocklistPage from './blocklist/BlocklistPage'
-import LogsPage from './logs/LogsPage.tsx'
+import LogsPage from './logs/LogsPage'
 
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth()
