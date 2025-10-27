@@ -211,22 +211,57 @@ export default function RulesContainer() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-400">Threat Type</p>
-                  <p className="text-gray-300 mt-1 font-medium">{selectedRule.threatType}</p>
+                  <p className="text-gray-300 mt-1 font-medium">{selectedRule.type || selectedRule.threatType}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-400">Mode</p>
                   <p className="text-gray-300 mt-1 font-medium">
-                    {selectedRule.mode === 'block' ? 'Block' : 'Detect'}
+                    {defaultRules.some(r => r.id === selectedRule.id) ? 'Detect & Block' : (selectedRule.mode === 'block' ? 'Block' : 'Detect')}
                   </p>
                 </div>
               </div>
 
-              <div>
-                <p className="text-sm text-gray-400">Pattern (Regex)</p>
-                <div className="bg-gray-700 p-3 rounded mt-1 font-mono text-sm text-gray-300 break-all">
-                  {selectedRule.pattern}
+              {selectedRule.severity && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-400">Severity</p>
+                    <span className={`px-3 py-1 rounded text-xs font-medium mt-1 inline-block ${
+                      selectedRule.severity === 'CRITICAL'
+                        ? 'bg-red-500/20 text-red-300'
+                        : selectedRule.severity === 'HIGH'
+                        ? 'bg-orange-500/20 text-orange-300'
+                        : 'bg-yellow-500/20 text-yellow-300'
+                    }`}>
+                      {selectedRule.severity}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {selectedRule.examples && selectedRule.examples.length > 0 && (
+                <div>
+                  <p className="text-sm text-gray-400">Examples</p>
+                  <ul className="mt-2 space-y-2">
+                    {selectedRule.examples.slice(0, 3).map((ex, idx) => (
+                      <li key={idx} className="text-gray-400 text-sm break-all">
+                        • <code className="bg-gray-700 px-2 py-1 rounded text-xs">{ex}</code>
+                      </li>
+                    ))}
+                    {selectedRule.examples.length > 3 && (
+                      <li className="text-gray-500 text-sm italic">+ {selectedRule.examples.length - 3} more examples</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              {selectedRule.pattern && (
+                <div>
+                  <p className="text-sm text-gray-400">Pattern (Regex)</p>
+                  <div className="bg-gray-700 p-3 rounded mt-1 font-mono text-sm text-gray-300 break-all">
+                    {selectedRule.pattern}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -252,15 +287,32 @@ export default function RulesContainer() {
             </div>
 
             <div className="flex gap-4 mt-6 pt-6 border-t border-gray-700">
-              <button
-                onClick={() => {
-                  handleEditRule(selectedRule);
-                  setShowDetailsModal(false);
-                }}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition"
-              >
-                Edit
-              </button>
+              {/* Check if this is a default rule */}
+              {!defaultRules.some(r => r.id === selectedRule.id) ? (
+                <>
+                  <button
+                    onClick={() => {
+                      handleEditRule(selectedRule);
+                      setShowDetailsModal(false);
+                    }}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleDeleteRule(selectedRule.id);
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition"
+                  >
+                    Delete
+                  </button>
+                </>
+              ) : (
+                <div className="text-sm text-blue-300 italic">
+                  This is a built-in rule and cannot be edited or deleted
+                </div>
+              )}
               <button
                 onClick={() => {
                   handleTestRule(selectedRule);
@@ -269,14 +321,6 @@ export default function RulesContainer() {
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition"
               >
                 Test
-              </button>
-              <button
-                onClick={() => {
-                  handleDeleteRule(selectedRule.id);
-                }}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition"
-              >
-                Delete
               </button>
               <button
                 onClick={() => setShowDetailsModal(false)}
