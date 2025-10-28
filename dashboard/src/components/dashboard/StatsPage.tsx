@@ -909,7 +909,11 @@ const StatsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Attack Hotspots - World Map - left side, 2 columns */}
+      </div>
+
+      {/* Attack Hotspots Section - New Row with Map and Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* World Map - Left side, 2 columns */}
         <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Attack Hotspots - World Map</h2>
@@ -943,94 +947,110 @@ const StatsPage: React.FC = () => {
             </div>
           </div>
           {geolocationMapData && geolocationMapData.length > 0 ? (
-            <>
-              <div style={{ height: '400px', position: 'relative', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px' }}>
-                <MapContainer
-                  {...({ center: [20, 0], zoom: 2 } as any)}
-                  style={{ height: '100%', width: '100%' }}
-                >
-                  <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  {geolocationMapData.map((marker, idx) => (
-                    <CircleMarker
-                      {...({
-                        center: [marker.lat, marker.lng],
-                        radius: Math.max(5, Math.sqrt(marker.count) * 2),
-                        fillColor: marker.color,
-                        color: marker.color,
-                        weight: 2,
-                        opacity: 0.8,
-                        fillOpacity: 0.7,
-                      } as any)}
-                      key={idx}
-                    >
-                      <Popup>
-                        <div className="text-gray-900">
-                          <p className="font-semibold">{marker.country}</p>
-                          <p className="text-sm">Attacks: {marker.count}</p>
-                        </div>
-                      </Popup>
-                    </CircleMarker>
-                  ))}
-                </MapContainer>
-              </div>
-              <div className="mt-6">
-                <h3 className="text-sm font-semibold text-white mb-4">Countries Attack Breakdown</h3>
-                {geolocationData && geolocationData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart
-                      data={geolocationCountryFilter !== 'all'
-                        ? geolocationData.filter(item => item.country === geolocationCountryFilter)
-                        : geolocationData
-                      }
-                      layout="vertical"
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                      <XAxis type="number" stroke="#9ca3af" style={{ fontSize: '12px' }} />
-                      <YAxis dataKey="country" type="category" stroke="#9ca3af" style={{ fontSize: '11px' }} width={80} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                        labelStyle={{ color: '#f3f4f6' }}
-                      />
-                      <Legend />
-                      <Bar dataKey="value" fill="#f97316" name="Attack Count" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-40 text-gray-400">
-                    <p>No data available</p>
-                  </div>
-                )}
-              </div>
-              <div className="mt-4 text-sm">
-                <p className="font-semibold text-white mb-3">Intensity Legend:</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2 text-red-500">
-                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#dc2626' }}></div>
-                    <span>Critical: 50+ attacks</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-orange-500">
-                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#f97316' }}></div>
-                    <span>High: 20-50</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-yellow-500">
-                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#eab308' }}></div>
-                    <span>Medium: 10-20</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-blue-500">
-                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
-                    <span>Low: &lt;10</span>
-                  </div>
-                </div>
-              </div>
-            </>
+            <div style={{ height: '450px', position: 'relative', borderRadius: '8px', overflow: 'hidden' }}>
+              <MapContainer
+                {...({ center: [20, 0], zoom: 2 } as any)}
+                style={{ height: '100%', width: '100%' }}
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {geolocationMapData.map((marker, idx) => (
+                  <CircleMarker
+                    {...({
+                      center: [marker.lat, marker.lng],
+                      radius: Math.max(5, Math.sqrt(marker.count) * 2),
+                      fillColor: marker.color,
+                      color: marker.color,
+                      weight: 2,
+                      opacity: 0.8,
+                      fillOpacity: 0.7,
+                    } as any)}
+                    key={idx}
+                  >
+                    <Popup>
+                      <div className="text-gray-900">
+                        <p className="font-semibold">{marker.country}</p>
+                        <p className="text-sm">Attacks: {marker.count}</p>
+                      </div>
+                    </Popup>
+                  </CircleMarker>
+                ))}
+              </MapContainer>
+            </div>
           ) : (
             <div className="flex items-center justify-center h-96 text-gray-400">
-              <p>No attack data available for map</p>
+              <p>No attack data available</p>
             </div>
           )}
         </div>
+
+        {/* Countries Attack Breakdown - Right side, 1 column */}
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-white mb-4">Countries Breakdown</h3>
+          {geolocationData && geolocationData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={450}>
+              <BarChart
+                data={geolocationCountryFilter !== 'all'
+                  ? geolocationData.filter(item => item.country === geolocationCountryFilter)
+                  : geolocationData
+                }
+                layout="vertical"
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis type="number" stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                <YAxis dataKey="country" type="category" stroke="#9ca3af" style={{ fontSize: '11px' }} width={80} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                  labelStyle={{ color: '#f3f4f6' }}
+                />
+                <Bar dataKey="value" fill="#f97316" name="Attacks" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-96 text-gray-400">
+              <p>No data available</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Intensity Legend - Below Map and Breakdown */}
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-white mb-4">Attack Intensity Legend</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#dc2626' }}></div>
+            <div>
+              <p className="font-semibold text-red-500">Critical</p>
+              <p className="text-sm text-gray-400">50+ attacks</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#f97316' }}></div>
+            <div>
+              <p className="font-semibold text-orange-500">High</p>
+              <p className="text-sm text-gray-400">20-50 attacks</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#eab308' }}></div>
+            <div>
+              <p className="font-semibold text-yellow-500">Medium</p>
+              <p className="text-sm text-gray-400">10-20 attacks</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
+            <div>
+              <p className="font-semibold text-blue-500">Low</p>
+              <p className="text-sm text-gray-400">&lt;10 attacks</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Threat Level Distribution - right side, 1 column */}
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">

@@ -7,7 +7,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/oschwald/geoip2-golang v1.11.0
-	github.com/oschwald/maxminddb-golang v1.13.0
 	golang.org/x/crypto v0.17.0
 	gorm.io/driver/sqlite v1.5.4
 	gorm.io/gorm v1.25.5
