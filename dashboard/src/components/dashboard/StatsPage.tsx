@@ -303,57 +303,66 @@ const StatsPage: React.FC = () => {
     setMaliciousIPsData(top10 && top10.length > 0 ? top10 : []);
   }, [recentAlerts, maliciousIPsFilter]);
 
-  // Funzione per mappare IP a paese (basato su IP ranges comuni)
-  const getCountryFromIP = (ip: string): string => {
-    if (!ip) return 'Unknown';
-
-    // Parsing dell'IP
-    const parts = ip.split('.').map(p => parseInt(p, 10));
-    if (parts.length !== 4 || parts.some(p => isNaN(p))) return 'Unknown';
-
-    const [octet1] = parts;
-
-    // Mappatura semplice dei range IP a paesi
-    // Questi sono range reali ma semplificati per demo
-    if (octet1 >= 1 && octet1 <= 11) return 'United States';
-    if (octet1 >= 12 && octet1 <= 21) return 'China';
-    if (octet1 >= 22 && octet1 <= 29) return 'Russia';
-    if (octet1 >= 30 && octet1 <= 47) return 'India';
-    if (octet1 >= 48 && octet1 <= 63) return 'Brazil';
-    if (octet1 >= 64 && octet1 <= 127) return 'Europe';
-    if (octet1 >= 128 && octet1 <= 191) return 'Asia-Pacific';
-    if (octet1 >= 192 && octet1 <= 223) return 'North America';
-
-    return 'Unknown';
-  };
-
-  // Calcola Geolocation Data (paese di provenienza)
+  // Calcola Geolocation Data (paese di provenienza) usando API backend
   useEffect(() => {
-    let filtered = [...recentAlerts];
+    const fetchGeolocation = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        const response = await fetch('/api/geolocation', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
 
-    const now = new Date();
-    const timeMs = getTimeMs(geolocationFilter);
-    filtered = filtered.filter(alert => {
-      const alertTime = new Date(alert.timestamp).getTime();
-      return now.getTime() - alertTime < timeMs;
-    });
+        if (response.ok) {
+          const data = await response.json();
 
-    // Raggruppa per paese usando la funzione getCountryFromIP
-    const countryCounts: { [key: string]: number } = {};
-    filtered.forEach(alert => {
-      const country = getCountryFromIP(alert.ip);
-      countryCounts[country] = (countryCounts[country] || 0) + 1;
-    });
+          // Filtra per il timeframe selezionato
+          const now = new Date();
+          const timeMs = getTimeMs(geolocationFilter);
 
-    // Converti in array e ordina per count decrescente
-    const geoData = Object.entries(countryCounts)
-      .map(([country, value]) => ({
-        country,
-        value
-      }))
-      .sort((a, b) => (b.value || 0) - (a.value || 0));
+          // Filtra gli alert nel timeframe
+          const filteredAlerts = recentAlerts.filter(alert => {
+            const alertTime = new Date(alert.timestamp).getTime();
+            return now.getTime() - alertTime < timeMs;
+          });
 
-    setGeolocationData(geoData && geoData.length > 0 ? geoData : []);
+          // Riconta per paese basato sui dati del backend
+          const countryCounts: { [key: string]: number } = {};
+          filteredAlerts.forEach(() => {
+            // Trova il paese per questo IP dal backend
+            const geoItem = (data.data || []).find((item: any) => item.country);
+            if (geoItem) {
+              countryCounts[geoItem.country] = (countryCounts[geoItem.country] || 0) + 1;
+            }
+          });
+
+          // Se non abbiamo dati filtrati, usa direttamente i dati del backend
+          let filtered = data.data || [];
+          if (Object.keys(countryCounts).length > 0) {
+            filtered = Object.entries(countryCounts)
+              .map(([country, count]) => ({
+                country,
+                count
+              }))
+              .sort((a, b) => (b.count || 0) - (a.count || 0));
+          }
+
+          // Converti a formato compatibile con il chart
+          const geoData = (filtered as any[]).map(item => ({
+            country: item.country,
+            value: item.count
+          }));
+
+          setGeolocationData(geoData && geoData.length > 0 ? geoData : []);
+        }
+      } catch (error) {
+        console.error('Error fetching geolocation data:', error);
+        setGeolocationData([]);
+      }
+    };
+
+    fetchGeolocation();
   }, [recentAlerts, geolocationFilter]);
 
   // Calcola Threat Level Distribution
@@ -642,9 +651,9 @@ const StatsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Threat Types & Recent Threats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Threat Types Chart */}
+      {/* Row 2 & 3: Threat Types Distribution, Top IPs, Geolocation, Threat Levels */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Threat Types Distribution - left side, 1 column */}
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Threat Types Distribution</h2>
@@ -687,11 +696,7 @@ const StatsPage: React.FC = () => {
           )}
         </div>
 
-      </div>
-
-      {/* Three New Charts: Top IPs, Geolocation, Threat Levels */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Top 10 Malicious IPs - 2 columns */}
+        {/* Top 10 Malicious IPs - right side, 2 columns */}
         <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Top 10 Malicious IPs</h2>
@@ -730,49 +735,6 @@ const StatsPage: React.FC = () => {
           ) : (
             <div className="flex items-center justify-center h-80 text-gray-400">
               <p>No IP data available</p>
-            </div>
-          )}
-        </div>
-
-        {/* Threat Types Distribution - right side, 1 column */}
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-white">Threat Types Distribution</h2>
-            <select
-              value={threatDistFilter}
-              onChange={(e) => setThreatDistFilter(e.target.value as TimeFilter)}
-              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="today">Today</option>
-              <option value="week">This week</option>
-              <option value="15m">Last 15 minutes</option>
-              <option value="30m">Last 30 minutes</option>
-              <option value="1h">Last 1 hour</option>
-              <option value="24h">Last 24 hours</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-              <option value="1y">Last 1 year</option>
-            </select>
-          </div>
-          {threatTypeData && threatTypeData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={threatTypeData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="name" stroke="#9ca3af" style={{ fontSize: '12px' }} />
-                <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#f3f4f6' }}
-                />
-                <Legend />
-                <Bar dataKey="value" fill="#3b82f6" name="Total Detected" />
-                <Bar dataKey="blocked" fill="#ef4444" name="Blocked" />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-80 text-gray-400">
-              <p>No threats detected yet</p>
             </div>
           )}
         </div>
