@@ -719,7 +719,7 @@ const StatsPage: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ip: ip,
+          ip_address: ip,
           reason: 'Manually blocked from Recent Threats',
           permanent: false,
         }),
