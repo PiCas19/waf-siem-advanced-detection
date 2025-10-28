@@ -46,10 +46,18 @@ func NewService() (*Service, error) {
 	}
 
 	// Try to load MaxMind GeoLite2 database
-	if reader, err := geoip2.Open("geoip/GeoLite2-Country.mmdb"); err == nil {
-		s.reader = reader
-		fmt.Println("[INFO] MaxMind GeoLite2 database loaded successfully")
-		return s, nil
+	dbPaths := []string{
+		"geoip/GeoLite2-Country.mmdb",
+		"./geoip/GeoLite2-Country.mmdb",
+		"/geoip/GeoLite2-Country.mmdb",
+	}
+
+	for _, dbPath := range dbPaths {
+		if reader, err := geoip2.Open(dbPath); err == nil {
+			s.reader = reader
+			fmt.Printf("[INFO] MaxMind GeoLite2 database loaded successfully from %s\n", dbPath)
+			return s, nil
+		}
 	}
 
 	// Fallback to JSON file if MaxMind not available
@@ -87,23 +95,23 @@ func (s *Service) LookupCountry(ipStr string) string {
 	ranges := s.ranges
 	s.mu.RUnlock()
 
-	// Try MaxMind first if available
-	if reader != nil {
-		ip := net.ParseIP(ipStr)
-		if ip != nil {
-			record, err := reader.Country(ip)
-			if err == nil && record != nil && record.Country.IsoCode != "" {
-				return record.Country.Names["en"]
-			}
-		}
-	}
-
-	// Fallback to JSON ranges
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return "Unknown"
 	}
 
+	// Try MaxMind first if available
+	if reader != nil {
+		record, err := reader.Country(ip)
+		if err == nil && record != nil && record.Country.IsoCode != "" {
+			country := record.Country.Names["en"]
+			if country != "" {
+				return country
+			}
+		}
+	}
+
+	// Fallback to JSON ranges
 	for _, r := range ranges {
 		startIP := net.ParseIP(r.Start)
 		endIP := net.ParseIP(r.End)
@@ -159,6 +167,12 @@ func compareIP(a, b net.IP) int {
 // getFallbackRanges returns hardcoded ranges for fallback
 func getFallbackRanges() []IPRange {
 	return []IPRange{
+		// Switzerland (Lugano area testing)
+		{Start: "5.102.0.0", End: "5.102.255.255", Country: "CH", CountryName: "Switzerland"},
+		{Start: "78.40.0.0", End: "78.40.255.255", Country: "CH", CountryName: "Switzerland"},
+		{Start: "195.0.0.0", End: "195.255.255.255", Country: "CH", CountryName: "Switzerland"},
+
+		// Europe
 		{Start: "1.0.0.0", End: "1.255.255.255", Country: "AU", CountryName: "Australia"},
 		{Start: "4.0.0.0", End: "4.255.255.255", Country: "US", CountryName: "United States"},
 		{Start: "7.0.0.0", End: "7.255.255.255", Country: "RU", CountryName: "Russia"},
