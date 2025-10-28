@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ScatterChart, Scatter,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
   AlertTriangle, Lock,
   ArrowUp, ArrowDown, Circle
 } from 'lucide-react';
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
 import { useWebSocketStats } from '@/hooks/useWebSocketStats';
 import { fetchStats } from '@/services/api';
 
@@ -911,12 +909,13 @@ const StatsPage: React.FC = () => {
 
       </div>
 
-      {/* Attack Hotspots Section - New Row with Map and Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* World Map - Left side, 2 columns */}
-        <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
+      {/* Attack Hotspots Section - Single Card with Internal Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Main Card - Left side 3 columns */}
+        <div className="lg:col-span-3 bg-gray-800 border border-gray-700 rounded-lg p-6">
+          {/* Header with filters */}
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-white">Attack Hotspots - World Map</h2>
+            <h2 className="text-lg font-semibold text-white">Attack Hotspots</h2>
             <div className="flex gap-2">
               <select
                 value={geolocationCountryFilter}
@@ -946,113 +945,132 @@ const StatsPage: React.FC = () => {
               </select>
             </div>
           </div>
-          {geolocationMapData && geolocationMapData.length > 0 ? (
-            <div style={{ height: '450px', position: 'relative', borderRadius: '8px', overflow: 'hidden' }}>
-              <MapContainer
-                {...({ center: [20, 0], zoom: 2 } as any)}
-                style={{ height: '100%', width: '100%' }}
-              >
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {geolocationMapData.map((marker, idx) => (
-                  <CircleMarker
-                    {...({
-                      center: [marker.lat, marker.lng],
-                      radius: Math.max(5, Math.sqrt(marker.count) * 2),
-                      fillColor: marker.color,
-                      color: marker.color,
-                      weight: 2,
-                      opacity: 0.8,
-                      fillOpacity: 0.7,
-                    } as any)}
-                    key={idx}
+
+          {/* Internal Grid: Map (2 cols) + Breakdown (1 col) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+            {/* World Map - Left side, 2 columns */}
+            <div className="lg:col-span-2">
+              {geolocationMapData && geolocationMapData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis
+                      dataKey="lng"
+                      type="number"
+                      stroke="#9ca3af"
+                      label={{ value: 'Longitude', position: 'insideBottomRight', offset: -5, fill: '#9ca3af' }}
+                      domain={[-180, 180]}
+                    />
+                    <YAxis
+                      dataKey="lat"
+                      stroke="#9ca3af"
+                      label={{ value: 'Latitude', angle: -90, position: 'insideLeft', fill: '#9ca3af' }}
+                      domain={[-90, 90]}
+                    />
+                    <Tooltip
+                      cursor={{ strokeDasharray: '3 3' }}
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      labelStyle={{ color: '#f3f4f6' }}
+                      content={({ active, payload }: any) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-gray-900 border border-gray-600 rounded-lg p-3">
+                              <p className="text-gray-300 font-semibold text-sm">{data.country}</p>
+                              <p className="text-gray-400 text-xs">Attacks: {data.count}</p>
+                              <p className="text-gray-500 text-xs">Lat: {data.lat.toFixed(2)}, Lng: {data.lng.toFixed(2)}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Scatter
+                      name="Attack Hotspots"
+                      data={geolocationMapData}
+                      fill="#f97316"
+                      shape="circle"
+                    >
+                      {geolocationMapData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Scatter>
+                  </ScatterChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-80 text-gray-400">
+                  <p>No attack data available</p>
+                </div>
+              )}
+            </div>
+
+            {/* Countries Attack Breakdown - Right side, 1 column */}
+            <div>
+              <h3 className="text-sm font-semibold text-white mb-3">Countries Breakdown</h3>
+              {geolocationData && geolocationData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <BarChart
+                    data={geolocationCountryFilter !== 'all'
+                      ? geolocationData.filter(item => item.country === geolocationCountryFilter)
+                      : geolocationData
+                    }
+                    layout="vertical"
                   >
-                    <Popup>
-                      <div className="text-gray-900">
-                        <p className="font-semibold">{marker.country}</p>
-                        <p className="text-sm">Attacks: {marker.count}</p>
-                      </div>
-                    </Popup>
-                  </CircleMarker>
-                ))}
-              </MapContainer>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis type="number" stroke="#9ca3af" style={{ fontSize: '10px' }} />
+                    <YAxis dataKey="country" type="category" stroke="#9ca3af" style={{ fontSize: '9px' }} width={70} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                      labelStyle={{ color: '#f3f4f6' }}
+                    />
+                    <Bar dataKey="value" fill="#f97316" name="Attacks" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-80 text-gray-400">
+                  <p>No data available</p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="flex items-center justify-center h-96 text-gray-400">
-              <p>No attack data available</p>
-            </div>
-          )}
-        </div>
+          </div>
 
-        {/* Countries Attack Breakdown - Right side, 1 column */}
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Countries Breakdown</h3>
-          {geolocationData && geolocationData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={450}>
-              <BarChart
-                data={geolocationCountryFilter !== 'all'
-                  ? geolocationData.filter(item => item.country === geolocationCountryFilter)
-                  : geolocationData
-                }
-                layout="vertical"
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis type="number" stroke="#9ca3af" style={{ fontSize: '12px' }} />
-                <YAxis dataKey="country" type="category" stroke="#9ca3af" style={{ fontSize: '11px' }} width={80} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#f3f4f6' }}
-                />
-                <Bar dataKey="value" fill="#f97316" name="Attacks" />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-96 text-gray-400">
-              <p>No data available</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Intensity Legend - Below Map and Breakdown */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Attack Intensity Legend</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#dc2626' }}></div>
-            <div>
-              <p className="font-semibold text-red-500">Critical</p>
-              <p className="text-sm text-gray-400">50+ attacks</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#f97316' }}></div>
-            <div>
-              <p className="font-semibold text-orange-500">High</p>
-              <p className="text-sm text-gray-400">20-50 attacks</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#eab308' }}></div>
-            <div>
-              <p className="font-semibold text-yellow-500">Medium</p>
-              <p className="text-sm text-gray-400">10-20 attacks</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
-            <div>
-              <p className="font-semibold text-blue-500">Low</p>
-              <p className="text-sm text-gray-400">&lt;10 attacks</p>
+          {/* Intensity Legend - Below Map and Breakdown (Full width) */}
+          <div className="border-t border-gray-700 pt-4">
+            <h3 className="text-sm font-semibold text-white mb-3">Attack Intensity Legend</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#dc2626' }}></div>
+                <div>
+                  <p className="font-semibold text-red-500 text-xs">Critical</p>
+                  <p className="text-xs text-gray-400">50+ attacks</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#f97316' }}></div>
+                <div>
+                  <p className="font-semibold text-orange-500 text-xs">High</p>
+                  <p className="text-xs text-gray-400">20-50 attacks</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#eab308' }}></div>
+                <div>
+                  <p className="font-semibold text-yellow-500 text-xs">Medium</p>
+                  <p className="text-xs text-gray-400">10-20 attacks</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
+                <div>
+                  <p className="font-semibold text-blue-500 text-xs">Low</p>
+                  <p className="text-xs text-gray-400">&lt;10 attacks</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Threat Level Distribution - right side, 1 column */}
+        {/* Threat Level Distribution - Right side, 1 column */}
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Threat Level Distribution</h2>
