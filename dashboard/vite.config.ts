@@ -13,7 +13,7 @@ export default defineConfig({
     port: 3000,
     middleware: [
       (req, res, next) => {
-        res.setHeader('Content-Security-Policy', "img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org");
+        res.setHeader('Content-Security-Policy', "img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org");
         next();
       }
     ],
