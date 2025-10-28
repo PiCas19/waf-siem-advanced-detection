@@ -15,6 +15,11 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel }: RuleEditor
     threatType: rule.threatType || rule.type,
     // Map action 'log' -> 'detect', 'block' -> 'block'
     mode: (rule.action === 'log' ? 'detect' : rule.mode || 'block') as 'detect' | 'block',
+    blockEnabled: (rule as any).block_enabled || false,
+    dropEnabled: (rule as any).drop_enabled || false,
+    redirectEnabled: (rule as any).redirect_enabled || false,
+    challengeEnabled: (rule as any).challenge_enabled || false,
+    redirectUrl: (rule as any).redirect_url || '',
   });
 
   const threatTypes = [
@@ -46,9 +51,16 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel }: RuleEditor
 
     // Map mode to action: 'detect' -> 'log', 'block' -> 'block'
     const payload = {
-      ...formData,
+      name: formData.name,
+      pattern: formData.pattern,
+      description: formData.description,
       type: formData.threatType,
       action: formData.mode === 'detect' ? 'log' : 'block',
+      block_enabled: formData.blockEnabled,
+      drop_enabled: formData.dropEnabled,
+      redirect_enabled: formData.redirectEnabled,
+      challenge_enabled: formData.challengeEnabled,
+      redirect_url: formData.redirectUrl || '',
     };
 
     try {
@@ -178,6 +190,8 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel }: RuleEditor
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
+                checked={formData.blockEnabled}
+                onChange={(e) => setFormData({ ...formData, blockEnabled: e.target.checked })}
                 className="w-4 h-4 rounded border-gray-600"
               />
               <span className="text-gray-300">Block - Reject request immediately</span>
@@ -185,6 +199,8 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel }: RuleEditor
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
+                checked={formData.dropEnabled}
+                onChange={(e) => setFormData({ ...formData, dropEnabled: e.target.checked })}
                 className="w-4 h-4 rounded border-gray-600"
               />
               <span className="text-gray-300">Drop - Terminate connection without response</span>
@@ -192,13 +208,28 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel }: RuleEditor
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
+                checked={formData.redirectEnabled}
+                onChange={(e) => setFormData({ ...formData, redirectEnabled: e.target.checked })}
                 className="w-4 h-4 rounded border-gray-600"
               />
               <span className="text-gray-300">Redirect - Redirect to security page</span>
             </label>
+            {formData.redirectEnabled && (
+              <div className="ml-7 mt-2">
+                <input
+                  type="text"
+                  value={formData.redirectUrl}
+                  onChange={(e) => setFormData({ ...formData, redirectUrl: e.target.value })}
+                  placeholder="https://example.com/security"
+                  className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+                />
+              </div>
+            )}
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
+                checked={formData.challengeEnabled}
+                onChange={(e) => setFormData({ ...formData, challengeEnabled: e.target.checked })}
                 className="w-4 h-4 rounded border-gray-600"
               />
               <span className="text-gray-300">Challenge - Require CAPTCHA verification</span>

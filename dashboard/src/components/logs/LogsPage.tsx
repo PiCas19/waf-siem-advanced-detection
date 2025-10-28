@@ -164,10 +164,10 @@ export default function LogsPage(): React.ReactElement {
       const searchLower = filter.search.toLowerCase();
       filtered = filtered.filter(
         (log) =>
-          log.client_ip.toLowerCase().includes(searchLower) ||
-          log.threat_type.toLowerCase().includes(searchLower) ||
-          log.url.toLowerCase().includes(searchLower) ||
-          log.payload.toLowerCase().includes(searchLower)
+          (log.client_ip?.toLowerCase() || '').includes(searchLower) ||
+          (log.threat_type?.toLowerCase() || '').includes(searchLower) ||
+          (log.url?.toLowerCase() || '').includes(searchLower) ||
+          (log.payload?.toLowerCase() || '').includes(searchLower)
       );
     }
 

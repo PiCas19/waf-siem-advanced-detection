@@ -13,6 +13,11 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
     description: '',
     threatType: 'SQL Injection',
     mode: 'block' as 'block' | 'detect',
+    blockEnabled: false,
+    dropEnabled: false,
+    redirectEnabled: false,
+    challengeEnabled: false,
+    redirectUrl: '',
   });
 
   const threatTypes = [
@@ -44,9 +49,16 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
 
     // Map mode to action: 'detect' -> 'log', 'block' -> 'block'
     const payload = {
-      ...formData,
+      name: formData.name,
+      pattern: formData.pattern,
+      description: formData.description,
       type: formData.threatType,
       action: formData.mode === 'detect' ? 'log' : 'block',
+      block_enabled: formData.blockEnabled,
+      drop_enabled: formData.dropEnabled,
+      redirect_enabled: formData.redirectEnabled,
+      challenge_enabled: formData.challengeEnabled,
+      redirect_url: formData.redirectUrl || '',
     };
 
     try {
@@ -69,6 +81,11 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
           description: '',
           threatType: 'SQL Injection',
           mode: 'block',
+          blockEnabled: false,
+          dropEnabled: false,
+          redirectEnabled: false,
+          challengeEnabled: false,
+          redirectUrl: '',
         });
       } else {
         alert('Error creating rule');
@@ -183,6 +200,8 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
+                checked={formData.blockEnabled}
+                onChange={(e) => setFormData({ ...formData, blockEnabled: e.target.checked })}
                 className="w-4 h-4 rounded border-gray-600"
               />
               <span className="text-gray-300">Block - Reject request immediately</span>
@@ -190,6 +209,8 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
+                checked={formData.dropEnabled}
+                onChange={(e) => setFormData({ ...formData, dropEnabled: e.target.checked })}
                 className="w-4 h-4 rounded border-gray-600"
               />
               <span className="text-gray-300">Drop - Terminate connection without response</span>
@@ -197,13 +218,28 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
+                checked={formData.redirectEnabled}
+                onChange={(e) => setFormData({ ...formData, redirectEnabled: e.target.checked })}
                 className="w-4 h-4 rounded border-gray-600"
               />
               <span className="text-gray-300">Redirect - Redirect to security page</span>
             </label>
+            {formData.redirectEnabled && (
+              <div className="ml-7 mt-2">
+                <input
+                  type="text"
+                  value={formData.redirectUrl}
+                  onChange={(e) => setFormData({ ...formData, redirectUrl: e.target.value })}
+                  placeholder="https://example.com/security"
+                  className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none text-sm"
+                />
+              </div>
+            )}
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
+                checked={formData.challengeEnabled}
+                onChange={(e) => setFormData({ ...formData, challengeEnabled: e.target.checked })}
                 className="w-4 h-4 rounded border-gray-600"
               />
               <span className="text-gray-300">Challenge - Require CAPTCHA verification</span>
