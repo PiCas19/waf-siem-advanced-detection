@@ -48,6 +48,33 @@ const TimelineTooltip: React.FC<any> = ({ active, payload }) => {
       </div>
     );
   }
+};
+
+// Custom Tooltip for Pie Charts (Block Rate, Threat Level)
+const PieChartTooltip: React.FC<any> = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0];
+    let tooltipColor = '#f3f4f6'; // default light gray
+
+    // Assign colors based on the data value/name
+    if (data.payload.name === 'Blocked' || data.payload.name === 'Critical') {
+      tooltipColor = '#ef4444'; // red
+    } else if (data.payload.name === 'Allowed' || data.payload.name === 'High') {
+      tooltipColor = '#22c55e'; // green
+    } else if (data.payload.name === 'Medium') {
+      tooltipColor = '#eab308'; // yellow
+    } else if (data.payload.name === 'Low') {
+      tooltipColor = '#3b82f6'; // blue
+    }
+
+    return (
+      <div className="bg-gray-900 border border-gray-600 rounded-lg p-3">
+        <p style={{ color: tooltipColor }} className="text-sm font-medium">
+          {data.payload.name}: {data.value}%
+        </p>
+      </div>
+    );
+  }
   return null;
 };
 
@@ -800,11 +827,7 @@ const StatsPage: React.FC = () => {
                     <Cell fill="#ef4444" />
                     <Cell fill="#22c55e" />
                   </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                    labelStyle={{ color: '#f3f4f6' }}
-                    formatter={(value) => `${value}%`}
-                  />
+                  <Tooltip content={<PieChartTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="text-center mt-4">
@@ -965,10 +988,20 @@ const StatsPage: React.FC = () => {
               <h3 className="text-sm font-semibold text-white mb-3">Countries Breakdown</h3>
               {geolocationData && geolocationData.length > 0 ? (
                 <div className="overflow-y-auto flex-1 max-h-80 space-y-2 pr-2">
-                  {geolocationCountryFilter !== 'all'
-                    ? geolocationData.filter(item => item.country === geolocationCountryFilter).map((item, idx) => {
-                      const maxValue = Math.max(...geolocationData.map(d => d.value));
-                      const percentage = ((item.value / geolocationData.reduce((sum, d) => sum + d.value, 0)) * 100).toFixed(1);
+                  {(() => {
+                    // Calcola il totale globale una sola volta
+                    const totalAttacks = geolocationData.reduce((sum, d) => sum + d.value, 0);
+                    const maxValue = Math.max(...geolocationData.map(d => d.value), 0);
+
+                    // Determina quale array mostrare
+                    const displayData = geolocationCountryFilter !== 'all'
+                      ? geolocationData.filter(item => item.country === geolocationCountryFilter)
+                      : geolocationData;
+
+                    return displayData.map((item, idx) => {
+                      // Percentuale rispetto al TOTALE MONDIALE
+                      const percentage = ((item.value / totalAttacks) * 100).toFixed(1);
+                      // Larghezza barra proporzionata al massimo globale
                       const barWidth = (item.value / maxValue) * 100;
                       return (
                         <div key={idx} className="text-xs">
@@ -984,27 +1017,8 @@ const StatsPage: React.FC = () => {
                           </div>
                         </div>
                       );
-                    })
-                    : geolocationData.map((item, idx) => {
-                      const maxValue = Math.max(...geolocationData.map(d => d.value));
-                      const percentage = ((item.value / geolocationData.reduce((sum, d) => sum + d.value, 0)) * 100).toFixed(1);
-                      const barWidth = (item.value / maxValue) * 100;
-                      return (
-                        <div key={idx} className="text-xs">
-                          <div className="flex justify-between mb-1">
-                            <span className="text-gray-300 font-medium">{item.country}</span>
-                            <span className="text-gray-400">{item.value} ({percentage}%)</span>
-                          </div>
-                          <div className="w-full bg-gray-700 rounded h-2 overflow-hidden">
-                            <div
-                              className="bg-orange-500 h-full transition-all duration-300"
-                              style={{ width: `${barWidth}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  }
+                    });
+                  })()}
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-80 text-gray-400">
@@ -1052,36 +1066,34 @@ const StatsPage: React.FC = () => {
 
         {/* Threat Level Distribution - Right side, 2 columns */}
         <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-white">Threat Level Distribution</h2>
-            <div className="flex gap-2">
-              <select
-                value={threatLevelSeverityFilter}
-                onChange={(e) => setThreatLevelSeverityFilter(e.target.value)}
-                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-              >
-                <option value="all">All Severities</option>
-                {availableSeverities.map(severity => (
-                  <option key={severity} value={severity}>{severity}</option>
-                ))}
-              </select>
-              <select
-                value={threatLevelFilter}
-                onChange={(e) => setThreatLevelFilter(e.target.value as TimeFilter)}
-                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-              >
-                <option value="today">Today</option>
-                <option value="week">This week</option>
-                <option value="15m">Last 15 minutes</option>
-                <option value="30m">Last 30 minutes</option>
-                <option value="1h">Last 1 hour</option>
-                <option value="24h">Last 24 hours</option>
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-                <option value="90d">Last 90 days</option>
-                <option value="1y">Last 1 year</option>
-              </select>
-            </div>
+          <h2 className="text-lg font-semibold text-white mb-3">Threat Level Distribution</h2>
+          <div className="flex gap-2 mb-4">
+            <select
+              value={threatLevelSeverityFilter}
+              onChange={(e) => setThreatLevelSeverityFilter(e.target.value)}
+              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="all">All Severities</option>
+              {availableSeverities.map(severity => (
+                <option key={severity} value={severity}>{severity}</option>
+              ))}
+            </select>
+            <select
+              value={threatLevelFilter}
+              onChange={(e) => setThreatLevelFilter(e.target.value as TimeFilter)}
+              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="today">Today</option>
+              <option value="week">This week</option>
+              <option value="15m">Last 15 minutes</option>
+              <option value="30m">Last 30 minutes</option>
+              <option value="1h">Last 1 hour</option>
+              <option value="24h">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+              <option value="1y">Last 1 year</option>
+            </select>
           </div>
           {threatLevelData && threatLevelData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
@@ -1101,10 +1113,7 @@ const StatsPage: React.FC = () => {
                   <Cell fill="#eab308" />
                   <Cell fill="#3b82f6" />
                 </Pie>
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#f3f4f6' }}
-                />
+                <Tooltip content={<PieChartTooltip />} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
