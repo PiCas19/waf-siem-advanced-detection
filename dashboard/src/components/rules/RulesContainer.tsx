@@ -159,7 +159,6 @@ export default function RulesContainer() {
         <AddRule
           onRuleAdded={handleAddRule}
           onCancel={() => setView('list')}
-          allRules={customRules}
         />
       )}
 
@@ -172,7 +171,6 @@ export default function RulesContainer() {
             setView('list');
             setEditingRule(null);
           }}
-          allRules={customRules}
         />
       )}
 

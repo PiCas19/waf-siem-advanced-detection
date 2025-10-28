@@ -5,10 +5,9 @@ interface RuleEditorProps {
   rule: WAFRule;
   onRuleUpdated: (rule: WAFRule) => void;
   onCancel: () => void;
-  allRules: WAFRule[];
 }
 
-export default function RuleEditor({ rule, onRuleUpdated, onCancel, allRules }: RuleEditorProps) {
+export default function RuleEditor({ rule, onRuleUpdated, onCancel }: RuleEditorProps) {
   const [formData, setFormData] = useState({
     name: rule.name,
     pattern: rule.pattern,
@@ -18,8 +17,22 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel, allRules }: 
     mode: (rule.action === 'log' ? 'detect' : rule.mode || 'block') as 'detect' | 'block',
   });
 
-  const threatTypes = Array.from(new Set(allRules.map(r => r.threatType)));
-  const uniqueThreatTypes = ['SQL Injection', 'XSS', 'Command Injection', 'Directory Traversal', ...threatTypes];
+  const threatTypes = [
+    'Command Injection',
+    'LDAP Injection',
+    'Local File Inclusion',
+    'NoSQL Injection',
+    'Path Traversal',
+    'Prototype Pollution',
+    'Response Splitting',
+    'Remote File Inclusion',
+    'SQL Injection',
+    'SSRF',
+    'Server-Side Template Injection',
+    'Cross-Site Scripting',
+    'XML External Entity',
+    'Other'
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,17 +76,17 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel, allRules }: 
 
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-      <h2 className="text-xl font-semibold text-white mb-6">Modifica Regola</h2>
+      <h2 className="text-xl font-semibold text-white mb-6">Edit Rule</h2>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Nome */}
+        {/* Name */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Nome Regola</label>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Rule Name</label>
           <input
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="es. SQL Injection Prevention"
+            placeholder="e.g. SQL Injection Prevention"
             className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
           />
         </div>
@@ -86,39 +99,39 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel, allRules }: 
           <textarea
             value={formData.pattern}
             onChange={(e) => setFormData({ ...formData, pattern: e.target.value })}
-            placeholder="es. SELECT|INSERT|UPDATE|DELETE|DROP"
+            placeholder="e.g. SELECT|INSERT|UPDATE|DELETE|DROP"
             rows={3}
             className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none font-mono text-sm"
           />
           <p className="text-xs text-gray-400 mt-1">
-            Inserisci un'espressione regolare per matchare i pattern di attacco
+            Enter a regular expression to match attack patterns
           </p>
         </div>
 
-        {/* Descrizione */}
+        {/* Description */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Descrizione</label>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
           <textarea
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="Descrizione della regola..."
+            placeholder="Rule description..."
             rows={2}
             className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Tipo di Minaccia */}
+          {/* Threat Type */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Tipo di Minaccia
+              Threat Type
             </label>
             <select
               value={formData.threatType}
               onChange={(e) => setFormData({ ...formData, threatType: e.target.value })}
               className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
             >
-              {uniqueThreatTypes.map(type => (
+              {threatTypes.map(type => (
                 <option key={type} value={type}>
                   {type}
                 </option>
@@ -126,9 +139,9 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel, allRules }: 
             </select>
           </div>
 
-          {/* Modalità */}
+          {/* Mode */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Modalità</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Mode</label>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -139,7 +152,7 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel, allRules }: 
                   onChange={(e) => setFormData({ ...formData, mode: e.target.value as 'detect' | 'block' })}
                   className="w-4 h-4"
                 />
-                <span className="text-gray-300">🔍 Rileva solo</span>
+                <span className="text-gray-300">Detect</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -150,9 +163,46 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel, allRules }: 
                   onChange={(e) => setFormData({ ...formData, mode: e.target.value as 'detect' | 'block' })}
                   className="w-4 h-4"
                 />
-                <span className="text-gray-300">🚫 Blocca</span>
+                <span className="text-gray-300">Block</span>
               </label>
             </div>
+          </div>
+        </div>
+
+        {/* Automated Blocking Actions */}
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-3">
+            Apply automated blocking actions
+          </label>
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-gray-600"
+              />
+              <span className="text-gray-300">Block - Reject request immediately</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-gray-600"
+              />
+              <span className="text-gray-300">Drop - Terminate connection without response</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-gray-600"
+              />
+              <span className="text-gray-300">Redirect - Redirect to security page</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-gray-600"
+              />
+              <span className="text-gray-300">Challenge - Require CAPTCHA verification</span>
+            </label>
           </div>
         </div>
 
@@ -162,14 +212,14 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel, allRules }: 
             type="submit"
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition"
           >
-            Salva Modifiche
+            Save Changes
           </button>
           <button
             type="button"
             onClick={onCancel}
             className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition"
           >
-            Annulla
+            Cancel
           </button>
         </div>
       </form>
