@@ -3,9 +3,13 @@ package geoip
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/oschwald/geoip2-golang"
 )
@@ -22,13 +26,50 @@ type IPRangesData struct {
 }
 
 type Service struct {
-	reader *geoip2.Reader
-	ranges []IPRange
-	mu     sync.RWMutex
+	reader      *geoip2.Reader
+	ranges      []IPRange
+	publicIP    string
+	mu          sync.RWMutex
 }
 
 var instance *Service
 var once sync.Once
+
+// GetPublicIP retrieves the server's public IP address
+// Tries multiple free services for redundancy
+func GetPublicIP() string {
+	services := []string{
+		"https://api.ipify.org?format=text",
+		"https://checkip.amazonaws.com",
+		"https://icanhazip.com",
+	}
+
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	for _, service := range services {
+		resp, err := client.Get(service)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			continue
+		}
+
+		ip := strings.TrimSpace(string(body))
+		if net.ParseIP(ip) != nil {
+			fmt.Printf("[INFO] Server public IP detected: %s (from %s)\n", ip, service)
+			return ip
+		}
+	}
+
+	fmt.Println("[WARN] Could not detect server public IP, local IP mapping will not work")
+	return ""
+}
 
 // GetInstance returns singleton instance of GeoIP service
 func GetInstance() (*Service, error) {
@@ -42,7 +83,8 @@ func GetInstance() (*Service, error) {
 // NewService loads MaxMind database if available, otherwise uses JSON fallback
 func NewService() (*Service, error) {
 	s := &Service{
-		ranges: []IPRange{},
+		ranges:   []IPRange{},
+		publicIP: GetPublicIP(), // Detect server's public IP for local IP mapping
 	}
 
 	// Try to load MaxMind GeoLite2 database
@@ -114,11 +156,12 @@ func IsPrivateIP(ipStr string) bool {
 }
 
 // LookupCountry returns country name for given IP address
-// For private/local IPs, maps to a default location (Switzerland)
+// For private/local IPs, uses the server's public IP for geolocation
 func (s *Service) LookupCountry(ipStr string) string {
 	s.mu.RLock()
 	reader := s.reader
 	ranges := s.ranges
+	publicIP := s.publicIP
 	s.mu.RUnlock()
 
 	ip := net.ParseIP(ipStr)
@@ -126,10 +169,15 @@ func (s *Service) LookupCountry(ipStr string) string {
 		return "Unknown"
 	}
 
-	// Handle private/local IPs - map to default location (Switzerland for local testing)
+	// Handle private/local IPs - map to server's public IP location
 	if IsPrivateIP(ipStr) {
-		fmt.Printf("[INFO] Private IP detected: %s -> Switzerland (local mapping)\n", ipStr)
-		return "Switzerland"
+		if publicIP != "" {
+			fmt.Printf("[INFO] Private IP detected: %s -> Using server public IP: %s\n", ipStr, publicIP)
+			// Recursively lookup using the public IP
+			return s.LookupCountry(publicIP)
+		}
+		fmt.Printf("[INFO] Private IP detected: %s -> No public IP available\n", ipStr)
+		return "Unknown"
 	}
 
 	// Try MaxMind first if available
