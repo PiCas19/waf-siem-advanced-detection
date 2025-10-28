@@ -2,10 +2,12 @@ package main
 
 import (
 	"log"
-	
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/api"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
 )
 
 func main() {
@@ -14,7 +16,19 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
-	
+
+	// Initialize MaxMind GeoIP database
+	licenseKey := os.Getenv("MAXMIND_LICENSE_KEY")
+	if licenseKey != "" {
+		log.Println("[INFO] MaxMind license key found, attempting to download/update database...")
+		config := geoip.DefaultDownloadConfig(licenseKey)
+		if err := geoip.DownloadDatabase(config); err != nil {
+			log.Printf("[WARN] Failed to download MaxMind database: %v. Will use fallback IP ranges.\n", err)
+		}
+	} else {
+		log.Println("[WARN] MAXMIND_LICENSE_KEY not set. Using fallback IP ranges. To use MaxMind, set MAXMIND_LICENSE_KEY environment variable.")
+	}
+
 	// Create Gin router
 	r := gin.Default()
 	
