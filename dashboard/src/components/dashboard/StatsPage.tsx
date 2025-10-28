@@ -708,7 +708,7 @@ const StatsPage: React.FC = () => {
   }, [recentAlerts, alertsTimeFilter, alertsThreatFilter, allAlertsSearchQuery, allAlertsSortColumn, allAlertsSortOrder]);
 
   // Blocca un IP
-  const handleBlockIP = async (ip: string) => {
+  const handleBlockIP = async (ip: string, alertTimestamp?: string) => {
     setBlockingIP(ip);
     try {
       const token = localStorage.getItem('authToken');
@@ -719,7 +719,7 @@ const StatsPage: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ip_address: ip,
+          ip: ip,
           reason: 'Manually blocked from Recent Threats',
           permanent: false,
         }),
@@ -728,10 +728,10 @@ const StatsPage: React.FC = () => {
       if (response.ok) {
         console.log('IP blocked successfully:', ip);
 
-        // Aggiorna tutti gli alert da questo IP per marcarli come bloccati
+        // Aggiorna solo l'alert specifico che è stato bloccato
         setRecentAlerts(prevAlerts =>
           prevAlerts.map(alert =>
-            alert.ip === ip ? { ...alert, blocked: true } : alert
+            alert.ip === ip && alert.timestamp === alertTimestamp ? { ...alert, blocked: true } : alert
           )
         );
 
@@ -1353,7 +1353,7 @@ const StatsPage: React.FC = () => {
                         <td className="py-3 px-4">
                           {!alert.blocked && (
                             <button
-                              onClick={() => handleBlockIP(alert.ip)}
+                              onClick={() => handleBlockIP(alert.ip, alert.timestamp)}
                               disabled={blockingIP === alert.ip}
                               className={`px-2 py-1 rounded text-xs font-medium transition ${
                                 blockingIP === alert.ip

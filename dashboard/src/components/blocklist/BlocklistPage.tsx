@@ -218,8 +218,8 @@ const BlocklistPage: React.FC = () => {
   };
 
   const filteredBlocklist = blocklist.filter((entry) => {
-    const matchesSearch = entry.ip_address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         entry.reason.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (entry.ip_address?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                         (entry.reason?.toLowerCase() || '').includes(searchTerm.toLowerCase());
 
     if (filterStatus === 'permanent') return matchesSearch && entry.permanent;
     if (filterStatus === 'temporary') return matchesSearch && !entry.permanent;
@@ -227,14 +227,14 @@ const BlocklistPage: React.FC = () => {
   });
 
   const filteredWhitelist = whitelist.filter((entry) =>
-    entry.ip_address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    entry.reason.toLowerCase().includes(searchTerm.toLowerCase())
+    (entry.ip_address?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (entry.reason?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   const filteredFalsePositives = falsePositives.filter((entry) =>
-    entry.threat_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    entry.client_ip.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    entry.url.toLowerCase().includes(searchTerm.toLowerCase())
+    (entry.threat_type?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (entry.client_ip?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (entry.url?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   return (
