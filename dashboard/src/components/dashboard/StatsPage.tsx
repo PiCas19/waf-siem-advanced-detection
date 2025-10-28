@@ -201,11 +201,20 @@ const getSeverityColor = (count: number): string => {
 };
 
 const StatsPage: React.FC = () => {
-  const { stats, isConnected } = useWebSocketStats();
+  const { stats, isConnected, onAlertReceived } = useWebSocketStats();
   const [timelineData, setTimelineData] = useState<ChartDataPoint[]>([]);
   const [threatTypeData, setThreatTypeData] = useState<any[]>([]);
   const [recentAlerts, setRecentAlerts] = useState<WAFEvent[]>([]);
   const [blockingIP, setBlockingIP] = useState<string | null>(null);
+
+  // Registra callback per aggiornamenti real-time degli alert
+  useEffect(() => {
+    const unsubscribe = onAlertReceived((alert: WAFEvent) => {
+      setRecentAlerts(prevAlerts => [alert, ...prevAlerts.slice(0, 999)]);
+    });
+
+    return unsubscribe;
+  }, [onAlertReceived]);
 
   // Type per i filtri di tempo
   type TimeFilter = 'today' | '15m' | '30m' | '1h' | '24h' | 'week' | '7d' | '30d' | '90d' | '1y';
@@ -1018,6 +1027,8 @@ const StatsPage: React.FC = () => {
                       const percentage = ((item.value / totalAttacks) * 100).toFixed(1);
                       // Larghezza barra proporzionata al massimo GLOBALE
                       const barWidth = (item.value / maxValueGlobal) * 100;
+                      // Colore basato sulla severità del conteggio
+                      const barColor = getSeverityColor(item.value);
                       return (
                         <div key={idx} className="text-xs">
                           <div className="flex justify-between mb-1">
@@ -1026,8 +1037,8 @@ const StatsPage: React.FC = () => {
                           </div>
                           <div className="w-full bg-gray-700 rounded h-2 overflow-hidden">
                             <div
-                              className="bg-orange-500 h-full transition-all duration-300"
-                              style={{ width: `${barWidth}%` }}
+                              className="h-full transition-all duration-300"
+                              style={{ width: `${barWidth}%`, backgroundColor: barColor }}
                             ></div>
                           </div>
                         </div>

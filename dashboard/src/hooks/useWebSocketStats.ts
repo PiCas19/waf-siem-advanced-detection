@@ -7,6 +7,16 @@ interface Stats {
   total_requests: number;
 }
 
+interface WAFEvent {
+  ip: string;
+  method: string;
+  path: string;
+  timestamp: string;
+  threat: string;
+  blocked: boolean;
+  user_agent?: string;
+}
+
 // WebSocket globale - mantiene la connessione tra i re-render
 let globalWs: WebSocket | null = null;
 let isConnecting = false;
@@ -18,8 +28,10 @@ export function useWebSocketStats() {
     total_requests: 0,
   });
   const [isConnected, setIsConnected] = useState(false);
+  const [newAlert, setNewAlert] = useState<WAFEvent | null>(null);
   const statsRef = useRef(stats);
   const lastStatsRef = useRef({ threats: 0, blocked: 0 }); // Traccia gli ultimi valori
+  const alertCallbacksRef = useRef<Array<(alert: WAFEvent) => void>>([]); // Callbacks per gli alert
 
   // Carica gli stats iniziali dal server
   useEffect(() => {
@@ -99,7 +111,7 @@ export function useWebSocketStats() {
           const message = JSON.parse(event.data);
           console.log('[WebSocket] Received message:', message);
 
-          // Se ricevi un evento WAF, aggiorna gli stats
+          // Se ricevi un evento WAF, aggiorna gli stats e invia agli alert
           if (message.type === 'waf_event' && message.data) {
             const wafEvent = message.data;
             console.log('[WebSocket] Processing WAF event:', {
@@ -108,11 +120,27 @@ export function useWebSocketStats() {
               ip: wafEvent.ip,
             });
 
+            // Aggiorna stats
             setStats((prevStats) => ({
               threats_detected: prevStats.threats_detected + 1,
               requests_blocked: prevStats.requests_blocked + (wafEvent.blocked ? 1 : 0),
               total_requests: prevStats.total_requests + 1,
             }));
+
+            // Crea evento alert formattato e passa ai callback
+            const alert: WAFEvent = {
+              ip: wafEvent.ip || 'Unknown',
+              method: wafEvent.method || 'UNKNOWN',
+              path: wafEvent.path || wafEvent.url || '/',
+              timestamp: wafEvent.timestamp || new Date().toISOString(),
+              threat: wafEvent.threat || 'Unknown',
+              blocked: wafEvent.blocked || false,
+              user_agent: wafEvent.user_agent,
+            };
+
+            // Chiama tutti i callback registrati
+            alertCallbacksRef.current.forEach(callback => callback(alert));
+            setNewAlert(alert);
           } else {
             console.log('[WebSocket] Ignoring message - type:', message.type, 'has data:', !!message.data);
           }
@@ -151,5 +179,13 @@ export function useWebSocketStats() {
     };
   }, []);
 
-  return { stats, isConnected };
+  // Funzione per registrare un callback per i nuovi alert
+  const onAlertReceived = (callback: (alert: WAFEvent) => void) => {
+    alertCallbacksRef.current.push(callback);
+    return () => {
+      alertCallbacksRef.current = alertCallbacksRef.current.filter(cb => cb !== callback);
+    };
+  };
+
+  return { stats, isConnected, newAlert, onAlertReceived };
 }
