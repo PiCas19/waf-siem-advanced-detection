@@ -975,13 +975,53 @@ const StatsPage: React.FC = () => {
                   ))}
                 </MapContainer>
               </div>
-              <div className="text-sm text-gray-400">
-                <p className="font-semibold mb-2">Intensity Legend:</p>
-                <div className="flex gap-4">
-                  <span>🔴 Red: 50+ attacks</span>
-                  <span>🟠 Orange: 20-50</span>
-                  <span>🟡 Yellow: 10-20</span>
-                  <span>🔵 Blue: &lt;10</span>
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-white mb-4">Countries Attack Breakdown</h3>
+                {geolocationData && geolocationData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart
+                      data={geolocationCountryFilter !== 'all'
+                        ? geolocationData.filter(item => item.country === geolocationCountryFilter)
+                        : geolocationData
+                      }
+                      layout="vertical"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis type="number" stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                      <YAxis dataKey="country" type="category" stroke="#9ca3af" style={{ fontSize: '11px' }} width={80} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                        labelStyle={{ color: '#f3f4f6' }}
+                      />
+                      <Legend />
+                      <Bar dataKey="value" fill="#f97316" name="Attack Count" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-40 text-gray-400">
+                    <p>No data available</p>
+                  </div>
+                )}
+              </div>
+              <div className="mt-4 text-sm">
+                <p className="font-semibold text-white mb-3">Intensity Legend:</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2 text-red-500">
+                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#dc2626' }}></div>
+                    <span>Critical: 50+ attacks</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-orange-500">
+                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#f97316' }}></div>
+                    <span>High: 20-50</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-yellow-500">
+                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#eab308' }}></div>
+                    <span>Medium: 10-20</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-blue-500">
+                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
+                    <span>Low: &lt;10</span>
+                  </div>
                 </div>
               </div>
             </>
