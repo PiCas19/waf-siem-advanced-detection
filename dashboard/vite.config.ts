@@ -11,6 +11,12 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
+    middleware: [
+      (req, res, next) => {
+        res.setHeader('Content-Security-Policy', "img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org");
+        next();
+      }
+    ],
     proxy: {
       '/api': {
         target: 'http://localhost:8081',

@@ -112,6 +112,46 @@ const countryCoordinates: { [key: string]: [number, number] } = {
   'Nigeria': [9.0820, 8.6753],
   'South Africa': [-30.5595, 22.9375],
   'Kenya': [-0.0236, 37.9062],
+  'Ukraine': [48.3794, 31.1656],
+  'Argentina': [-38.4161, -63.6167],
+  'Chile': [-35.6751, -71.5430],
+  'Colombia': [4.5709, -74.2973],
+  'Peru': [-9.1900, -75.0152],
+  'Venezuela': [6.4238, -66.5897],
+  'Greece': [39.0742, 21.8243],
+  'Portugal': [39.3999, -8.2245],
+  'Austria': [47.5162, 14.5501],
+  'Czech Republic': [49.8175, 15.4730],
+  'Hungary': [47.1625, 19.5033],
+  'Romania': [45.9432, 24.9668],
+  'Serbia': [44.0165, 21.0059],
+  'Croatia': [45.1000, 15.2000],
+  'Finland': [61.9241, 25.7482],
+  'Norway': [60.4720, 8.4689],
+  'Denmark': [56.2639, 9.5018],
+  'Ireland': [53.4129, -8.2439],
+  'Israel': [31.0461, 34.8516],
+  'UAE': [23.4241, 53.8478],
+  'Qatar': [25.2548, 51.6224],
+  'Kuwait': [29.3117, 47.4818],
+  'Bahrain': [26.0667, 50.5577],
+  'Oman': [21.4735, 55.9754],
+  'Morocco': [31.7917, -7.0926],
+  'Algeria': [28.0339, 1.6596],
+  'Tunisia': [33.8869, 9.5375],
+  'Libya': [26.3351, 17.2283],
+  'Sudan': [12.8628, 30.8025],
+  'Ethiopia': [9.1450, 40.4897],
+  'Uganda': [1.3733, 32.2903],
+  'Tanzania': [-6.3690, 34.8888],
+  'Zimbabwe': [-19.0154, 29.1549],
+  'Botswana': [-22.3285, 24.6849],
+  'Namibia': [-22.9375, 18.6947],
+  'Lesotho': [-29.6100, 28.2336],
+  'Mauritius': [-20.3484, 57.5522],
+  'New Zealand': [-40.9006, 174.8860],
+  'Papua New Guinea': [-6.3150, 143.9555],
+  'Malaysia (Peninsular)': [4.2105, 101.6964],
   'Unknown': [20.0, 0.0]
 };
 
@@ -869,10 +909,10 @@ const StatsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Geolocation Heatmap - left side, 2 columns */}
+        {/* Attack Hotspots - World Map - left side, 2 columns */}
         <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-white">Geolocation Heatmap</h2>
+            <h2 className="text-lg font-semibold text-white">Attack Hotspots - World Map</h2>
             <div className="flex gap-2">
               <select
                 value={geolocationCountryFilter}
@@ -902,23 +942,52 @@ const StatsPage: React.FC = () => {
               </select>
             </div>
           </div>
-          {geolocationData && geolocationData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={geolocationData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="country" stroke="#9ca3af" style={{ fontSize: '12px' }} angle={-45} textAnchor="end" height={100} />
-                <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#f3f4f6' }}
-                />
-                <Legend />
-                <Bar dataKey="value" fill="#f97316" name="Attack Count" />
-              </BarChart>
-            </ResponsiveContainer>
+          {geolocationMapData && geolocationMapData.length > 0 ? (
+            <>
+              <div style={{ height: '400px', position: 'relative', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px' }}>
+                <MapContainer
+                  {...({ center: [20, 0], zoom: 2 } as any)}
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  {geolocationMapData.map((marker, idx) => (
+                    <CircleMarker
+                      {...({
+                        center: [marker.lat, marker.lng],
+                        radius: Math.max(5, Math.sqrt(marker.count) * 2),
+                        fillColor: marker.color,
+                        color: marker.color,
+                        weight: 2,
+                        opacity: 0.8,
+                        fillOpacity: 0.7,
+                      } as any)}
+                      key={idx}
+                    >
+                      <Popup>
+                        <div className="text-gray-900">
+                          <p className="font-semibold">{marker.country}</p>
+                          <p className="text-sm">Attacks: {marker.count}</p>
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  ))}
+                </MapContainer>
+              </div>
+              <div className="text-sm text-gray-400">
+                <p className="font-semibold mb-2">Intensity Legend:</p>
+                <div className="flex gap-4">
+                  <span>🔴 Red: 50+ attacks</span>
+                  <span>🟠 Orange: 20-50</span>
+                  <span>🟡 Yellow: 10-20</span>
+                  <span>🔵 Blue: &lt;10</span>
+                </div>
+              </div>
+            </>
           ) : (
-            <div className="flex items-center justify-center h-80 text-gray-400">
-              <p>No geolocation data available</p>
+            <div className="flex items-center justify-center h-96 text-gray-400">
+              <p>No attack data available for map</p>
             </div>
           )}
         </div>
@@ -986,52 +1055,6 @@ const StatsPage: React.FC = () => {
               <p>No threat level data available</p>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Geolocation Attack Map */}
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Attack Hotspots - World Map</h2>
-        {geolocationMapData && geolocationMapData.length > 0 ? (
-          <div style={{ height: '500px', position: 'relative', borderRadius: '8px', overflow: 'hidden' }}>
-            <MapContainer
-              {...({ center: [20, 0], zoom: 2 } as any)}
-              style={{ height: '100%', width: '100%' }}
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              {geolocationMapData.map((marker, idx) => (
-                <CircleMarker
-                  {...({
-                    center: [marker.lat, marker.lng],
-                    radius: Math.max(5, Math.sqrt(marker.count) * 2),
-                    fillColor: marker.color,
-                    color: marker.color,
-                    weight: 2,
-                    opacity: 0.8,
-                    fillOpacity: 0.7,
-                  } as any)}
-                  key={idx}
-                >
-                  <Popup>
-                    <div className="text-gray-900">
-                      <p className="font-semibold">{marker.country}</p>
-                      <p className="text-sm">Attacks: {marker.count}</p>
-                    </div>
-                  </Popup>
-                </CircleMarker>
-              ))}
-            </MapContainer>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-96 text-gray-400">
-            <p>No attack data available for map</p>
-          </div>
-        )}
-        <div className="mt-4 text-sm text-gray-400">
-          <p>Circle size and color indicate attack intensity:</p>
-          <p className="mt-2">Red (50+) | Orange (20-50) | Yellow (10-20) | Blue (&lt;10)</p>
         </div>
       </div>
 
