@@ -244,6 +244,87 @@ func compareIP(a, b net.IP) int {
 	return 0
 }
 
+// IPifyResponse represents the response from ipify.org API
+type IPifyResponse struct {
+	Query   string `json:"query"`
+	Status  string `json:"status"`
+	Country string `json:"country"`
+	City    string `json:"city"`
+	Org     string `json:"org"`
+}
+
+// EnrichIPFromService enriches unknown IPs using ipify.org API
+// This is called when local databases don't recognize an IP
+func (s *Service) EnrichIPFromService(ipStr string) string {
+	// Skip private IPs
+	if IsPrivateIP(ipStr) {
+		return "Unknown"
+	}
+
+	// Validate IP format
+	if net.ParseIP(ipStr) == nil {
+		return "Unknown"
+	}
+
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+
+	// Use ipapi.co which is free and includes country info
+	// Format: https://ipapi.co/{ip}/json/
+	url := fmt.Sprintf("https://ipapi.co/%s/json/", ipStr)
+
+	resp, err := client.Get(url)
+	if err != nil {
+		fmt.Printf("[WARN] Failed to enrich IP %s from ipapi.co: %v\n", ipStr, err)
+		return "Unknown"
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Printf("[WARN] ipapi.co returned status %d for IP %s\n", resp.StatusCode, ipStr)
+		return "Unknown"
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("[WARN] Failed to read ipapi.co response for IP %s: %v\n", ipStr, err)
+		return "Unknown"
+	}
+
+	var apiResp map[string]interface{}
+	if err := json.Unmarshal(body, &apiResp); err != nil {
+		fmt.Printf("[WARN] Failed to parse ipapi.co response for IP %s: %v\n", ipStr, err)
+		return "Unknown"
+	}
+
+	// Extract country name from response
+	if country, ok := apiResp["country_name"].(string); ok && country != "" {
+		fmt.Printf("[INFO] IP %s enriched from ipapi.co: %s\n", ipStr, country)
+		return country
+	}
+
+	fmt.Printf("[WARN] Country name not found in ipapi.co response for IP %s\n", ipStr)
+	return "Unknown"
+}
+
+// LookupCountryWithEnrichment performs country lookup with ipify enrichment fallback
+func (s *Service) LookupCountryWithEnrichment(ipStr string) string {
+	// First try standard lookup methods
+	country := s.LookupCountry(ipStr)
+	if country != "Unknown" {
+		return country
+	}
+
+	// If not found and it's a public IP, try enrichment from ipify service
+	if !IsPrivateIP(ipStr) {
+		fmt.Printf("[INFO] Attempting IP enrichment for: %s\n", ipStr)
+		return s.EnrichIPFromService(ipStr)
+	}
+
+	return "Unknown"
+}
+
 // getFallbackRanges returns hardcoded ranges for fallback
 func getFallbackRanges() []IPRange {
 	return []IPRange{

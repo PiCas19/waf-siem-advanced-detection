@@ -159,10 +159,10 @@ func GetGeolocationHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Group logs by country
+		// Group logs by country with IP enrichment fallback
 		countryMap := make(map[string]int)
 		for _, log := range logs {
-			country := geoService.LookupCountry(log.ClientIP)
+			country := geoService.LookupCountryWithEnrichment(log.ClientIP)
 			countryMap[country]++
 		}
 
