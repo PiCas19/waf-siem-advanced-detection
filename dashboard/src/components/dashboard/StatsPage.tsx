@@ -7,9 +7,8 @@ import {
   AlertTriangle, Lock,
   ArrowUp, ArrowDown, Circle
 } from 'lucide-react';
-// TODO: MapContainer, TileLayer, CircleMarker, Popup will be used for Geolocation map
-// import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-// import 'leaflet/dist/leaflet.css';
+import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useWebSocketStats } from '@/hooks/useWebSocketStats';
 import { fetchStats } from '@/services/api';
 
@@ -75,6 +74,55 @@ const TimelineTooltip: React.FC<any> = ({ active, payload }) => {
 //   return null;
 // };
 
+// Country coordinates for map visualization
+const countryCoordinates: { [key: string]: [number, number] } = {
+  'United States': [37.0902, -95.7129],
+  'China': [35.8617, 104.1954],
+  'Russia': [61.5240, 105.3188],
+  'India': [20.5937, 78.9629],
+  'Brazil': [-14.2350, -51.9253],
+  'Japan': [36.2048, 138.2529],
+  'Germany': [51.1657, 10.4515],
+  'United Kingdom': [55.3781, -3.4360],
+  'France': [46.2276, 2.2137],
+  'Italy': [41.8719, 12.5674],
+  'Australia': [-25.2744, 133.7751],
+  'Canada': [56.1304, -106.3468],
+  'South Korea': [35.9078, 127.7669],
+  'Mexico': [23.6345, -102.5528],
+  'Spain': [40.4637, -3.7492],
+  'Netherlands': [52.1326, 5.2913],
+  'Saudi Arabia': [23.8859, 45.0792],
+  'Turkey': [38.9637, 35.2433],
+  'Switzerland': [46.8182, 8.2275],
+  'Sweden': [60.1282, 18.6435],
+  'Poland': [51.9194, 19.1451],
+  'Belgium': [50.5039, 4.4699],
+  'Thailand': [15.8700, 100.9925],
+  'Indonesia': [-0.7893, 113.9213],
+  'Malaysia': [4.2105, 101.6964],
+  'Singapore': [1.3521, 103.8198],
+  'Hong Kong': [22.3193, 114.1694],
+  'Taiwan': [23.6978, 120.9605],
+  'Vietnam': [14.0583, 108.2772],
+  'Philippines': [12.8797, 121.7740],
+  'Pakistan': [30.3753, 69.3451],
+  'Bangladesh': [23.6850, 90.3563],
+  'Egypt': [26.8206, 30.8025],
+  'Nigeria': [9.0820, 8.6753],
+  'South Africa': [-30.5595, 22.9375],
+  'Kenya': [-0.0236, 37.9062],
+  'Unknown': [20.0, 0.0]
+};
+
+// Get severity color for map markers
+const getSeverityColor = (count: number): string => {
+  if (count >= 50) return '#dc2626'; // Red for critical
+  if (count >= 20) return '#f97316'; // Orange for high
+  if (count >= 10) return '#eab308'; // Yellow for medium
+  return '#3b82f6'; // Blue for low
+};
+
 const StatsPage: React.FC = () => {
   const { stats, isConnected } = useWebSocketStats();
   const [timelineData, setTimelineData] = useState<ChartDataPoint[]>([]);
@@ -132,11 +180,10 @@ const StatsPage: React.FC = () => {
   // Dati per i tre nuovi grafici
   const [maliciousIPsData, setMaliciousIPsData] = useState<any[]>([]);
   const [geolocationData, setGeolocationData] = useState<any[]>([]);
-  // TODO: Use for map visualization
-  // const [geolocationMapData, setGeolocationMapData] = useState<any[]>([]);
-  const [availableCountries] = useState<string[]>([]);
+  const [geolocationMapData, setGeolocationMapData] = useState<any[]>([]);
+  const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [threatLevelData, setThreatLevelData] = useState<any[]>([]);
-  const [availableSeverities] = useState<string[]>([]);
+  const [availableSeverities, setAvailableSeverities] = useState<string[]>([]);
 
   // Dati filtrati per ogni sezione
   const [filteredAlertsByAllAlerts, setFilteredAlertsByAllAlerts] = useState<WAFEvent[]>([]);
@@ -396,11 +443,19 @@ const StatsPage: React.FC = () => {
               .sort((a, b) => (b.count || 0) - (a.count || 0));
           }
 
-          // Converti a formato compatibile con il chart
-          const geoData = (filtered as any[]).map(item => ({
+          // Estrai i paesi disponibili per il dropdown filter
+          const countries = filtered.map((item: any) => item.country).filter((c: any) => c);
+          setAvailableCountries(countries);
+
+          // Filtra in base al country selezionato
+          let geoData = (filtered as any[]).map(item => ({
             country: item.country,
             value: item.count
           }));
+
+          if (geolocationCountryFilter !== 'all') {
+            geoData = geoData.filter(item => item.country === geolocationCountryFilter);
+          }
 
           setGeolocationData(geoData && geoData.length > 0 ? geoData : []);
         }
@@ -411,7 +466,26 @@ const StatsPage: React.FC = () => {
     };
 
     fetchGeolocation();
-  }, [recentAlerts, geolocationFilter]);
+  }, [recentAlerts, geolocationFilter, geolocationCountryFilter, setAvailableCountries]);
+
+  // Prepara i dati per la mappa Leaflet
+  useEffect(() => {
+    if (geolocationData.length > 0) {
+      const mapMarkers = geolocationData.map(item => {
+        const coords = countryCoordinates[item.country] || countryCoordinates['Unknown'];
+        return {
+          country: item.country,
+          count: item.value,
+          lat: coords[0],
+          lng: coords[1],
+          color: getSeverityColor(item.value)
+        };
+      });
+      setGeolocationMapData(mapMarkers);
+    } else {
+      setGeolocationMapData([]);
+    }
+  }, [geolocationData]);
 
   // Calcola Threat Level Distribution
   useEffect(() => {
@@ -453,15 +527,26 @@ const StatsPage: React.FC = () => {
       severityCounts[severity]++;
     });
 
-    const threatLevelDistribution = [
-      { name: 'Critical', value: severityCounts['CRITICAL'] },
-      { name: 'High', value: severityCounts['HIGH'] },
-      { name: 'Medium', value: severityCounts['MEDIUM'] },
-      { name: 'Low', value: severityCounts['LOW'] },
+    // Estrai i severity disponibili per il dropdown filter
+    const availableSevs = Object.entries(severityCounts)
+      .filter(([_, count]) => count > 0)
+      .map(([severity, _]) => severity);
+    setAvailableSeverities(availableSevs);
+
+    let threatLevelDistribution = [
+      { name: 'Critical', value: severityCounts['CRITICAL'], severity: 'CRITICAL' },
+      { name: 'High', value: severityCounts['HIGH'], severity: 'HIGH' },
+      { name: 'Medium', value: severityCounts['MEDIUM'], severity: 'MEDIUM' },
+      { name: 'Low', value: severityCounts['LOW'], severity: 'LOW' },
     ].filter(item => item.value > 0);
 
+    // Filtra in base al severity selezionato
+    if (threatLevelSeverityFilter !== 'all') {
+      threatLevelDistribution = threatLevelDistribution.filter(item => item.severity === threatLevelSeverityFilter);
+    }
+
     setThreatLevelData(threatLevelDistribution && threatLevelDistribution.length > 0 ? threatLevelDistribution : []);
-  }, [recentAlerts, threatLevelFilter]);
+  }, [recentAlerts, threatLevelFilter, threatLevelSeverityFilter, setAvailableSeverities]);
 
   // Funzione per eseguire la ricerca elastica su All Alerts
   const searchAllAlerts = (alerts: WAFEvent[], query: string): WAFEvent[] => {
@@ -901,6 +986,52 @@ const StatsPage: React.FC = () => {
               <p>No threat level data available</p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Geolocation Attack Map */}
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <h2 className="text-lg font-semibold text-white mb-4">Attack Hotspots - World Map</h2>
+        {geolocationMapData && geolocationMapData.length > 0 ? (
+          <div style={{ height: '500px', position: 'relative', borderRadius: '8px', overflow: 'hidden' }}>
+            <MapContainer
+              {...({ center: [20, 0], zoom: 2 } as any)}
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {geolocationMapData.map((marker, idx) => (
+                <CircleMarker
+                  {...({
+                    center: [marker.lat, marker.lng],
+                    radius: Math.max(5, Math.sqrt(marker.count) * 2),
+                    fillColor: marker.color,
+                    color: marker.color,
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.7,
+                  } as any)}
+                  key={idx}
+                >
+                  <Popup>
+                    <div className="text-gray-900">
+                      <p className="font-semibold">{marker.country}</p>
+                      <p className="text-sm">Attacks: {marker.count}</p>
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              ))}
+            </MapContainer>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-96 text-gray-400">
+            <p>No attack data available for map</p>
+          </div>
+        )}
+        <div className="mt-4 text-sm text-gray-400">
+          <p>Circle size and color indicate attack intensity:</p>
+          <p className="mt-2">Red (50+) | Orange (20-50) | Yellow (10-20) | Blue (&lt;10)</p>
         </div>
       </div>
 
