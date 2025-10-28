@@ -2,6 +2,13 @@
 
 # Script to run the WAF API server with MaxMind GeoIP support
 
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    echo "[INFO] This script requires sudo to run"
+    sudo "$0" "$@"
+    exit $?
+fi
+
 # Check if MAXMIND_LICENSE_KEY is set
 if [ -z "$MAXMIND_LICENSE_KEY" ]; then
     echo "[INFO] MaxMind GeoIP License Key not set"
