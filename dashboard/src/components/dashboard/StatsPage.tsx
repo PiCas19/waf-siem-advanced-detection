@@ -56,21 +56,25 @@ const PieChartTooltip: React.FC<any> = ({ active, payload }) => {
     const data = payload[0];
     let tooltipColor = '#f3f4f6'; // default light gray
 
-    // Assign colors based on the data value/name
+    // Assign colors based on the data name
     if (data.payload.name === 'Blocked' || data.payload.name === 'Critical') {
       tooltipColor = '#ef4444'; // red
-    } else if (data.payload.name === 'Allowed' || data.payload.name === 'High') {
-      tooltipColor = '#22c55e'; // green
-    } else if (data.payload.name === 'Medium') {
+    } else if (data.payload.name === 'High') {
+      tooltipColor = '#f97316'; // orange
+    } else if (data.payload.name === 'Allowed' || data.payload.name === 'Medium') {
       tooltipColor = '#eab308'; // yellow
     } else if (data.payload.name === 'Low') {
       tooltipColor = '#3b82f6'; // blue
     }
 
+    // Calcola percentuale dal valore vero
+    const actualValue = data.payload.value || 0;
+    const percentage = data.value || 0; // questo è già la percentuale da Recharts
+
     return (
       <div className="bg-gray-900 border border-gray-600 rounded-lg p-3">
         <p style={{ color: tooltipColor }} className="text-sm font-medium">
-          {data.payload.name}: {data.value}%
+          {data.payload.name}: {actualValue} ({percentage.toFixed(1)}%)
         </p>
       </div>
     );
@@ -989,20 +993,21 @@ const StatsPage: React.FC = () => {
               {geolocationData && geolocationData.length > 0 ? (
                 <div className="overflow-y-auto flex-1 max-h-80 space-y-2 pr-2">
                   {(() => {
-                    // Calcola il totale globale una sola volta
-                    const totalAttacks = geolocationData.reduce((sum, d) => sum + d.value, 0);
-                    const maxValue = Math.max(...geolocationData.map(d => d.value), 0);
-
                     // Determina quale array mostrare
                     const displayData = geolocationCountryFilter !== 'all'
                       ? geolocationData.filter(item => item.country === geolocationCountryFilter)
                       : geolocationData;
 
+                    // Calcola il totale globale per percentuali
+                    const totalAttacks = geolocationData.reduce((sum, d) => sum + d.value, 0);
+                    // Calcola il max dei dati visualizzati per la larghezza barra
+                    const maxValueDisplay = Math.max(...displayData.map(d => d.value), 0);
+
                     return displayData.map((item, idx) => {
                       // Percentuale rispetto al TOTALE MONDIALE
                       const percentage = ((item.value / totalAttacks) * 100).toFixed(1);
-                      // Larghezza barra proporzionata al massimo globale
-                      const barWidth = (item.value / maxValue) * 100;
+                      // Larghezza barra proporzionata al massimo dei dati visualizzati
+                      const barWidth = (item.value / maxValueDisplay) * 100;
                       return (
                         <div key={idx} className="text-xs">
                           <div className="flex justify-between mb-1">
