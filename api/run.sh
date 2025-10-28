@@ -27,6 +27,14 @@ fi
 # Create bin directory if it doesn't exist
 mkdir -p ./bin
 
+# Run go mod tidy to ensure dependencies are correct
+echo "[INFO] Running: go mod tidy"
+go mod tidy
+if [ $? -ne 0 ]; then
+    echo "[ERROR] go mod tidy failed!"
+    exit 1
+fi
+
 # Check if binary exists, if not build it
 if [ ! -f "./bin/api-server" ]; then
     echo "[INFO] Binary not found, building the server..."
