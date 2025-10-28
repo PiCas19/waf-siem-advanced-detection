@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
@@ -158,30 +158,69 @@ const StatsPage: React.FC = () => {
     }
 
     const now = new Date();
+    const timeMs = getTimeMs(timelineFilter);
     const points: ChartDataPoint[] = [];
 
-    // Crea 31 punti (uno per ogni minuto nei prossimi 30 minuti)
-    for (let i = 30; i >= 0; i--) {
-      const startTime = new Date(now.getTime() - i * 60000);
-      const endTime = new Date(startTime.getTime() + 60000);
+    // Filtra gli alerts in base al timelineFilter
+    const filteredAlerts = recentAlerts.filter(alert => {
+      const alertTime = new Date(alert.timestamp).getTime();
+      return now.getTime() - alertTime < timeMs;
+    });
 
-      const timeStr = startTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00';
+    if (filteredAlerts.length === 0) {
+      // Se nessun dato nel periodo, mostra il periodo vuoto
+      const periodInMinutes = Math.ceil(timeMs / 60000);
+      for (let i = periodInMinutes; i >= 0; i--) {
+        const startTime = new Date(now.getTime() - i * 60000);
+        const timeStr = startTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00';
+        points.push({
+          time: timeStr,
+          threats: 0,
+          blocked: 0,
+        });
+      }
+      setTimelineData(points);
+      return;
+    }
 
-      // Conta i logs in questo minuto
-      const threatsInThisMinute = recentAlerts.filter(alert => {
+    // Determina il numero di intervalli in base al timelineFilter
+    let intervalMinutes = 1;
+    if (timelineFilter === '24h' || timelineFilter === '7d') {
+      intervalMinutes = 60; // Un punto per ora
+    } else if (timelineFilter === '30d' || timelineFilter === '90d' || timelineFilter === '1y') {
+      intervalMinutes = 24 * 60; // Un punto per giorno
+    }
+
+    // Calcola il numero di intervalli
+    const periodInMinutes = Math.ceil(timeMs / 60000);
+    const numIntervals = Math.ceil(periodInMinutes / intervalMinutes);
+
+    // Crea i punti del grafico
+    for (let i = numIntervals; i >= 0; i--) {
+      const startTime = new Date(now.getTime() - i * intervalMinutes * 60000);
+      const endTime = new Date(startTime.getTime() + intervalMinutes * 60000);
+
+      const timeStr = intervalMinutes === 1
+        ? startTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00'
+        : intervalMinutes === 60
+        ? startTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00'
+        : startTime.toLocaleDateString('it-IT', { month: 'short', day: 'numeric' }) || 'Data';
+
+      // Conta i logs in questo intervallo
+      const threatsInInterval = filteredAlerts.filter(alert => {
         const alertTime = new Date(alert.timestamp).getTime();
         return alertTime >= startTime.getTime() && alertTime < endTime.getTime();
       }).length;
 
-      const blockedInThisMinute = recentAlerts.filter(alert => {
+      const blockedInInterval = filteredAlerts.filter(alert => {
         const alertTime = new Date(alert.timestamp).getTime();
         return alertTime >= startTime.getTime() && alertTime < endTime.getTime() && alert.blocked;
       }).length;
 
       points.push({
         time: timeStr,
-        threats: threatsInThisMinute,
-        blocked: blockedInThisMinute,
+        threats: threatsInInterval,
+        blocked: blockedInInterval,
       });
     }
 
@@ -501,10 +540,20 @@ const StatsPage: React.FC = () => {
 
         {/* Threats Trend Chart */}
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Threats Trend (Hourly)</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Threats Trend</h2>
           {recentAlerts.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={timelineData}>
+              <AreaChart data={timelineData}>
+                <defs>
+                  <linearGradient id="colorThreats" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorBlocked" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                 <XAxis dataKey="time" stroke="#9ca3af" style={{ fontSize: '12px' }} />
                 <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
@@ -513,9 +562,9 @@ const StatsPage: React.FC = () => {
                   labelStyle={{ color: '#f3f4f6' }}
                 />
                 <Legend />
-                <Line type="monotone" dataKey="threats" stroke="#ef4444" strokeWidth={3} dot={{ fill: '#ef4444', r: 4 }} name="Total Threats" />
-                <Line type="monotone" dataKey="blocked" stroke="#22c55e" strokeWidth={3} dot={{ fill: '#22c55e', r: 4 }} name="Blocked" />
-              </LineChart>
+                <Area type="monotone" dataKey="threats" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorThreats)" name="Total Threats" />
+                <Area type="monotone" dataKey="blocked" stroke="#22c55e" strokeWidth={2} fillOpacity={1} fill="url(#colorBlocked)" name="Blocked" />
+              </AreaChart>
             </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-80 text-gray-400">

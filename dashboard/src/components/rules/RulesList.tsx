@@ -39,7 +39,7 @@ export default function RulesList({
       filteredDefaults = filteredDefaults.filter(
         rule =>
           rule.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          rule.description.toLowerCase().includes(searchTerm.toLowerCase())
+          (rule.description && rule.description.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
@@ -58,7 +58,7 @@ export default function RulesList({
       filteredCustom = filteredCustom.filter(
         rule =>
           rule.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          rule.description.toLowerCase().includes(searchTerm.toLowerCase())
+          (rule.description && rule.description.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
