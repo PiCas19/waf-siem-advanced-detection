@@ -69,7 +69,14 @@ const PieChartTooltip: React.FC<any> = ({ active, payload }) => {
 
     // Calcola percentuale dal valore vero
     const actualValue = data.payload.value || 0;
-    const percentage = data.value || 0; // questo è già la percentuale da Recharts
+
+    // Per Threat Level Distribution, usa globalTotal per percentuale corretta
+    // Per Block Rate, usa data.value (percentuale di Recharts)
+    let percentage = data.value || 0;
+    if (data.payload.globalTotal) {
+      // È un dato Threat Level, calcola percentuale su totale globale
+      percentage = (actualValue / data.payload.globalTotal) * 100;
+    }
 
     return (
       <div className="bg-gray-900 border border-gray-600 rounded-lg p-3">
@@ -603,11 +610,14 @@ const StatsPage: React.FC = () => {
       .map(([severity, _]) => severity);
     setAvailableSeverities(availableSevs);
 
+    // Calcola il totale globale di tutti gli attacchi (per il calcolo percentuale corretto nel tooltip)
+    const globalTotal = Object.values(severityCounts).reduce((sum, count) => sum + count, 0);
+
     let threatLevelDistribution = [
-      { name: 'Critical', value: severityCounts['CRITICAL'], severity: 'CRITICAL' },
-      { name: 'High', value: severityCounts['HIGH'], severity: 'HIGH' },
-      { name: 'Medium', value: severityCounts['MEDIUM'], severity: 'MEDIUM' },
-      { name: 'Low', value: severityCounts['LOW'], severity: 'LOW' },
+      { name: 'Critical', value: severityCounts['CRITICAL'], severity: 'CRITICAL', globalTotal },
+      { name: 'High', value: severityCounts['HIGH'], severity: 'HIGH', globalTotal },
+      { name: 'Medium', value: severityCounts['MEDIUM'], severity: 'MEDIUM', globalTotal },
+      { name: 'Low', value: severityCounts['LOW'], severity: 'LOW', globalTotal },
     ].filter(item => item.value > 0);
 
     // Filtra in base al severity selezionato
@@ -998,16 +1008,16 @@ const StatsPage: React.FC = () => {
                       ? geolocationData.filter(item => item.country === geolocationCountryFilter)
                       : geolocationData;
 
-                    // Calcola il totale globale per percentuali
+                    // Calcola il totale globale per percentuali e per la larghezza barra
                     const totalAttacks = geolocationData.reduce((sum, d) => sum + d.value, 0);
-                    // Calcola il max dei dati visualizzati per la larghezza barra
-                    const maxValueDisplay = Math.max(...displayData.map(d => d.value), 0);
+                    // Usa il max GLOBALE, non solo dei dati visualizzati, per proporzioni corrette
+                    const maxValueGlobal = Math.max(...geolocationData.map(d => d.value), 0);
 
                     return displayData.map((item, idx) => {
                       // Percentuale rispetto al TOTALE MONDIALE
                       const percentage = ((item.value / totalAttacks) * 100).toFixed(1);
-                      // Larghezza barra proporzionata al massimo dei dati visualizzati
-                      const barWidth = (item.value / maxValueDisplay) * 100;
+                      // Larghezza barra proporzionata al massimo GLOBALE
+                      const barWidth = (item.value / maxValueGlobal) * 100;
                       return (
                         <div key={idx} className="text-xs">
                           <div className="flex justify-between mb-1">
