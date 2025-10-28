@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   ChevronDown, Search, Download, Filter,
   AlertTriangle, Database, Shield, File, FolderOpen, Zap,
-  KeyRound, Bot, Lock, Eye
+  KeyRound, Bot, Lock, Eye, BlocksIcon
 } from 'lucide-react';
 
 interface Log {
@@ -19,12 +19,14 @@ interface Log {
   blocked: boolean;
 }
 
+type TimeRangeFilter = 'today' | 'week' | '15m' | '30m' | '1h' | '24h' | '7d' | '30d' | '90d' | '1y' | 'all';
+
 interface FilterState {
   search: string;
   threatType: string;
   severity: string;
   blocked: string;
-  timeRange: '1h' | '24h' | '7d' | '30d' | 'all';
+  timeRange: TimeRangeFilter;
 }
 
 export default function LogsPage(): React.ReactElement {
@@ -38,8 +40,39 @@ export default function LogsPage(): React.ReactElement {
     threatType: 'all',
     severity: 'all',
     blocked: 'all',
-    timeRange: '7d',
+    timeRange: '24h',
   });
+
+  // Funzione utility per calcolare il timeMs
+  const getTimeMs = (timeRange: TimeRangeFilter): number | null => {
+    const now = new Date();
+    switch (timeRange) {
+      case 'today':
+        return now.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      case 'week':
+        return 7 * 24 * 60 * 60 * 1000;
+      case '15m':
+        return 15 * 60 * 1000;
+      case '30m':
+        return 30 * 60 * 1000;
+      case '1h':
+        return 60 * 60 * 1000;
+      case '24h':
+        return 24 * 60 * 60 * 1000;
+      case '7d':
+        return 7 * 24 * 60 * 60 * 1000;
+      case '30d':
+        return 30 * 24 * 60 * 60 * 1000;
+      case '90d':
+        return 90 * 24 * 60 * 60 * 1000;
+      case '1y':
+        return 365 * 24 * 60 * 60 * 1000;
+      case 'all':
+        return null;
+      default:
+        return 24 * 60 * 60 * 1000;
+    }
+  };
 
   const itemsPerPage = 15;
   const severityColors: Record<string, string> = {
@@ -102,18 +135,9 @@ export default function LogsPage(): React.ReactElement {
 
     // Time range filter
     const now = new Date();
-    const timeMs =
-      filter.timeRange === '1h'
-        ? 60 * 60 * 1000
-        : filter.timeRange === '24h'
-        ? 24 * 60 * 60 * 1000
-        : filter.timeRange === '7d'
-        ? 7 * 24 * 60 * 60 * 1000
-        : filter.timeRange === '30d'
-        ? 30 * 24 * 60 * 60 * 1000
-        : Infinity;
+    const timeMs = getTimeMs(filter.timeRange);
 
-    if (filter.timeRange !== 'all') {
+    if (filter.timeRange !== 'all' && timeMs !== null) {
       filtered = filtered.filter((log) => {
         const logTime = new Date(log.created_at).getTime();
         return now.getTime() - logTime < timeMs;
@@ -213,13 +237,19 @@ export default function LogsPage(): React.ReactElement {
           {/* Time Range */}
           <select
             value={filter.timeRange}
-            onChange={(e) => setFilter({ ...filter, timeRange: e.target.value as any })}
+            onChange={(e) => setFilter({ ...filter, timeRange: e.target.value as TimeRangeFilter })}
             className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
           >
+            <option value="today">Today</option>
+            <option value="week">This week</option>
+            <option value="15m">Last 15 minutes</option>
+            <option value="30m">Last 30 minutes</option>
             <option value="1h">Last 1 hour</option>
             <option value="24h">Last 24 hours</option>
             <option value="7d">Last 7 days</option>
             <option value="30d">Last 30 days</option>
+            <option value="90d">Last 90 days</option>
+            <option value="1y">Last 1 year</option>
             <option value="all">All time</option>
           </select>
 
@@ -336,12 +366,14 @@ export default function LogsPage(): React.ReactElement {
                     </div>
                     <div className="col-span-1">
                       {log.blocked ? (
-                        <span className="px-2 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium border border-red-500/30">
-                          🚫 Blocked
+                        <span className="px-2 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium border border-red-500/30 flex items-center gap-1 w-fit">
+                          <BlocksIcon size={14} />
+                          Blocked
                         </span>
                       ) : (
-                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium border border-yellow-500/30">
-                          ⚠️ Detected
+                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium border border-yellow-500/30 flex items-center gap-1 w-fit">
+                          <AlertTriangle size={14} />
+                          Detected
                         </span>
                       )}
                     </div>
