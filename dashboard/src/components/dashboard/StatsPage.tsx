@@ -1028,36 +1028,34 @@ const StatsPage: React.FC = () => {
 
         {/* Threat Level Distribution - Right side, 1 column */}
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-white">Threat Level Distribution</h2>
-            <div className="flex gap-2">
-              <select
-                value={threatLevelSeverityFilter}
-                onChange={(e) => setThreatLevelSeverityFilter(e.target.value)}
-                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-              >
-                <option value="all">All Severities</option>
-                {availableSeverities.map(severity => (
-                  <option key={severity} value={severity}>{severity}</option>
-                ))}
-              </select>
-              <select
-                value={threatLevelFilter}
-                onChange={(e) => setThreatLevelFilter(e.target.value as TimeFilter)}
-                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-              >
-                <option value="today">Today</option>
-                <option value="week">This week</option>
-                <option value="15m">Last 15 minutes</option>
-                <option value="30m">Last 30 minutes</option>
-                <option value="1h">Last 1 hour</option>
-                <option value="24h">Last 24 hours</option>
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-                <option value="90d">Last 90 days</option>
-                <option value="1y">Last 1 year</option>
-              </select>
-            </div>
+          <h2 className="text-lg font-semibold text-white mb-4">Threat Level Distribution</h2>
+          <div className="flex gap-2 mb-4">
+            <select
+              value={threatLevelSeverityFilter}
+              onChange={(e) => setThreatLevelSeverityFilter(e.target.value)}
+              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="all">All Severities</option>
+              {availableSeverities.map(severity => (
+                <option key={severity} value={severity}>{severity}</option>
+              ))}
+            </select>
+            <select
+              value={threatLevelFilter}
+              onChange={(e) => setThreatLevelFilter(e.target.value as TimeFilter)}
+              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="today">Today</option>
+              <option value="week">This week</option>
+              <option value="15m">Last 15 minutes</option>
+              <option value="30m">Last 30 minutes</option>
+              <option value="1h">Last 1 hour</option>
+              <option value="24h">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+              <option value="1y">Last 1 year</option>
+            </select>
           </div>
           {threatLevelData && threatLevelData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
