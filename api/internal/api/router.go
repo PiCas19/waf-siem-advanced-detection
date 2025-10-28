@@ -25,6 +25,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	protected.Use(auth.AuthMiddleware())
 	{
 		protected.GET("/stats", WAFStatsHandler)
+		protected.GET("/geolocation", GetGeolocationHandler(db))
 
 		rules := protected.Group("/rules")
 		{

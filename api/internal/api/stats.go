@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/websocket"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -132,4 +133,50 @@ func WAFStatsHandler(c *gin.Context) {
 	statsMu.RLock()
 	defer statsMu.RUnlock()
 	c.JSON(200, stats)
+}
+
+// GeolocationData represents geolocation statistics
+type GeolocationData struct {
+	Country string `json:"country"`
+	Count   int    `json:"count"`
+}
+
+// GetGeolocationHandler returns geolocation distribution of threats
+func GetGeolocationHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		geoService, err := geoip.GetInstance()
+		if err != nil {
+			fmt.Printf("[ERROR] Failed to initialize GeoIP service: %v\n", err)
+			c.JSON(500, gin.H{"error": "geoip service unavailable"})
+			return
+		}
+
+		var logs []models.Log
+		result := db.Find(&logs)
+		if result.Error != nil {
+			fmt.Printf("[ERROR] Failed to fetch logs: %v\n", result.Error)
+			c.JSON(500, gin.H{"error": "database error"})
+			return
+		}
+
+		// Group logs by country
+		countryMap := make(map[string]int)
+		for _, log := range logs {
+			country := geoService.LookupCountry(log.ClientIP)
+			countryMap[country]++
+		}
+
+		// Convert to response format
+		var response []GeolocationData
+		for country, count := range countryMap {
+			response = append(response, GeolocationData{
+				Country: country,
+				Count:   count,
+			})
+		}
+
+		c.JSON(200, gin.H{
+			"data": response,
+		})
+	}
 }
