@@ -7,6 +7,8 @@ import {
   AlertTriangle, Lock,
   ArrowUp, ArrowDown, Circle
 } from 'lucide-react';
+import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useWebSocketStats } from '@/hooks/useWebSocketStats';
 import { fetchStats } from '@/services/api';
 
@@ -32,6 +34,44 @@ interface ChartDataPoint {
   threats: number;
   blocked: number;
 }
+
+// Custom Tooltip for Timeline - shows colors based on blocked status
+const TimelineTooltip: React.FC<any> = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-gray-900 border border-gray-600 rounded-lg p-3">
+        <p className="text-gray-300 text-sm">{payload[0]?.payload?.time}</p>
+        {payload.map((entry: any, index: number) => (
+          <p key={index} style={{ color: entry.color }} className="text-sm font-medium">
+            {entry.name}: {entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
+// Custom Tooltip for Bar Charts - shows colors based on blocked/allowed
+const BarChartTooltip: React.FC<any> = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-gray-900 border border-gray-600 rounded-lg p-3">
+        <p className="text-gray-300 text-sm font-semibold">{payload[0]?.payload?.name || payload[0]?.name}</p>
+        {payload.map((entry: any, index: number) => {
+          const isBlocked = entry.name === 'Blocked' || entry.dataKey === 'blocked';
+          const color = isBlocked ? '#ef4444' : '#22c55e';
+          return (
+            <p key={index} style={{ color }} className="text-sm font-medium">
+              {entry.name}: {entry.value}
+            </p>
+          );
+        })}
+      </div>
+    );
+  }
+  return null;
+};
 
 const StatsPage: React.FC = () => {
   const { stats, isConnected } = useWebSocketStats();
@@ -83,12 +123,17 @@ const StatsPage: React.FC = () => {
   // Filtri per i tre nuovi grafici
   const [maliciousIPsFilter, setMaliciousIPsFilter] = useState<TimeFilter>('24h');
   const [geolocationFilter, setGeolocationFilter] = useState<TimeFilter>('24h');
+  const [geolocationCountryFilter, setGeolocationCountryFilter] = useState<string>('all');
   const [threatLevelFilter, setThreatLevelFilter] = useState<TimeFilter>('24h');
+  const [threatLevelSeverityFilter, setThreatLevelSeverityFilter] = useState<string>('all');
 
   // Dati per i tre nuovi grafici
   const [maliciousIPsData, setMaliciousIPsData] = useState<any[]>([]);
   const [geolocationData, setGeolocationData] = useState<any[]>([]);
+  const [geolocationMapData, setGeolocationMapData] = useState<any[]>([]);
+  const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [threatLevelData, setThreatLevelData] = useState<any[]>([]);
+  const [availableSeverities, setAvailableSeverities] = useState<string[]>([]);
 
   // Dati filtrati per ogni sezione
   const [filteredAlertsByAllAlerts, setFilteredAlertsByAllAlerts] = useState<WAFEvent[]>([]);
@@ -598,10 +643,7 @@ const StatsPage: React.FC = () => {
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="time" stroke="#9ca3af" style={{ fontSize: '12px' }} />
               <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                labelStyle={{ color: '#f3f4f6' }}
-              />
+              <Tooltip content={<TimelineTooltip />} />
               <Legend />
               <Line type="monotone" dataKey="threats" stroke="#ef4444" strokeWidth={2} dot={false} name="Threats Detected" />
               <Line type="monotone" dataKey="blocked" stroke="#f97316" strokeWidth={2} dot={false} name="Blocked" />
