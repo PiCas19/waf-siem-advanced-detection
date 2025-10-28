@@ -19,6 +19,7 @@ export function useWebSocketStats() {
   });
   const [isConnected, setIsConnected] = useState(false);
   const statsRef = useRef(stats);
+  const lastStatsRef = useRef({ threats: 0, blocked: 0 }); // Traccia gli ultimi valori
 
   // Carica gli stats iniziali dal server
   useEffect(() => {
@@ -30,11 +31,17 @@ export function useWebSocketStats() {
         const data = await fetchStats();
         console.log('[Stats Hook] Stats loaded successfully:', data);
 
-        setStats({
+        const newStats = {
           threats_detected: data.threats_detected || 0,
           requests_blocked: data.requests_blocked || 0,
           total_requests: data.total_requests || 0,
-        });
+        };
+
+        setStats(newStats);
+        lastStatsRef.current = {
+          threats: newStats.threats_detected,
+          blocked: newStats.requests_blocked,
+        };
       } catch (error) {
         console.error('[Stats Hook] Failed to load initial stats:', error);
         console.error('[Stats Hook] Error details:', {
@@ -42,10 +49,14 @@ export function useWebSocketStats() {
           status: (error as any)?.response?.status,
           statusText: (error as any)?.response?.statusText,
         });
+        // Fallback: se l'API fallisce, gli stats rimangono a 0
       }
     };
 
     loadInitialStats();
+    // Ricarica gli stats ogni 10 secondi come backup
+    const interval = setInterval(loadInitialStats, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // Aggiorna il ref quando stats cambia

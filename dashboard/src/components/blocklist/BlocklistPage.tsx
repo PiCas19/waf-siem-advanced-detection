@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Lock, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface BlockedEntry {
   id: string | number;
@@ -237,44 +238,48 @@ const BlocklistPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-white mb-2">Security Blocklist</h1>
-        <p className="text-gray-400">Manage blocked IPs, whitelisted IPs, and false positives</p>
-      </div>
+    <div className="min-h-screen bg-gray-900 p-6">
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-white mb-2">Security Blocklist</h1>
+          <p className="text-gray-400">Manage blocked IPs, whitelisted IPs, and false positives</p>
+        </div>
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-700">
         <button
           onClick={() => setActiveTab('blocklist')}
-          className={`px-6 py-3 font-medium transition border-b-2 ${
+          className={`px-6 py-3 font-medium transition border-b-2 flex items-center gap-2 ${
             activeTab === 'blocklist'
               ? 'border-red-500 text-red-400'
               : 'border-transparent text-gray-400 hover:text-white'
           }`}
         >
-          🚫 Blocklist ({blocklist.length})
+          <Lock size={18} />
+          Blocklist ({blocklist.length})
         </button>
         <button
           onClick={() => setActiveTab('whitelist')}
-          className={`px-6 py-3 font-medium transition border-b-2 ${
+          className={`px-6 py-3 font-medium transition border-b-2 flex items-center gap-2 ${
             activeTab === 'whitelist'
               ? 'border-green-500 text-green-400'
               : 'border-transparent text-gray-400 hover:text-white'
           }`}
         >
-          ✅ Whitelist ({whitelist.length})
+          <CheckCircle size={18} />
+          Whitelist ({whitelist.length})
         </button>
         <button
           onClick={() => setActiveTab('false-positives')}
-          className={`px-6 py-3 font-medium transition border-b-2 ${
+          className={`px-6 py-3 font-medium transition border-b-2 flex items-center gap-2 ${
             activeTab === 'false-positives'
               ? 'border-blue-500 text-blue-400'
               : 'border-transparent text-gray-400 hover:text-white'
           }`}
         >
-          ⚠️ False Positives ({falsePositives.filter(fp => fp.status === 'pending').length})
+          <AlertTriangle size={18} />
+          False Positives ({falsePositives.filter(fp => fp.status === 'pending').length})
         </button>
       </div>
 
@@ -584,6 +589,7 @@ const BlocklistPage: React.FC = () => {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 };
