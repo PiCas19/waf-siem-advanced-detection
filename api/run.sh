@@ -24,20 +24,11 @@ if [ -z "$MAXMIND_LICENSE_KEY" ]; then
     fi
 fi
 
-# Create bin directory if it doesn't exist
-mkdir -p ./bin
-
-# Check if binary exists, if not build it
+# Check if binary exists
 if [ ! -f "./bin/api-server" ]; then
-    echo "[INFO] Binary not found, building the server..."
-    go build -o bin/api-server ./cmd/api-server
-    if [ $? -ne 0 ]; then
-        echo "[ERROR] Build failed"
-        exit 1
-    fi
-    echo "[INFO] Build completed successfully"
-else
-    echo "[INFO] Using existing binary"
+    echo "[ERROR] Binary not found at ./bin/api-server"
+    echo "[INFO] Please build it first with: go build -o bin/api-server ./cmd/api-server"
+    exit 1
 fi
 
 # Run the server
