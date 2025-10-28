@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ScatterChart, Scatter,
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import {
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useWebSocketStats } from '@/hooks/useWebSocketStats';
 import { fetchStats } from '@/services/api';
+import WorldMapSVG from '@/components/WorldMap';
 
 interface WAFEvent {
   ip: string;
@@ -951,54 +952,9 @@ const StatsPage: React.FC = () => {
             {/* World Map - Left side, 2 columns */}
             <div className="lg:col-span-2">
               {geolocationMapData && geolocationMapData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={350}>
-                  <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis
-                      dataKey="lng"
-                      type="number"
-                      stroke="#9ca3af"
-                      label={{ value: 'Longitude', position: 'insideBottomRight', offset: -5, fill: '#9ca3af' }}
-                      domain={[-180, 180]}
-                    />
-                    <YAxis
-                      dataKey="lat"
-                      stroke="#9ca3af"
-                      label={{ value: 'Latitude', angle: -90, position: 'insideLeft', fill: '#9ca3af' }}
-                      domain={[-90, 90]}
-                    />
-                    <Tooltip
-                      cursor={{ strokeDasharray: '3 3' }}
-                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                      labelStyle={{ color: '#f3f4f6' }}
-                      content={({ active, payload }: any) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-gray-900 border border-gray-600 rounded-lg p-3">
-                              <p className="text-gray-300 font-semibold text-sm">{data.country}</p>
-                              <p className="text-gray-400 text-xs">Attacks: {data.count}</p>
-                              <p className="text-gray-500 text-xs">Lat: {data.lat.toFixed(2)}, Lng: {data.lng.toFixed(2)}</p>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Scatter
-                      name="Attack Hotspots"
-                      data={geolocationMapData}
-                      fill="#f97316"
-                      shape="circle"
-                    >
-                      {geolocationMapData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Scatter>
-                  </ScatterChart>
-                </ResponsiveContainer>
+                <WorldMapSVG data={geolocationMapData} height={350} />
               ) : (
-                <div className="flex items-center justify-center h-80 text-gray-400">
+                <div className="flex items-center justify-center h-80 text-gray-400 bg-gray-900 rounded-lg border border-gray-700">
                   <p>No attack data available</p>
                 </div>
               )}

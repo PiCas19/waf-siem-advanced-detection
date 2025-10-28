@@ -88,7 +88,33 @@ func (s *Service) loadFromFile(filepath string) error {
 	return nil
 }
 
+// IsPrivateIP checks if IP address is private/local
+func IsPrivateIP(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+
+	// Check loopback (127.0.0.0/8 for IPv4, ::1 for IPv6)
+	if ip.IsLoopback() {
+		return true
+	}
+
+	// Check private ranges
+	if ip.IsPrivate() {
+		return true
+	}
+
+	// Check link-local
+	if ip.IsLinkLocalUnicast() {
+		return true
+	}
+
+	return false
+}
+
 // LookupCountry returns country name for given IP address
+// For private/local IPs, maps to a default location (Switzerland)
 func (s *Service) LookupCountry(ipStr string) string {
 	s.mu.RLock()
 	reader := s.reader
@@ -98,6 +124,12 @@ func (s *Service) LookupCountry(ipStr string) string {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return "Unknown"
+	}
+
+	// Handle private/local IPs - map to default location (Switzerland for local testing)
+	if IsPrivateIP(ipStr) {
+		fmt.Printf("[INFO] Private IP detected: %s -> Switzerland (local mapping)\n", ipStr)
+		return "Switzerland"
 	}
 
 	// Try MaxMind first if available
