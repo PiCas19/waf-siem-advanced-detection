@@ -303,6 +303,30 @@ const StatsPage: React.FC = () => {
     setMaliciousIPsData(top10 && top10.length > 0 ? top10 : []);
   }, [recentAlerts, maliciousIPsFilter]);
 
+  // Funzione per mappare IP a paese (basato su IP ranges comuni)
+  const getCountryFromIP = (ip: string): string => {
+    if (!ip) return 'Unknown';
+
+    // Parsing dell'IP
+    const parts = ip.split('.').map(p => parseInt(p, 10));
+    if (parts.length !== 4 || parts.some(p => isNaN(p))) return 'Unknown';
+
+    const [octet1] = parts;
+
+    // Mappatura semplice dei range IP a paesi
+    // Questi sono range reali ma semplificati per demo
+    if (octet1 >= 1 && octet1 <= 11) return 'United States';
+    if (octet1 >= 12 && octet1 <= 21) return 'China';
+    if (octet1 >= 22 && octet1 <= 29) return 'Russia';
+    if (octet1 >= 30 && octet1 <= 47) return 'India';
+    if (octet1 >= 48 && octet1 <= 63) return 'Brazil';
+    if (octet1 >= 64 && octet1 <= 127) return 'Europe';
+    if (octet1 >= 128 && octet1 <= 191) return 'Asia-Pacific';
+    if (octet1 >= 192 && octet1 <= 223) return 'North America';
+
+    return 'Unknown';
+  };
+
   // Calcola Geolocation Data (paese di provenienza)
   useEffect(() => {
     let filtered = [...recentAlerts];
@@ -314,17 +338,20 @@ const StatsPage: React.FC = () => {
       return now.getTime() - alertTime < timeMs;
     });
 
-    // Dividiamo equamente tra i paesi comuni di attacchi (simulato)
-    // In un sistema reale, avremmo una geolocation API per risolvere gli IP
-    const commonAttackCountries = ['China', 'Russia', 'United States', 'India', 'Brazil', 'Unknown'];
-    const countPerCountry = Math.floor(filtered.length / commonAttackCountries.length);
+    // Raggruppa per paese usando la funzione getCountryFromIP
+    const countryCounts: { [key: string]: number } = {};
+    filtered.forEach(alert => {
+      const country = getCountryFromIP(alert.ip);
+      countryCounts[country] = (countryCounts[country] || 0) + 1;
+    });
 
-    const geoData = commonAttackCountries.map((country, index) => ({
-      country,
-      value: index === commonAttackCountries.length - 1
-        ? filtered.length - (countPerCountry * (commonAttackCountries.length - 1))
-        : countPerCountry
-    })).filter(g => g.value > 0);
+    // Converti in array e ordina per count decrescente
+    const geoData = Object.entries(countryCounts)
+      .map(([country, value]) => ({
+        country,
+        value
+      }))
+      .sort((a, b) => (b.value || 0) - (a.value || 0));
 
     setGeolocationData(geoData && geoData.length > 0 ? geoData : []);
   }, [recentAlerts, geolocationFilter]);
@@ -664,8 +691,8 @@ const StatsPage: React.FC = () => {
 
       {/* Three New Charts: Top IPs, Geolocation, Threat Levels */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Top 10 Malicious IPs */}
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        {/* Top 10 Malicious IPs - 2 columns */}
+        <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Top 10 Malicious IPs</h2>
             <select
@@ -707,8 +734,51 @@ const StatsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Geolocation Heatmap */}
+        {/* Threat Types Distribution - right side, 1 column */}
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-white">Threat Types Distribution</h2>
+            <select
+              value={threatDistFilter}
+              onChange={(e) => setThreatDistFilter(e.target.value as TimeFilter)}
+              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="today">Today</option>
+              <option value="week">This week</option>
+              <option value="15m">Last 15 minutes</option>
+              <option value="30m">Last 30 minutes</option>
+              <option value="1h">Last 1 hour</option>
+              <option value="24h">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+              <option value="1y">Last 1 year</option>
+            </select>
+          </div>
+          {threatTypeData && threatTypeData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={threatTypeData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="name" stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+                  labelStyle={{ color: '#f3f4f6' }}
+                />
+                <Legend />
+                <Bar dataKey="value" fill="#3b82f6" name="Total Detected" />
+                <Bar dataKey="blocked" fill="#ef4444" name="Blocked" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-80 text-gray-400">
+              <p>No threats detected yet</p>
+            </div>
+          )}
+        </div>
+
+        {/* Geolocation Heatmap - left side, 2 columns */}
+        <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Geolocation Heatmap</h2>
             <select
@@ -749,7 +819,7 @@ const StatsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Threat Level Distribution */}
+        {/* Threat Level Distribution - right side, 1 column */}
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Threat Level Distribution</h2>
@@ -854,7 +924,7 @@ const StatsPage: React.FC = () => {
         {filteredAlertsByAllAlerts.length > 0 ? (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-gray-700">
                     <th
@@ -866,16 +936,18 @@ const StatsPage: React.FC = () => {
                           setAllAlertsSortOrder('desc');
                         }
                       }}
-                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition inline-flex items-center gap-2"
+                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition w-32"
                     >
-                      Timestamp
-                      {allAlertsSortColumn === 'timestamp' && (
-                        allAlertsSortOrder === 'asc' ? (
-                          <ArrowUp size={14} />
-                        ) : (
-                          <ArrowDown size={14} />
-                        )
-                      )}
+                      <div className="flex items-center gap-2">
+                        Timestamp
+                        {allAlertsSortColumn === 'timestamp' && (
+                          allAlertsSortOrder === 'asc' ? (
+                            <ArrowUp size={14} />
+                          ) : (
+                            <ArrowDown size={14} />
+                          )
+                        )}
+                      </div>
                     </th>
                     <th
                       onClick={() => {
@@ -886,16 +958,18 @@ const StatsPage: React.FC = () => {
                           setAllAlertsSortOrder('asc');
                         }
                       }}
-                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition inline-flex items-center gap-2"
+                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition w-28"
                     >
-                      IP
-                      {allAlertsSortColumn === 'ip' && (
-                        allAlertsSortOrder === 'asc' ? (
-                          <ArrowUp size={14} />
-                        ) : (
-                          <ArrowDown size={14} />
-                        )
-                      )}
+                      <div className="flex items-center gap-2">
+                        IP
+                        {allAlertsSortColumn === 'ip' && (
+                          allAlertsSortOrder === 'asc' ? (
+                            <ArrowUp size={14} />
+                          ) : (
+                            <ArrowDown size={14} />
+                          )
+                        )}
+                      </div>
                     </th>
                     <th
                       onClick={() => {
@@ -906,16 +980,18 @@ const StatsPage: React.FC = () => {
                           setAllAlertsSortOrder('asc');
                         }
                       }}
-                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition inline-flex items-center gap-2"
+                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition w-20"
                     >
-                      Method
-                      {allAlertsSortColumn === 'method' && (
-                        allAlertsSortOrder === 'asc' ? (
-                          <ArrowUp size={14} />
-                        ) : (
-                          <ArrowDown size={14} />
-                        )
-                      )}
+                      <div className="flex items-center gap-2">
+                        Method
+                        {allAlertsSortColumn === 'method' && (
+                          allAlertsSortOrder === 'asc' ? (
+                            <ArrowUp size={14} />
+                          ) : (
+                            <ArrowDown size={14} />
+                          )
+                        )}
+                      </div>
                     </th>
                     <th
                       onClick={() => {
@@ -926,16 +1002,18 @@ const StatsPage: React.FC = () => {
                           setAllAlertsSortOrder('asc');
                         }
                       }}
-                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition inline-flex items-center gap-2"
+                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition flex-1"
                     >
-                      Path
-                      {allAlertsSortColumn === 'path' && (
-                        allAlertsSortOrder === 'asc' ? (
-                          <ArrowUp size={14} />
-                        ) : (
-                          <ArrowDown size={14} />
-                        )
-                      )}
+                      <div className="flex items-center gap-2">
+                        Path
+                        {allAlertsSortColumn === 'path' && (
+                          allAlertsSortOrder === 'asc' ? (
+                            <ArrowUp size={14} />
+                          ) : (
+                            <ArrowDown size={14} />
+                          )
+                        )}
+                      </div>
                     </th>
                     <th
                       onClick={() => {
@@ -946,19 +1024,21 @@ const StatsPage: React.FC = () => {
                           setAllAlertsSortOrder('asc');
                         }
                       }}
-                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition inline-flex items-center gap-2"
+                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition w-28"
                     >
-                      Threat Type
-                      {allAlertsSortColumn === 'threat' && (
-                        allAlertsSortOrder === 'asc' ? (
-                          <ArrowUp size={14} />
-                        ) : (
-                          <ArrowDown size={14} />
-                        )
-                      )}
+                      <div className="flex items-center gap-2">
+                        Threat Type
+                        {allAlertsSortColumn === 'threat' && (
+                          allAlertsSortOrder === 'asc' ? (
+                            <ArrowUp size={14} />
+                          ) : (
+                            <ArrowDown size={14} />
+                          )
+                        )}
+                      </div>
                     </th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Action</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">Status</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">Action</th>
                   </tr>
                 </thead>
                 <tbody>
