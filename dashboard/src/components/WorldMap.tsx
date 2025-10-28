@@ -48,8 +48,8 @@ const WorldMapOL: React.FC<WorldMapProps> = ({ data, height = 400 }) => {
         color: marker.color,
       });
 
-      // Calculate radius based on attack count
-      const radius = marker.count >= 50 ? 12 : marker.count >= 20 ? 10 : marker.count >= 10 ? 8 : 6;
+      // Calculate radius based on attack count - LARGER for better visibility
+      const radius = marker.count >= 50 ? 20 : marker.count >= 20 ? 16 : marker.count >= 10 ? 13 : 10;
 
       // Style with color from intensity legend
       feature.setStyle(
@@ -61,9 +61,11 @@ const WorldMapOL: React.FC<WorldMapProps> = ({ data, height = 400 }) => {
           }),
           text: new Text({
             text: marker.count.toString(),
-            font: 'bold 11px Arial',
+            font: 'bold 14px Arial',
             fill: new Fill({ color: '#ffffff' }),
             offsetY: 0,
+            textAlign: 'center',
+            textBaseline: 'middle',
           }),
         })
       );
@@ -91,7 +93,7 @@ const WorldMapOL: React.FC<WorldMapProps> = ({ data, height = 400 }) => {
 
     const popup = new Overlay({
       element: popupContainer,
-      autoPan: true,
+      autoPan: false, // Don't pan map when showing tooltip
     });
 
     // Initialize map
