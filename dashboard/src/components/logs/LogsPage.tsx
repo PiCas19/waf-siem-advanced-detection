@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, Search, Download, Filter } from 'lucide-react';
+import {
+  ChevronDown, Search, Download, Filter,
+  AlertTriangle, Database, Shield, File, FolderOpen, Zap,
+  KeyRound, Bot, Lock, Eye
+} from 'lucide-react';
 
 interface Log {
   id: number;
@@ -46,19 +50,22 @@ export default function LogsPage(): React.ReactElement {
     INFO: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
   };
 
-  const threatTypeEmojis: Record<string, string> = {
-    'XSS': '🔓',
-    'SQL Injection': '💾',
-    'CSRF': '🛡️',
-    'XXE': '📄',
-    'Path Traversal': '📁',
-    'Command Injection': '⚡',
-    'Directory Listing': '📂',
-    'Malicious Pattern': '⚠️',
-    'Brute Force': '🔑',
-    'Bot Detection': '🤖',
-    'Unauthorized Access': '🚫',
-    'Suspicious Activity': '👁️',
+  const getThreatIcon = (threatType: string) => {
+    const iconMap: Record<string, React.ReactNode> = {
+      'XSS': <AlertTriangle size={16} />,
+      'SQL Injection': <Database size={16} />,
+      'CSRF': <Shield size={16} />,
+      'XXE': <File size={16} />,
+      'Path Traversal': <FolderOpen size={16} />,
+      'Command Injection': <Zap size={16} />,
+      'Directory Listing': <FolderOpen size={16} />,
+      'Malicious Pattern': <AlertTriangle size={16} />,
+      'Brute Force': <KeyRound size={16} />,
+      'Bot Detection': <Bot size={16} />,
+      'Unauthorized Access': <Lock size={16} />,
+      'Suspicious Activity': <Eye size={16} />,
+    };
+    return iconMap[threatType] || <AlertTriangle size={16} />;
   };
 
   // Load logs from API
@@ -306,9 +313,9 @@ export default function LogsPage(): React.ReactElement {
                     <div className="col-span-1 text-xs text-gray-300">
                       {new Date(log.created_at).toLocaleTimeString('it-IT')}
                     </div>
-                    <div className="col-span-2 text-sm text-white font-medium">
-                      <span className="mr-2">
-                        {threatTypeEmojis[log.threat_type] || '⚠️'}
+                    <div className="col-span-2 text-sm text-white font-medium flex items-center gap-2">
+                      <span className="text-gray-400">
+                        {getThreatIcon(log.threat_type)}
                       </span>
                       {log.threat_type}
                     </div>
@@ -321,10 +328,10 @@ export default function LogsPage(): React.ReactElement {
                     <div className="col-span-1">
                       <span
                         className={`px-2 py-1 rounded text-xs font-semibold border ${
-                          severityColors[log.severity] || 'bg-gray-500/20 text-gray-300'
+                          severityColors[log.severity?.toUpperCase()] || 'bg-gray-500/20 text-gray-300 border-gray-500/30'
                         }`}
                       >
-                        {log.severity}
+                        {log.severity?.toUpperCase() || 'N/A'}
                       </span>
                     </div>
                     <div className="col-span-1">

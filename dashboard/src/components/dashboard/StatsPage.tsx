@@ -3,6 +3,10 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import {
+  AlertTriangle, Lock,
+  ArrowUp, ArrowDown, Circle
+} from 'lucide-react';
 import { useWebSocketStats } from '@/hooks/useWebSocketStats';
 import { fetchStats } from '@/services/api';
 
@@ -55,6 +59,14 @@ const StatsPage: React.FC = () => {
   const [allAlertsPage, setAllAlertsPage] = useState(1);
   const itemsPerPage = 10;
 
+  // Sorting states (solo per All Alerts table)
+  const [allAlertsSortColumn, setAllAlertsSortColumn] = useState<'timestamp' | 'ip' | 'method' | 'path' | 'threat'>('timestamp');
+  const [allAlertsSortOrder, setAllAlertsSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Search states
+  const [recentThreatsSearchQuery, setRecentThreatsSearchQuery] = useState<string>('');
+  const [allAlertsSearchQuery, setAllAlertsSearchQuery] = useState<string>('');
+
   // Carica i dati iniziali
   useEffect(() => {
     const loadInitialData = async () => {
@@ -62,6 +74,12 @@ const StatsPage: React.FC = () => {
         // Carica stats per il timeline
         const data = await fetchStats();
         initializeTimeline();
+
+        // Inizializza prevStats con i dati dal backend
+        setPrevStats({
+          threats_detected: data.threats_detected || 0,
+          requests_blocked: data.requests_blocked || 0,
+        });
 
         // Carica logs (tutte le threat) dal database
         const token = localStorage.getItem('authToken');
@@ -110,38 +128,52 @@ const StatsPage: React.FC = () => {
     setTimelineData(points.length > 0 ? points : []);
   };
 
-  // Aggiorna timeline quando arrivano nuovi eventi
+  // Track previous stats to calculate increments
+  const [prevStats, setPrevStats] = useState({ threats_detected: 0, requests_blocked: 0 });
+
+  // Aggiorna timeline quando arrivano nuovi eventi dal WebSocket
   useEffect(() => {
     if (timelineData.length === 0) return;
 
-    setTimelineData((prevData) => {
-      if (!prevData || prevData.length === 0) return prevData;
+    // Se i stats sono cambiati, aggiungi l'incremento al timeline attuale
+    const threatIncrease = stats.threats_detected - prevStats.threats_detected;
+    const blockedIncrease = stats.requests_blocked - prevStats.requests_blocked;
 
-      const newData = [...prevData];
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00';
+    if (threatIncrease > 0 || blockedIncrease > 0) {
+      setTimelineData((prevData) => {
+        if (!prevData || prevData.length === 0) return prevData;
 
-      let lastPoint = newData[newData.length - 1];
-      if (!lastPoint) return prevData;
+        const newData = [...prevData];
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00';
 
-      if (lastPoint.time !== timeStr) {
-        newData.shift();
-        newData.push({
-          time: timeStr,
-          threats: lastPoint?.threats ?? 0,
-          blocked: lastPoint?.blocked ?? 0,
-        });
-        lastPoint = newData[newData.length - 1];
-      }
+        let lastPoint = newData[newData.length - 1];
+        if (!lastPoint) return prevData;
 
-      if (lastPoint) {
-        lastPoint.threats = Math.max(lastPoint.threats, stats.threats_detected);
-        lastPoint.blocked = Math.max(lastPoint.blocked, stats.requests_blocked);
-      }
+        if (lastPoint.time !== timeStr) {
+          // Nuovo minuto - crea un nuovo punto
+          newData.shift();
+          newData.push({
+            time: timeStr,
+            threats: threatIncrease,
+            blocked: blockedIncrease,
+          });
+        } else {
+          // Stesso minuto - accumula l'incremento
+          lastPoint.threats += threatIncrease;
+          lastPoint.blocked += blockedIncrease;
+        }
 
-      return newData;
-    });
-  }, [stats]);
+        return newData;
+      });
+
+      // Aggiorna i stats precedenti
+      setPrevStats({
+        threats_detected: stats.threats_detected,
+        requests_blocked: stats.requests_blocked,
+      });
+    }
+  }, [stats, timelineData.length]);
 
   // Calcola threat types solo per Threat Distribution (con suo filtro)
   useEffect(() => {
@@ -173,7 +205,76 @@ const StatsPage: React.FC = () => {
     setThreatTypeData(threatCounts && threatCounts.length > 0 ? threatCounts : []);
   }, [recentAlerts, threatDistFilter]);
 
-  // Filtra per Recent Threats Table (solo timeframe)
+  // Funzione per eseguire la ricerca elastica su Recent Threats
+  const searchRecentThreats = (alerts: WAFEvent[], query: string): WAFEvent[] => {
+    if (!query.trim()) return alerts;
+    const lowerQuery = query.toLowerCase();
+    return alerts.filter(alert => {
+      return (
+        alert.ip?.toLowerCase().includes(lowerQuery) ||
+        alert.threat?.toLowerCase().includes(lowerQuery) ||
+        alert.method?.toLowerCase().includes(lowerQuery) ||
+        alert.path?.toLowerCase().includes(lowerQuery) ||
+        new Date(alert.timestamp).toLocaleString('it-IT').toLowerCase().includes(lowerQuery)
+      );
+    });
+  };
+
+  // Funzione per eseguire la ricerca elastica su All Alerts
+  const searchAllAlerts = (alerts: WAFEvent[], query: string): WAFEvent[] => {
+    if (!query.trim()) return alerts;
+    const lowerQuery = query.toLowerCase();
+    return alerts.filter(alert => {
+      return (
+        alert.ip?.toLowerCase().includes(lowerQuery) ||
+        alert.threat?.toLowerCase().includes(lowerQuery) ||
+        alert.method?.toLowerCase().includes(lowerQuery) ||
+        alert.path?.toLowerCase().includes(lowerQuery) ||
+        new Date(alert.timestamp).toLocaleString('it-IT').toLowerCase().includes(lowerQuery)
+      );
+    });
+  };
+
+  // Funzione per ordinare Recent Threats (sempre per timestamp DESC)
+  const sortRecentThreats = (alerts: WAFEvent[]): WAFEvent[] => {
+    return [...alerts].sort((a, b) => {
+      const aVal = new Date(a.timestamp).getTime();
+      const bVal = new Date(b.timestamp).getTime();
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    });
+  };
+
+  // Funzione per ordinare All Alerts
+  const sortAllAlerts = (alerts: WAFEvent[]): WAFEvent[] => {
+    return [...alerts].sort((a, b) => {
+      let aVal: any, bVal: any;
+
+      if (allAlertsSortColumn === 'threat') {
+        aVal = a.threat;
+        bVal = b.threat;
+      } else if (allAlertsSortColumn === 'ip') {
+        aVal = a.ip;
+        bVal = b.ip;
+      } else if (allAlertsSortColumn === 'method') {
+        aVal = a.method;
+        bVal = b.method;
+      } else if (allAlertsSortColumn === 'path') {
+        aVal = a.path;
+        bVal = b.path;
+      } else {
+        aVal = new Date(a.timestamp).getTime();
+        bVal = new Date(b.timestamp).getTime();
+      }
+
+      if (allAlertsSortOrder === 'asc') {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+  };
+
+  // Filtra per Recent Threats Table (timeframe + ricerca + ordinamento)
   useEffect(() => {
     let filtered = [...recentAlerts];
 
@@ -184,13 +285,17 @@ const StatsPage: React.FC = () => {
       return now.getTime() - alertTime < timeMs;
     });
 
-    setRecentThreatsPage(1); // Reset pagination
-    setFilteredAlertsByRecentThreats(filtered.sort((a, b) =>
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    ));
-  }, [recentAlerts, recentThreatsFilter]);
+    // Applica ricerca
+    filtered = searchRecentThreats(filtered, recentThreatsSearchQuery);
 
-  // Filtra per All Alerts Table (timeframe + threat type)
+    // Applica ordinamento (sempre timestamp DESC)
+    filtered = sortRecentThreats(filtered);
+
+    setRecentThreatsPage(1); // Reset pagination
+    setFilteredAlertsByRecentThreats(filtered);
+  }, [recentAlerts, recentThreatsFilter, recentThreatsSearchQuery]);
+
+  // Filtra per All Alerts Table (timeframe + threat type + ricerca + ordinamento)
   useEffect(() => {
     let filtered = [...recentAlerts];
 
@@ -205,11 +310,15 @@ const StatsPage: React.FC = () => {
       return now.getTime() - alertTime < timeMs;
     });
 
+    // Applica ricerca
+    filtered = searchAllAlerts(filtered, allAlertsSearchQuery);
+
+    // Applica ordinamento
+    filtered = sortAllAlerts(filtered);
+
     setAllAlertsPage(1); // Reset pagination
-    setFilteredAlertsByAllAlerts(filtered.sort((a, b) =>
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    ));
-  }, [recentAlerts, alertsTimeFilter, alertsThreatFilter]);
+    setFilteredAlertsByAllAlerts(filtered);
+  }, [recentAlerts, alertsTimeFilter, alertsThreatFilter, allAlertsSearchQuery, allAlertsSortColumn, allAlertsSortOrder]);
 
   // Blocca un IP
   const handleBlockIP = async (ip: string) => {
@@ -265,8 +374,9 @@ const StatsPage: React.FC = () => {
           <h1 className="text-3xl font-bold text-white mb-2">Security Analytics</h1>
           <p className="text-gray-400">Real-time WAF monitoring and threat detection</p>
         </div>
-        <div className={`px-4 py-2 rounded-lg font-medium ${isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-          {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium ${isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+          <Circle size={8} className={isConnected ? 'fill-green-400' : 'fill-red-400'} />
+          {isConnected ? 'Connected' : 'Disconnected'}
         </div>
       </div>
 
@@ -424,6 +534,17 @@ const StatsPage: React.FC = () => {
             </select>
           </div>
 
+          {/* Search Bar */}
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search threats by IP, threat type, method, path..."
+              value={recentThreatsSearchQuery}
+              onChange={(e) => setRecentThreatsSearchQuery(e.target.value)}
+              className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+
           {filteredAlertsByRecentThreats.length > 0 ? (
             <>
               <div className="space-y-2">
@@ -436,9 +557,15 @@ const StatsPage: React.FC = () => {
                           <p className="text-sm font-medium text-white">
                             {alert.threat}
                             {alert.blocked ? (
-                              <span className="ml-2 px-2 py-1 bg-red-500/20 text-red-300 rounded text-xs">🚫 Blocked</span>
+                              <span className="ml-2 px-2 py-1 bg-red-500/20 text-red-300 rounded text-xs inline-flex items-center gap-1">
+                                <Lock size={12} />
+                                Blocked
+                              </span>
                             ) : (
-                              <span className="ml-2 px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs">⚠️ Detected</span>
+                              <span className="ml-2 px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs inline-flex items-center gap-1">
+                                <AlertTriangle size={12} />
+                                Detected
+                              </span>
                             )}
                           </p>
                           <p className="text-xs text-gray-400 mt-1">
@@ -515,29 +642,42 @@ const StatsPage: React.FC = () => {
 
       {/* All Alerts Table */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-semibold text-white">All Alerts</h2>
-          <div className="flex gap-4">
-            <select
-              value={alertsTimeFilter}
-              onChange={(e) => setAlertsTimeFilter(e.target.value as any)}
-              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="1h">Last 1 hour</option>
-              <option value="24h">Last 24 hours</option>
-              <option value="7d">Last 7 days</option>
-            </select>
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-white">All Alerts</h2>
+            <div className="flex gap-4">
+              <select
+                value={alertsTimeFilter}
+                onChange={(e) => setAlertsTimeFilter(e.target.value as any)}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="1h">Last 1 hour</option>
+                <option value="24h">Last 24 hours</option>
+                <option value="7d">Last 7 days</option>
+              </select>
 
-            <select
-              value={alertsThreatFilter}
-              onChange={(e) => setAlertsThreatFilter(e.target.value)}
-              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="all">All Types</option>
-              {allUniqueThreats.map(threat => (
-                <option key={threat} value={threat}>{threat}</option>
-              ))}
-            </select>
+              <select
+                value={alertsThreatFilter}
+                onChange={(e) => setAlertsThreatFilter(e.target.value)}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="all">All Types</option>
+                {allUniqueThreats.map(threat => (
+                  <option key={threat} value={threat}>{threat}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Search Bar for All Alerts */}
+          <div>
+            <input
+              type="text"
+              placeholder="Search alerts by timestamp, IP, method, path, threat type..."
+              value={allAlertsSearchQuery}
+              onChange={(e) => setAllAlertsSearchQuery(e.target.value)}
+              className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+            />
           </div>
         </div>
 
@@ -547,11 +687,106 @@ const StatsPage: React.FC = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-700">
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Timestamp</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium">IP</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Method</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Path</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Threat Type</th>
+                    <th
+                      onClick={() => {
+                        if (allAlertsSortColumn === 'timestamp') {
+                          setAllAlertsSortOrder(allAlertsSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setAllAlertsSortColumn('timestamp');
+                          setAllAlertsSortOrder('desc');
+                        }
+                      }}
+                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition inline-flex items-center gap-2"
+                    >
+                      Timestamp
+                      {allAlertsSortColumn === 'timestamp' && (
+                        allAlertsSortOrder === 'asc' ? (
+                          <ArrowUp size={14} />
+                        ) : (
+                          <ArrowDown size={14} />
+                        )
+                      )}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (allAlertsSortColumn === 'ip') {
+                          setAllAlertsSortOrder(allAlertsSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setAllAlertsSortColumn('ip');
+                          setAllAlertsSortOrder('asc');
+                        }
+                      }}
+                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition inline-flex items-center gap-2"
+                    >
+                      IP
+                      {allAlertsSortColumn === 'ip' && (
+                        allAlertsSortOrder === 'asc' ? (
+                          <ArrowUp size={14} />
+                        ) : (
+                          <ArrowDown size={14} />
+                        )
+                      )}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (allAlertsSortColumn === 'method') {
+                          setAllAlertsSortOrder(allAlertsSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setAllAlertsSortColumn('method');
+                          setAllAlertsSortOrder('asc');
+                        }
+                      }}
+                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition inline-flex items-center gap-2"
+                    >
+                      Method
+                      {allAlertsSortColumn === 'method' && (
+                        allAlertsSortOrder === 'asc' ? (
+                          <ArrowUp size={14} />
+                        ) : (
+                          <ArrowDown size={14} />
+                        )
+                      )}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (allAlertsSortColumn === 'path') {
+                          setAllAlertsSortOrder(allAlertsSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setAllAlertsSortColumn('path');
+                          setAllAlertsSortOrder('asc');
+                        }
+                      }}
+                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition inline-flex items-center gap-2"
+                    >
+                      Path
+                      {allAlertsSortColumn === 'path' && (
+                        allAlertsSortOrder === 'asc' ? (
+                          <ArrowUp size={14} />
+                        ) : (
+                          <ArrowDown size={14} />
+                        )
+                      )}
+                    </th>
+                    <th
+                      onClick={() => {
+                        if (allAlertsSortColumn === 'threat') {
+                          setAllAlertsSortOrder(allAlertsSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setAllAlertsSortColumn('threat');
+                          setAllAlertsSortOrder('asc');
+                        }
+                      }}
+                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition inline-flex items-center gap-2"
+                    >
+                      Threat Type
+                      {allAlertsSortColumn === 'threat' && (
+                        allAlertsSortOrder === 'asc' ? (
+                          <ArrowUp size={14} />
+                        ) : (
+                          <ArrowDown size={14} />
+                        )
+                      )}
+                    </th>
                     <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-medium">Action</th>
                   </tr>
@@ -576,9 +811,15 @@ const StatsPage: React.FC = () => {
                         <td className="py-3 px-4 text-gray-300">{alert.threat}</td>
                         <td className="py-3 px-4">
                           {alert.blocked ? (
-                            <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium">🚫 Blocked</span>
+                            <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium inline-flex items-center gap-1">
+                              <Lock size={12} />
+                              Blocked
+                            </span>
                           ) : (
-                            <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium">⚠️ Detected</span>
+                            <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium inline-flex items-center gap-1">
+                              <AlertTriangle size={12} />
+                              Detected
+                            </span>
                           )}
                         </td>
                         <td className="py-3 px-4">

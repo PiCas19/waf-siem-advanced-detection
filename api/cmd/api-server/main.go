@@ -39,7 +39,10 @@ func main() {
 	
 	// Setup routes
 	api.SetupRoutes(r, db)
-	
+
+	// Initialize stats handler with database
+	api.SetStatsDB(db)
+
 	// Start server
 	log.Println("Starting API server on :8081")
 	if err := r.Run(":8081"); err != nil {

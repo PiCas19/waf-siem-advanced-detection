@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Search, Shield } from 'lucide-react';
 
 interface WAFRule {
   id: string;
@@ -323,7 +324,10 @@ const Rules: React.FC = () => {
                       onChange={(e) => setFormData({ ...formData, mode: e.target.value as 'detect' | 'block' })}
                       className="w-4 h-4"
                     />
-                    <span className="text-gray-300">🔍 Rileva solo</span>
+                    <span className="text-gray-300 flex items-center gap-1">
+                      <Search size={14} />
+                      Rileva solo
+                    </span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -334,7 +338,10 @@ const Rules: React.FC = () => {
                       onChange={(e) => setFormData({ ...formData, mode: e.target.value as 'detect' | 'block' })}
                       className="w-4 h-4"
                     />
-                    <span className="text-gray-300">🚫 Blocca</span>
+                    <span className="text-gray-300 flex items-center gap-1">
+                      <Shield size={14} />
+                      Blocca
+                    </span>
                   </label>
                 </div>
               </div>
@@ -402,8 +409,8 @@ const Rules: React.FC = () => {
                 className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
               >
                 <option value="all">Tutte le modalità</option>
-                <option value="detect">🔍 Rileva</option>
-                <option value="block">🚫 Blocca</option>
+                <option value="detect">Rileva</option>
+                <option value="block">Blocca</option>
               </select>
             </div>
 
@@ -439,25 +446,35 @@ const Rules: React.FC = () => {
                     <td className="py-3 px-4 text-gray-400">{rule.threatType}</td>
                     <td className="py-3 px-4">
                       <span
-                        className={`px-3 py-1 rounded text-xs font-medium ${
+                        className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
                           rule.mode === 'block'
                             ? 'bg-red-500/20 text-red-300'
                             : 'bg-yellow-500/20 text-yellow-300'
                         }`}
                       >
-                        {rule.mode === 'block' ? '🚫 Blocca' : '🔍 Rileva'}
+                        {rule.mode === 'block' ? (
+                          <>
+                            <Shield size={12} />
+                            Blocca
+                          </>
+                        ) : (
+                          <>
+                            <Search size={12} />
+                            Rileva
+                          </>
+                        )}
                       </span>
                     </td>
                     <td className="py-3 px-4">
                       <button
                         onClick={() => handleToggleRule(rule.id)}
-                        className={`px-3 py-1 rounded text-xs font-medium transition ${
+                        className={`px-3 py-1 rounded text-xs font-medium transition inline-flex items-center gap-1 ${
                           rule.enabled
                             ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30'
                             : 'bg-gray-600/50 text-gray-400 hover:bg-gray-600'
                         }`}
                       >
-                        {rule.enabled ? '✓ Attiva' : '✕ Disattiva'}
+                        {rule.enabled ? 'Attiva' : 'Disattiva'}
                       </button>
                     </td>
                     <td className="py-3 px-4 text-gray-400 text-xs">
@@ -523,8 +540,18 @@ const Rules: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-400">Modalità</p>
-                  <p className="text-gray-300 mt-1 font-medium">
-                    {selectedRule.mode === 'block' ? '🚫 Blocca' : '🔍 Rileva'}
+                  <p className="text-gray-300 mt-1 font-medium flex items-center gap-1">
+                    {selectedRule.mode === 'block' ? (
+                      <>
+                        <Shield size={14} />
+                        Blocca
+                      </>
+                    ) : (
+                      <>
+                        <Search size={14} />
+                        Rileva
+                      </>
+                    )}
                   </p>
                 </div>
               </div>

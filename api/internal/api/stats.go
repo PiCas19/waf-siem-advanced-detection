@@ -76,7 +76,59 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+// Iniezione della dipendenza del database
+var statsDB *gorm.DB
+
+// SetStatsDB imposta il database per il gestore delle statistiche
+func SetStatsDB(db *gorm.DB) {
+	statsDB = db
+}
+
 func WAFStatsHandler(c *gin.Context) {
+	// Se il database è disponibile, carica i dati dal database invece che dalla memoria
+	if statsDB != nil {
+		var totalLogs int64
+		var blockedLogs int64
+		var threatLogs int64
+
+		// Conta tutti i logs
+		statsDB.Model(&models.Log{}).Count(&totalLogs)
+
+		// Conta i logs bloccati
+		statsDB.Model(&models.Log{}).Where("blocked = ?", true).Count(&blockedLogs)
+
+		// Conta i logs con minacce (tutti sono considerati minacce)
+		statsDB.Model(&models.Log{}).Count(&threatLogs)
+
+		// Carica i log recenti
+		var recentLogs []models.Log
+		statsDB.Order("created_at DESC").Limit(5).Find(&recentLogs)
+
+		// Converti i log recenti a WAFEvent
+		recentEvents := make([]websocket.WAFEvent, 0, len(recentLogs))
+		for _, log := range recentLogs {
+			recentEvents = append(recentEvents, websocket.WAFEvent{
+				IP:        log.ClientIP,
+				Threat:    log.ThreatType,
+				Blocked:   log.Blocked,
+				Timestamp: log.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+				Method:    log.Method,
+				Path:      log.URL,
+				UA:        log.UserAgent,
+			})
+		}
+
+		c.JSON(200, WAFStats{
+			ThreatsDetected: int(threatLogs),
+			RequestsBlocked: int(blockedLogs),
+			TotalRequests:   int(totalLogs),
+			LastSeen:        fmt.Sprintf("%d minuti fa", 0),
+			Recent:          recentEvents,
+		})
+		return
+	}
+
+	// Fallback: usa i dati in memoria se il database non è disponibile
 	statsMu.RLock()
 	defer statsMu.RUnlock()
 	c.JSON(200, stats)
