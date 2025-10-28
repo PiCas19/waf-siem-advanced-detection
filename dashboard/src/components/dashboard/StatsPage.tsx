@@ -911,8 +911,8 @@ const StatsPage: React.FC = () => {
       </div>
 
       {/* Attack Hotspots Section - Single Card with Internal Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Main Card - Left side 3 columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Main Card - Left side 2.5 columns */}
         <div className="lg:col-span-3 bg-gray-800 border border-gray-700 rounded-lg p-6">
           {/* Header with filters */}
           <div className="flex justify-between items-center mb-4">
@@ -947,8 +947,8 @@ const StatsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Internal Grid: Map (2 cols) + Breakdown (1 col) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          {/* Internal Grid: Map (1.5 cols) + Breakdown (1.5 cols) */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
             {/* World Map - Left side, 2 columns */}
             <div className="lg:col-span-2">
               {geolocationMapData && geolocationMapData.length > 0 ? (
@@ -973,7 +973,7 @@ const StatsPage: React.FC = () => {
                     layout="vertical"
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis type="number" stroke="#9ca3af" style={{ fontSize: '10px' }} />
+                    <XAxis type="number" stroke="#9ca3af" style={{ fontSize: '10px' }} allowDecimals={false} />
                     <YAxis dataKey="country" type="category" stroke="#9ca3af" style={{ fontSize: '9px' }} width={70} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
