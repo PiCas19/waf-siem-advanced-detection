@@ -911,9 +911,9 @@ const StatsPage: React.FC = () => {
       </div>
 
       {/* Attack Hotspots Section - Single Card with Internal Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Main Card - Left side 2.5 columns */}
-        <div className="lg:col-span-3 bg-gray-800 border border-gray-700 rounded-lg p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+        {/* Main Card - Left side 4 columns */}
+        <div className="lg:col-span-4 bg-gray-800 border border-gray-700 rounded-lg p-6">
           {/* Header with filters */}
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Attack Hotspots</h2>
@@ -947,8 +947,8 @@ const StatsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Internal Grid: Map (1.5 cols) + Breakdown (1.5 cols) */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+          {/* Internal Grid: Map + Breakdown */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
             {/* World Map - Left side, 2 columns */}
             <div className="lg:col-span-2">
               {geolocationMapData && geolocationMapData.length > 0 ? (
@@ -961,27 +961,51 @@ const StatsPage: React.FC = () => {
             </div>
 
             {/* Countries Attack Breakdown - Right side, 1 column */}
-            <div>
+            <div className="flex flex-col">
               <h3 className="text-sm font-semibold text-white mb-3">Countries Breakdown</h3>
               {geolocationData && geolocationData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={350}>
-                  <BarChart
-                    data={geolocationCountryFilter !== 'all'
-                      ? geolocationData.filter(item => item.country === geolocationCountryFilter)
-                      : geolocationData
-                    }
-                    layout="vertical"
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis type="number" stroke="#9ca3af" style={{ fontSize: '10px' }} allowDecimals={false} />
-                    <YAxis dataKey="country" type="category" stroke="#9ca3af" style={{ fontSize: '9px' }} width={70} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-                      labelStyle={{ color: '#f3f4f6' }}
-                    />
-                    <Bar dataKey="value" fill="#f97316" name="Attacks" />
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="overflow-y-auto flex-1 max-h-80 space-y-2 pr-2">
+                  {geolocationCountryFilter !== 'all'
+                    ? geolocationData.filter(item => item.country === geolocationCountryFilter).map((item, idx) => {
+                      const maxValue = Math.max(...geolocationData.map(d => d.value));
+                      const percentage = ((item.value / geolocationData.reduce((sum, d) => sum + d.value, 0)) * 100).toFixed(1);
+                      const barWidth = (item.value / maxValue) * 100;
+                      return (
+                        <div key={idx} className="text-xs">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-gray-300 font-medium">{item.country}</span>
+                            <span className="text-gray-400">{item.value} ({percentage}%)</span>
+                          </div>
+                          <div className="w-full bg-gray-700 rounded h-2 overflow-hidden">
+                            <div
+                              className="bg-orange-500 h-full transition-all duration-300"
+                              style={{ width: `${barWidth}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    })
+                    : geolocationData.map((item, idx) => {
+                      const maxValue = Math.max(...geolocationData.map(d => d.value));
+                      const percentage = ((item.value / geolocationData.reduce((sum, d) => sum + d.value, 0)) * 100).toFixed(1);
+                      const barWidth = (item.value / maxValue) * 100;
+                      return (
+                        <div key={idx} className="text-xs">
+                          <div className="flex justify-between mb-1">
+                            <span className="text-gray-300 font-medium">{item.country}</span>
+                            <span className="text-gray-400">{item.value} ({percentage}%)</span>
+                          </div>
+                          <div className="w-full bg-gray-700 rounded h-2 overflow-hidden">
+                            <div
+                              className="bg-orange-500 h-full transition-all duration-300"
+                              style={{ width: `${barWidth}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  }
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-80 text-gray-400">
                   <p>No data available</p>
@@ -1026,36 +1050,38 @@ const StatsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Threat Level Distribution - Right side, 1 column */}
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Threat Level Distribution</h2>
-          <div className="flex gap-2 mb-4">
-            <select
-              value={threatLevelSeverityFilter}
-              onChange={(e) => setThreatLevelSeverityFilter(e.target.value)}
-              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="all">All Severities</option>
-              {availableSeverities.map(severity => (
-                <option key={severity} value={severity}>{severity}</option>
-              ))}
-            </select>
-            <select
-              value={threatLevelFilter}
-              onChange={(e) => setThreatLevelFilter(e.target.value as TimeFilter)}
-              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="today">Today</option>
-              <option value="week">This week</option>
-              <option value="15m">Last 15 minutes</option>
-              <option value="30m">Last 30 minutes</option>
-              <option value="1h">Last 1 hour</option>
-              <option value="24h">Last 24 hours</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-              <option value="1y">Last 1 year</option>
-            </select>
+        {/* Threat Level Distribution - Right side, 2 columns */}
+        <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-white">Threat Level Distribution</h2>
+            <div className="flex gap-2">
+              <select
+                value={threatLevelSeverityFilter}
+                onChange={(e) => setThreatLevelSeverityFilter(e.target.value)}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="all">All Severities</option>
+                {availableSeverities.map(severity => (
+                  <option key={severity} value={severity}>{severity}</option>
+                ))}
+              </select>
+              <select
+                value={threatLevelFilter}
+                onChange={(e) => setThreatLevelFilter(e.target.value as TimeFilter)}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="today">Today</option>
+                <option value="week">This week</option>
+                <option value="15m">Last 15 minutes</option>
+                <option value="30m">Last 30 minutes</option>
+                <option value="1h">Last 1 hour</option>
+                <option value="24h">Last 24 hours</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="1y">Last 1 year</option>
+              </select>
+            </div>
           </div>
           {threatLevelData && threatLevelData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
