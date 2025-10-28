@@ -7,8 +7,9 @@ import {
   AlertTriangle, Lock,
   ArrowUp, ArrowDown, Circle
 } from 'lucide-react';
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+// TODO: MapContainer, TileLayer, CircleMarker, Popup will be used for Geolocation map
+// import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+// import 'leaflet/dist/leaflet.css';
 import { useWebSocketStats } from '@/hooks/useWebSocketStats';
 import { fetchStats } from '@/services/api';
 
@@ -52,26 +53,27 @@ const TimelineTooltip: React.FC<any> = ({ active, payload }) => {
   return null;
 };
 
-// Custom Tooltip for Bar Charts - shows colors based on blocked/allowed
-const BarChartTooltip: React.FC<any> = ({ active, payload }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-gray-900 border border-gray-600 rounded-lg p-3">
-        <p className="text-gray-300 text-sm font-semibold">{payload[0]?.payload?.name || payload[0]?.name}</p>
-        {payload.map((entry: any, index: number) => {
-          const isBlocked = entry.name === 'Blocked' || entry.dataKey === 'blocked';
-          const color = isBlocked ? '#ef4444' : '#22c55e';
-          return (
-            <p key={index} style={{ color }} className="text-sm font-medium">
-              {entry.name}: {entry.value}
-            </p>
-          );
-        })}
-      </div>
-    );
-  }
-  return null;
-};
+// TODO: Custom Tooltip for Bar Charts - shows colors based on blocked/allowed
+// Will be used for Threat Types, Malicious IPs, and Geolocation charts
+// const BarChartTooltip: React.FC<any> = ({ active, payload }) => {
+//   if (active && payload && payload.length) {
+//     return (
+//       <div className="bg-gray-900 border border-gray-600 rounded-lg p-3">
+//         <p className="text-gray-300 text-sm font-semibold">{payload[0]?.payload?.name || payload[0]?.name}</p>
+//         {payload.map((entry: any, index: number) => {
+//           const isBlocked = entry.name === 'Blocked' || entry.dataKey === 'blocked';
+//           const color = isBlocked ? '#ef4444' : '#22c55e';
+//           return (
+//             <p key={index} style={{ color }} className="text-sm font-medium">
+//               {entry.name}: {entry.value}
+//             </p>
+//           );
+//         })}
+//       </div>
+//     );
+//   }
+//   return null;
+// };
 
 const StatsPage: React.FC = () => {
   const { stats, isConnected } = useWebSocketStats();
@@ -130,10 +132,11 @@ const StatsPage: React.FC = () => {
   // Dati per i tre nuovi grafici
   const [maliciousIPsData, setMaliciousIPsData] = useState<any[]>([]);
   const [geolocationData, setGeolocationData] = useState<any[]>([]);
-  const [geolocationMapData, setGeolocationMapData] = useState<any[]>([]);
-  const [availableCountries, setAvailableCountries] = useState<string[]>([]);
+  // TODO: Use for map visualization
+  // const [geolocationMapData, setGeolocationMapData] = useState<any[]>([]);
+  const [availableCountries] = useState<string[]>([]);
   const [threatLevelData, setThreatLevelData] = useState<any[]>([]);
-  const [availableSeverities, setAvailableSeverities] = useState<string[]>([]);
+  const [availableSeverities] = useState<string[]>([]);
 
   // Dati filtrati per ogni sezione
   const [filteredAlertsByAllAlerts, setFilteredAlertsByAllAlerts] = useState<WAFEvent[]>([]);
@@ -785,22 +788,34 @@ const StatsPage: React.FC = () => {
         <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Geolocation Heatmap</h2>
-            <select
-              value={geolocationFilter}
-              onChange={(e) => setGeolocationFilter(e.target.value as TimeFilter)}
-              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="today">Today</option>
-              <option value="week">This week</option>
-              <option value="15m">Last 15 minutes</option>
-              <option value="30m">Last 30 minutes</option>
-              <option value="1h">Last 1 hour</option>
-              <option value="24h">Last 24 hours</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-              <option value="1y">Last 1 year</option>
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={geolocationCountryFilter}
+                onChange={(e) => setGeolocationCountryFilter(e.target.value)}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="all">All Countries</option>
+                {availableCountries.map(country => (
+                  <option key={country} value={country}>{country}</option>
+                ))}
+              </select>
+              <select
+                value={geolocationFilter}
+                onChange={(e) => setGeolocationFilter(e.target.value as TimeFilter)}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="today">Today</option>
+                <option value="week">This week</option>
+                <option value="15m">Last 15 minutes</option>
+                <option value="30m">Last 30 minutes</option>
+                <option value="1h">Last 1 hour</option>
+                <option value="24h">Last 24 hours</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="1y">Last 1 year</option>
+              </select>
+            </div>
           </div>
           {geolocationData && geolocationData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
@@ -827,22 +842,34 @@ const StatsPage: React.FC = () => {
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Threat Level Distribution</h2>
-            <select
-              value={threatLevelFilter}
-              onChange={(e) => setThreatLevelFilter(e.target.value as TimeFilter)}
-              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="today">Today</option>
-              <option value="week">This week</option>
-              <option value="15m">Last 15 minutes</option>
-              <option value="30m">Last 30 minutes</option>
-              <option value="1h">Last 1 hour</option>
-              <option value="24h">Last 24 hours</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-              <option value="1y">Last 1 year</option>
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={threatLevelSeverityFilter}
+                onChange={(e) => setThreatLevelSeverityFilter(e.target.value)}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="all">All Severities</option>
+                {availableSeverities.map(severity => (
+                  <option key={severity} value={severity}>{severity}</option>
+                ))}
+              </select>
+              <select
+                value={threatLevelFilter}
+                onChange={(e) => setThreatLevelFilter(e.target.value as TimeFilter)}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="today">Today</option>
+                <option value="week">This week</option>
+                <option value="15m">Last 15 minutes</option>
+                <option value="30m">Last 30 minutes</option>
+                <option value="1h">Last 1 hour</option>
+                <option value="24h">Last 24 hours</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="1y">Last 1 year</option>
+              </select>
+            </div>
           </div>
           {threatLevelData && threatLevelData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
