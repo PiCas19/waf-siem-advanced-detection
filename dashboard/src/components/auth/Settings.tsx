@@ -100,7 +100,7 @@ const Settings: React.FC = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ code: twoFAOtpCode }),
+        body: JSON.stringify({ secret: twoFASecret, otp_code: twoFAOtpCode }),
       })
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}))
