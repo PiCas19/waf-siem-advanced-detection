@@ -78,7 +78,7 @@ const Settings: React.FC = () => {
       }
       const data = await resp.json()
       setTwoFASecret(data.secret || '')
-      setTwoFAOtpauth(data.otpauth_url || '')
+      setTwoFAOtpauth(data.qr_code_url || '')
       setIsSettingUp2FA(true)
     } catch (e: any) {
       setTwoFAError(e?.message || 'Error starting 2FA setup')
