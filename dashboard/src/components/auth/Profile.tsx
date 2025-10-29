@@ -8,7 +8,7 @@ const Profile: React.FC = () => {
   const navigate = useNavigate()
 
   const seed = user?.email || user?.name || 'guest'
-  const avatarUrl = `https://avatars.dicebear.com/api/identicon/${encodeURIComponent(seed)}.svg`
+  const avatarUrl = `https://api.dicebear.com/9.x/identicon/svg?seed=${encodeURIComponent(seed)}`
 
   // Simple permissions mapping (API may expose a richer structure)
   const permissions = user?.role === 'admin' ? ['manage:all'] : ['read:logs', 'view:stats']
