@@ -5,6 +5,7 @@ import Login from '@/components/auth/Login'
 import Register from '@/components/auth/Register'
 import Dashboard from '@/components/Dashboard'
 import Settings from '@/components/auth/Settings'
+import Profile from '@/components/auth/Profile'
 
 function App() {
   return (
@@ -30,6 +31,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             }
           />

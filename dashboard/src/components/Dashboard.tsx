@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import AvatarMenu from './common/AvatarMenu'
 import StatsPage from './stats/StatsPage'
 import RulesContainer from './rules/RulesContainer'
 import BlocklistPage from './blocklist/BlocklistPage'
@@ -26,18 +27,7 @@ const Dashboard: React.FC = () => {
             <p className="text-sm text-gray-400">Welcome, {user?.name}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('/settings')}
-              className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-medium transition"
-            >
-              Settings
-            </button>
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-medium transition"
-            >
-              Logout
-            </button>
+            <AvatarMenu />
           </div>
         </div>
       </header>
