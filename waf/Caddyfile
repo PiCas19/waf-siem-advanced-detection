@@ -1,8 +1,7 @@
 {
     email pierpaolo.casati@student.supsi.ch
-    auto_https on
+    auto_https off
     order waf before file_server
-    
     servers {
         protocols h1 h2 h3
         timeouts {
