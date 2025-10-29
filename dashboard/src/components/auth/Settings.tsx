@@ -39,9 +39,12 @@ const Settings: React.FC = () => {
     try {
       const token = localStorage.getItem('authToken')
       const resp = await fetch('/api/auth/2fa/setup', {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({}),
       })
       if (!resp.ok) {
         throw new Error('Failed to start 2FA setup')
