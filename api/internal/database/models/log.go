@@ -6,8 +6,7 @@ import "time"
 type Log struct {
 	ID          uint      `gorm:"primarykey" json:"id"`
 	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-
+	
 	ThreatType  string `json:"threat_type"`
 	Severity    string `json:"severity"`
 	Description string `json:"description"`
