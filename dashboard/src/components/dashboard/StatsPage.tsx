@@ -1063,7 +1063,7 @@ const StatsPage: React.FC = () => {
                 <tbody>
                   {filteredAlertsByAllAlerts
                     .slice((allAlertsPage - 1) * itemsPerPage, allAlertsPage * itemsPerPage)
-                    .map((alert, idx) => (
+                    .map((alert) => (
                       <tr key={`${alert.ip}-${alert.timestamp}-${alert.threat}`} className="border-b border-gray-700 hover:bg-gray-700/50 transition">
                         <td className="py-3 px-4 text-gray-300 text-xs">
                           {new Date(alert.timestamp).toLocaleString('it-IT')}
