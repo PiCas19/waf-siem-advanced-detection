@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import QRCode from 'qrcode'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { RefreshCw, Clipboard } from 'lucide-react'
@@ -28,17 +29,26 @@ const Settings: React.FC = () => {
     setIsTwoFAEnabled(!!user?.two_fa_enabled)
   }, [user?.two_fa_enabled])
 
-  const qrImageUrl = useMemo(() => {
-    if (!twoFAOtpauth) return ''
-    const data = encodeURIComponent(twoFAOtpauth)
-    return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${data}`
-  }, [twoFAOtpauth])
-
-  // Debugging helper: log when otpauth or qr URL changes so you can inspect in console
+  // Generate QR image as data URL locally to avoid external requests/CSP issues
+  const [qrDataUrl, setQrDataUrl] = useState<string>('')
   useEffect(() => {
-    if (twoFAOtpauth) console.debug('twoFAOtpauth:', twoFAOtpauth)
-    if (qrImageUrl) console.debug('qrImageUrl:', qrImageUrl)
-  }, [twoFAOtpauth, qrImageUrl])
+    let mounted = true
+    const build = async () => {
+      if (!twoFAOtpauth) {
+        setQrDataUrl('')
+        return
+      }
+      try {
+        const dataUrl = await QRCode.toDataURL(twoFAOtpauth, { margin: 1, width: 200 })
+        if (mounted) setQrDataUrl(dataUrl)
+      } catch (err) {
+        console.error('Failed to generate QR', err)
+        if (mounted) setQrDataUrl('')
+      }
+    }
+    build()
+    return () => { mounted = false }
+  }, [twoFAOtpauth])
 
   const copySecret = async () => {
     if (!twoFASecret) return
@@ -50,15 +60,7 @@ const Settings: React.FC = () => {
     }
   }
 
-  const copyOtpauth = async () => {
-    if (!twoFAOtpauth) return
-    try {
-      await navigator.clipboard.writeText(twoFAOtpauth)
-      alert('otpauth_url copied to clipboard')
-    } catch (e) {
-      console.error('Copy failed', e)
-    }
-  }
+  // removed copyOtpauth debug helper (not needed now)
 
   const startTwoFASetup = async () => {
     setTwoFAError('')
@@ -180,18 +182,10 @@ const Settings: React.FC = () => {
           {!isTwoFAEnabled && isSettingUp2FA && (
             <div>
               <p className="text-gray-400 mb-4">Scan the QR code below with your authenticator app (recommended), or copy the manual secret and add it to your app.</p>
-              {qrImageUrl && (
+              {qrDataUrl && (
                 <div className="mb-4 text-center">
-                  <img crossOrigin="anonymous" src={qrImageUrl} alt="2FA QR code to scan with an authenticator app" className="w-48 h-48 border border-gray-700 rounded mb-2 mx-auto" />
-                  <div className="flex items-center justify-center gap-3 mb-2">
-                    <a href={qrImageUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-400 hover:underline">Open QR in new tab</a>
-                    <button onClick={copyOtpauth} className="text-sm text-gray-300 bg-gray-700 px-2 py-1 rounded hover:bg-gray-600">Copy otpauth_url</button>
-                  </div>
+                  <img src={qrDataUrl} alt="2FA QR code to scan with an authenticator app" className="w-48 h-48 border border-gray-700 rounded mb-2 mx-auto" />
                   <p className="text-xs text-gray-400">If your app can't scan the code, use the manual secret shown below.</p>
-                  <details className="mt-2 text-left text-xs text-gray-400">
-                    <summary className="cursor-pointer text-gray-300">Show otpauth_url (for debugging)</summary>
-                    <pre className="whitespace-pre-wrap break-words bg-gray-900 border border-gray-700 p-2 rounded mt-2 text-xs">{twoFAOtpauth}</pre>
-                  </details>
                 </div>
               )}
 
