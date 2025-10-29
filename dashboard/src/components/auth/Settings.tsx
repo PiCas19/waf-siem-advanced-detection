@@ -131,103 +131,104 @@ const Settings: React.FC = () => {
         <button onClick={() => navigate(-1)} className="mb-4 flex items-center gap-2 text-gray-300 hover:text-white">← Back</button>
         <h2 className="text-2xl font-bold mb-6 text-white">Account Settings</h2>
 
-      <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-8">
-        <h3 className="text-lg font-semibold text-white mb-4">Two-Factor Authentication (2FA)</h3>
-        <p className="text-gray-300 mb-4">
-          Status: {isTwoFAEnabled ? (<span className="text-green-400">Enabled</span>) : (<span className="text-red-400">Disabled</span>)}
-        </p>
+        <section className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-8">
+          <h3 className="text-lg font-semibold text-white mb-4">Two-Factor Authentication (2FA)</h3>
+          <p className="text-gray-300 mb-4">
+            Status: {isTwoFAEnabled ? (<span className="text-green-400">Enabled</span>) : (<span className="text-red-400">Disabled</span>)}
+          </p>
 
-        {!isTwoFAEnabled && !isSettingUp2FA && (
-          <button
-            onClick={startTwoFASetup}
-            disabled={twoFALoading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-medium px-4 py-2 rounded"
-          >
-            {twoFALoading ? 'Preparing…' : 'Enable 2FA'}
-          </button>
-        )}
+          {!isTwoFAEnabled && !isSettingUp2FA && (
+            <button
+              onClick={startTwoFASetup}
+              disabled={twoFALoading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-medium px-4 py-2 rounded"
+            >
+              {twoFALoading ? 'Preparing…' : 'Enable 2FA'}
+            </button>
+          )}
 
-        {!isTwoFAEnabled && isSettingUp2FA && (
-          <div>
-            <p className="text-gray-400 mb-4">Scan the QR code with your authenticator app or enter the secret manually.</p>
-            {qrImageUrl && (
-              <img src={qrImageUrl} alt="2FA QR" className="w-48 h-48 border border-gray-700 rounded mb-4" />
-            )}
-            {twoFASecret && (
+          {!isTwoFAEnabled && isSettingUp2FA && (
+            <div>
+              <p className="text-gray-400 mb-4">Scan the QR code with your authenticator app or enter the secret manually.</p>
+              {qrImageUrl && (
+                <img src={qrImageUrl} alt="2FA QR" className="w-48 h-48 border border-gray-700 rounded mb-4" />
+              )}
+              {twoFASecret && (
+                <div className="mb-4">
+                  <p className="text-gray-400 text-sm mb-1">Manual secret</p>
+                  <code className="text-xs bg-gray-900 border border-gray-700 px-2 py-1 rounded text-gray-200">{twoFASecret}</code>
+                </div>
+              )}
               <div className="mb-4">
-                <p className="text-gray-400 text-sm mb-1">Manual secret</p>
-                <code className="text-xs bg-gray-900 border border-gray-700 px-2 py-1 rounded text-gray-200">{twoFASecret}</code>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Enter 6-digit code</label>
+                <input
+                  type="text"
+                  value={twoFAOtpCode}
+                  onChange={(e) => setTwoFAOtpCode(e.target.value)}
+                  placeholder="000000"
+                  maxLength={6}
+                  className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
+                />
               </div>
-            )}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Enter 6-digit code</label>
+              {twoFAError && (
+                <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded mb-3 text-sm">{twoFAError}</div>
+              )}
+              <button
+                onClick={confirmEnableTwoFA}
+                disabled={twoFALoading || twoFAOtpCode.length < 6}
+                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-medium px-4 py-2 rounded"
+              >
+                {twoFALoading ? 'Enabling…' : 'Confirm & Enable'}
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section className="bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4">Change Password</h3>
+          <form onSubmit={changePassword} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Current Password</label>
               <input
-                type="text"
-                value={twoFAOtpCode}
-                onChange={(e) => setTwoFAOtpCode(e.target.value)}
-                placeholder="000000"
-                maxLength={6}
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
                 className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
               />
             </div>
-            {twoFAError && (
-              <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded mb-3 text-sm">{twoFAError}</div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            {pwError && (
+              <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded text-sm">{pwError}</div>
+            )}
+            {pwSuccess && (
+              <div className="bg-green-500/20 border border-green-500 text-green-300 px-4 py-3 rounded text-sm">{pwSuccess}</div>
             )}
             <button
-              onClick={confirmEnableTwoFA}
-              disabled={twoFALoading || twoFAOtpCode.length < 6}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-medium px-4 py-2 rounded"
+              type="submit"
+              disabled={pwLoading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-medium px-4 py-2 rounded"
             >
-              {twoFALoading ? 'Enabling…' : 'Confirm & Enable'}
+              {pwLoading ? 'Updating…' : 'Change Password'}
             </button>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-        <h3 className="text-lg font-semibold text-white mb-4">Change Password</h3>
-        <form onSubmit={changePassword} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Current Password</label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">New Password</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Confirm New Password</label>
-            <input
-              type="password"
-              value={confirmNewPassword}
-              onChange={(e) => setConfirmNewPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
-            />
-          </div>
-          {pwError && (
-            <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded text-sm">{pwError}</div>
-          )}
-          {pwSuccess && (
-            <div className="bg-green-500/20 border border-green-500 text-green-300 px-4 py-3 rounded text-sm">{pwSuccess}</div>
-          )}
-          <button
-            type="submit"
-            disabled={pwLoading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-medium px-4 py-2 rounded"
-          >
-            {pwLoading ? 'Updating…' : 'Change Password'}
-          </button>
-        </form>
+          </form>
+        </section>
       </div>
     </div>
   )
