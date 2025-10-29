@@ -239,6 +239,7 @@ export default function RulesList({
                     <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat Type</th>
                     <th className="text-left py-3 px-4 text-gray-300 font-medium">Mode</th>
                     <th className="text-left py-3 px-4 text-gray-300 font-medium">Status</th>
+                    <th className="text-left py-3 px-4 text-gray-300 font-medium">Created</th>
                     <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -269,6 +270,9 @@ export default function RulesList({
                         >
                           {rule.enabled ? 'ENABLED' : 'DISABLED'}
                         </button>
+                      </td>
+                      <td className="py-3 px-4 text-gray-400 text-xs">
+                        {getCreatedDate(rule).split(' ')[0]}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex justify-center gap-2">
