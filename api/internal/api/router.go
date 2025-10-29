@@ -58,6 +58,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		protected.POST("/auth/2fa/setup", authHandler.InitiateTwoFASetup)
 		protected.POST("/auth/2fa/confirm", authHandler.CompleteTwoFASetup)
 		protected.POST("/auth/2fa/disable", authHandler.DisableTwoFA)
+
+		// Change password
+		protected.POST("/auth/change-password", authHandler.ChangePassword)
 	}
 
 	admin := r.Group("/api/admin")
