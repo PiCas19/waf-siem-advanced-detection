@@ -25,12 +25,20 @@ const Dashboard: React.FC = () => {
             <h1 className="text-2xl font-bold">WAF Dashboard</h1>
             <p className="text-sm text-gray-400">Welcome, {user?.name}</p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-medium transition"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/settings')}
+              className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-medium transition"
+            >
+              Settings
+            </button>
+            <button
+              onClick={handleLogout}
+              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded font-medium transition"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
@@ -78,16 +86,7 @@ const Dashboard: React.FC = () => {
             >
               Access Control
             </button>
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`px-4 py-3 border-b-2 font-medium transition ${
-                activeTab === 'settings'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-white'
-              }`}
-            >
-              Settings
-            </button>
+            {/* Settings moved to a dedicated page */}
           </div>
         </div>
       </nav>
@@ -114,46 +113,7 @@ const Dashboard: React.FC = () => {
           <BlocklistPage />
         )}
 
-        {/* Settings Tab */}
-        {activeTab === 'settings' && (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Account Settings</h2>
-            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-3">User Information</h3>
-                <div className="space-y-2">
-                  <p className="text-gray-300">
-                    <span className="text-gray-400">Email:</span> {user?.email}
-                  </p>
-                  <p className="text-gray-300">
-                    <span className="text-gray-400">Name:</span> {user?.name}
-                  </p>
-                  <p className="text-gray-300">
-                    <span className="text-gray-400">Role:</span> {user?.role}
-                  </p>
-                  <p className="text-gray-300">
-                    <span className="text-gray-400">2FA Status:</span>{' '}
-                    {user?.two_fa_enabled ? (
-                      <span className="text-green-400">✓ Enabled</span>
-                    ) : (
-                      <span className="text-red-400">✗ Disabled</span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-700 pt-6">
-                <h3 className="text-lg font-semibold mb-3">Security</h3>
-                <button className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-medium transition">
-                  Change Password
-                </button>
-                <button className="ml-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-medium transition">
-                  {user?.two_fa_enabled ? 'Manage 2FA' : 'Enable 2FA'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Settings moved: use the header Settings button */}
       </main>
     </div>
   )

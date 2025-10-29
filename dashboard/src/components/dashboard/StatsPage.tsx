@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useWebSocketStats } from '@/hooks/useWebSocketStats';
 import { fetchStats } from '@/services/api';
-import WorldMapSVG from '@/components/WorldMap';
+import WorldMapSVG from '@/components/dashboard/WorldMap';
 
 interface WAFEvent {
   ip: string;
@@ -205,7 +205,7 @@ const StatsPage: React.FC = () => {
   const [timelineData, setTimelineData] = useState<ChartDataPoint[]>([]);
   const [threatTypeData, setThreatTypeData] = useState<any[]>([]);
   const [recentAlerts, setRecentAlerts] = useState<WAFEvent[]>([]);
-  const [blockingIP, setBlockingIP] = useState<string | null>(null);
+  const [processingKey, setProcessingKey] = useState<string | null>(null);
 
   // Registra callback per aggiornamenti real-time degli alert
   useEffect(() => {
@@ -707,43 +707,74 @@ const StatsPage: React.FC = () => {
     setFilteredAlertsByAllAlerts(filtered);
   }, [recentAlerts, alertsTimeFilter, alertsThreatFilter, allAlertsSearchQuery, allAlertsSortColumn, allAlertsSortOrder]);
 
-  // Blocca un IP
-  const handleBlockIP = async (ip: string, alertTimestamp?: string) => {
-    setBlockingIP(ip);
+  // Util: chiave composta per azioni su alert specifico/gruppo
+  const getAlertKey = (ip?: string, threat?: string) => `${ip || ''}::${threat || ''}`;
+
+  // Blocca tutte le threat dello stesso IP + tipo di attacco dell'alert selezionato
+  const handleBlockThreat = async (ip: string, threat: string, alertTimestamp?: string) => {
+    const key = getAlertKey(ip, threat);
+    setProcessingKey(key);
+
+    // Optimistic update: marca come blocked tutti gli alert con stesso ip+threat
+    setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true } : a)));
+
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/blocklist', {
+      const resp = await fetch('/api/alerts/block', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ip: ip,
-          reason: 'Manually blocked from Recent Threats',
-          permanent: false,
-        }),
+        body: JSON.stringify({ ip, threat, timestamp: alertTimestamp }),
       });
 
-      if (response.ok) {
-        console.log('IP blocked successfully:', ip);
-
-        // Aggiorna solo l'alert specifico che è stato bloccato
-        setRecentAlerts(prevAlerts =>
-          prevAlerts.map(alert =>
-            alert.ip === ip && alert.timestamp === alertTimestamp ? { ...alert, blocked: true } : alert
-          )
-        );
-
-        alert(`IP ${ip} bloccato con successo (24 ore)`);
-      } else {
-        alert('Errore nel blocco dell\'IP');
+      if (!resp.ok) {
+        // rollback
+        setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false } : a)));
+        alert('Errore nel blocco della threat');
       }
-    } catch (error) {
-      console.error('Failed to block IP:', error);
-      alert('Errore nel blocco dell\'IP');
+    } catch (e) {
+      console.error('Block threat failed', e);
+      // rollback
+      setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false } : a)));
+      alert('Errore di rete nel blocco della threat');
     } finally {
-      setBlockingIP(null);
+      setProcessingKey(null);
+    }
+  };
+
+  // Sblocca tutte le threat dello stesso IP + tipo di attacco dell'alert selezionato
+  const handleUnblockThreat = async (ip: string, threat: string, alertTimestamp?: string) => {
+    const key = getAlertKey(ip, threat);
+    setProcessingKey(key);
+
+    // Optimistic update: marca come unblocked tutti gli alert con stesso ip+threat
+    setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false } : a)));
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const resp = await fetch('/api/alerts/unblock', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ip, threat, timestamp: alertTimestamp }),
+      });
+
+      if (!resp.ok) {
+        // rollback
+        setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true } : a)));
+        alert('Errore nello sblocco della threat');
+      }
+    } catch (e) {
+      console.error('Unblock threat failed', e);
+      // rollback
+      setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true } : a)));
+      alert('Errore di rete nello sblocco della threat');
+    } finally {
+      setProcessingKey(null);
     }
   };
 
@@ -1351,17 +1382,29 @@ const StatsPage: React.FC = () => {
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          {!alert.blocked && (
+                          {alert.blocked ? (
                             <button
-                              onClick={() => handleBlockIP(alert.ip, alert.timestamp)}
-                              disabled={blockingIP === alert.ip}
+                              onClick={() => handleUnblockThreat(alert.ip, alert.threat, alert.timestamp)}
+                              disabled={processingKey === getAlertKey(alert.ip, alert.threat)}
                               className={`px-2 py-1 rounded text-xs font-medium transition ${
-                                blockingIP === alert.ip
+                                processingKey === getAlertKey(alert.ip, alert.threat)
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-gray-600 hover:bg-gray-700 text-white'
+                              }`}
+                            >
+                              {processingKey === getAlertKey(alert.ip, alert.threat) ? '...' : 'Unblock'}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleBlockThreat(alert.ip, alert.threat, alert.timestamp)}
+                              disabled={processingKey === getAlertKey(alert.ip, alert.threat)}
+                              className={`px-2 py-1 rounded text-xs font-medium transition ${
+                                processingKey === getAlertKey(alert.ip, alert.threat)
                                   ? 'bg-blue-600 text-white'
                                   : 'bg-red-600 hover:bg-red-700 text-white'
                               }`}
                             >
-                              {blockingIP === alert.ip ? '...' : 'Block'}
+                              {processingKey === getAlertKey(alert.ip, alert.threat) ? '...' : 'Block'}
                             </button>
                           )}
                         </td>
