@@ -38,7 +38,7 @@ const Settings: React.FC = () => {
     setTwoFALoading(true)
     try {
       const token = localStorage.getItem('authToken')
-      const resp = await fetch('/api/2fa/setup', {
+      const resp = await fetch('/api/auth/2fa/setup', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -62,7 +62,7 @@ const Settings: React.FC = () => {
     setTwoFALoading(true)
     try {
       const token = localStorage.getItem('authToken')
-      const resp = await fetch('/api/2fa/enable', {
+      const resp = await fetch('/api/auth/2fa/confirm', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
