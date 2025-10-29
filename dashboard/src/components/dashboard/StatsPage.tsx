@@ -20,7 +20,6 @@ interface WAFEvent {
   timestamp: string;
   threat: string;
   blocked: boolean;
-  // Da API logs endpoint
   id?: number;
   client_ip?: string;
   threat_type?: string;
@@ -34,7 +33,6 @@ interface ChartDataPoint {
   blocked: number;
 }
 
-// Custom Tooltip for Timeline - shows colors based on blocked status
 const TimelineTooltip: React.FC<any> = ({ active, payload }) => {
   if (active && payload && payload.length) {
     return (
@@ -48,33 +46,26 @@ const TimelineTooltip: React.FC<any> = ({ active, payload }) => {
       </div>
     );
   }
+  return null;
 };
 
-// Custom Tooltip for Pie Charts (Block Rate, Threat Level)
 const PieChartTooltip: React.FC<any> = ({ active, payload }) => {
   if (active && payload && payload.length) {
     const data = payload[0];
-    let tooltipColor = '#f3f4f6'; // default light gray
-
-    // Assign colors based on the data name
+    let tooltipColor = '#f3f4f6';
     if (data.payload.name === 'Blocked' || data.payload.name === 'Critical') {
-      tooltipColor = '#ef4444'; // red
+      tooltipColor = '#ef4444';
     } else if (data.payload.name === 'High') {
-      tooltipColor = '#f97316'; // orange
+      tooltipColor = '#f97316';
     } else if (data.payload.name === 'Allowed' || data.payload.name === 'Medium') {
-      tooltipColor = '#eab308'; // yellow
+      tooltipColor = '#eab308';
     } else if (data.payload.name === 'Low') {
-      tooltipColor = '#3b82f6'; // blue
+      tooltipColor = '#3b82f6';
     }
 
-    // Calcola percentuale dal valore vero
     const actualValue = data.payload.value || 0;
-
-    // Per Threat Level Distribution, usa globalTotal per percentuale corretta
-    // Per Block Rate, usa data.value (percentuale di Recharts)
     let percentage = data.value || 0;
     if (data.payload.globalTotal) {
-      // È un dato Threat Level, calcola percentuale su totale globale
       percentage = (actualValue / data.payload.globalTotal) * 100;
     }
 
@@ -89,29 +80,6 @@ const PieChartTooltip: React.FC<any> = ({ active, payload }) => {
   return null;
 };
 
-// TODO: Custom Tooltip for Bar Charts - shows colors based on blocked/allowed
-// Will be used for Threat Types, Malicious IPs, and Geolocation charts
-// const BarChartTooltip: React.FC<any> = ({ active, payload }) => {
-//   if (active && payload && payload.length) {
-//     return (
-//       <div className="bg-gray-900 border border-gray-600 rounded-lg p-3">
-//         <p className="text-gray-300 text-sm font-semibold">{payload[0]?.payload?.name || payload[0]?.name}</p>
-//         {payload.map((entry: any, index: number) => {
-//           const isBlocked = entry.name === 'Blocked' || entry.dataKey === 'blocked';
-//           const color = isBlocked ? '#ef4444' : '#22c55e';
-//           return (
-//             <p key={index} style={{ color }} className="text-sm font-medium">
-//               {entry.name}: {entry.value}
-//             </p>
-//           );
-//         })}
-//       </div>
-//     );
-//   }
-//   return null;
-// };
-
-// Country coordinates for map visualization
 const countryCoordinates: { [key: string]: [number, number] } = {
   'United States': [37.0902, -95.7129],
   'China': [35.8617, 104.1954],
@@ -192,12 +160,11 @@ const countryCoordinates: { [key: string]: [number, number] } = {
   'Unknown': [20.0, 0.0]
 };
 
-// Get severity color for map markers
 const getSeverityColor = (count: number): string => {
-  if (count >= 50) return '#dc2626'; // Red for critical
-  if (count >= 20) return '#f97316'; // Orange for high
-  if (count >= 10) return '#eab308'; // Yellow for medium
-  return '#3b82f6'; // Blue for low
+  if (count >= 50) return '#dc2626';
+  if (count >= 20) return '#f97316';
+  if (count >= 10) return '#eab308';
+  return '#3b82f6';
 };
 
 const StatsPage: React.FC = () => {
@@ -205,65 +172,69 @@ const StatsPage: React.FC = () => {
   const [timelineData, setTimelineData] = useState<ChartDataPoint[]>([]);
   const [threatTypeData, setThreatTypeData] = useState<any[]>([]);
   const [recentAlerts, setRecentAlerts] = useState<WAFEvent[]>([]);
-  const [blockingIP, setBlockingIP] = useState<string | null>(null);
+  const [blockedIPs, setBlockedIPs] = useState<Set<string>>(new Set());
+  const [toggling, setToggling] = useState<Set<string>>(new Set());
 
-  // Registra callback per aggiornamenti real-time degli alert
+  // Carica blocklist all'avvio
+  useEffect(() => {
+    const loadBlocklist = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        const res = await fetch('/api/blocklist', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setBlockedIPs(new Set(data.blocked_ips.map((b: any) => b.ip)));
+        }
+      } catch (err) {
+        console.error('Failed to load blocklist');
+      }
+    };
+    loadBlocklist();
+  }, []);
+
+  // WebSocket + ricarica blocklist
   useEffect(() => {
     const unsubscribe = onAlertReceived((alert: WAFEvent) => {
-      setRecentAlerts(prevAlerts => [alert, ...prevAlerts.slice(0, 999)]);
+      setRecentAlerts(prev => [alert, ...prev.slice(0, 999)]);
+      // Ricarica blocklist per sincronizzare
+      fetch('/api/blocklist', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` }
+      }).then(r => r.json()).then(d => {
+        setBlockedIPs(new Set(d.blocked_ips.map((b: any) => b.ip)));
+      });
     });
-
     return unsubscribe;
   }, [onAlertReceived]);
 
-  // Type per i filtri di tempo
   type TimeFilter = 'today' | '15m' | '30m' | '1h' | '24h' | 'week' | '7d' | '30d' | '90d' | '1y';
-
-  // Funzione utility per calcolare il timeMs da TimeFilter
   const getTimeMs = (filter: TimeFilter): number => {
     const now = new Date();
     switch (filter) {
-      case 'today':
-        return now.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-      case '15m':
-        return 15 * 60 * 1000;
-      case '30m':
-        return 30 * 60 * 1000;
-      case '1h':
-        return 60 * 60 * 1000;
-      case '24h':
-        return 24 * 60 * 60 * 1000;
-      case 'week':
-        return 7 * 24 * 60 * 60 * 1000;
-      case '7d':
-        return 7 * 24 * 60 * 60 * 1000;
-      case '30d':
-        return 30 * 24 * 60 * 60 * 1000;
-      case '90d':
-        return 90 * 24 * 60 * 60 * 1000;
-      case '1y':
-        return 365 * 24 * 60 * 60 * 1000;
-      default:
-        return 24 * 60 * 60 * 1000;
+      case 'today': return now.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      case '15m': return 15 * 60 * 1000;
+      case '30m': return 30 * 60 * 1000;
+      case '1h': return 60 * 60 * 1000;
+      case '24h': return 24 * 60 * 60 * 1000;
+      case 'week': case '7d': return 7 * 24 * 60 * 60 * 1000;
+      case '30d': return 30 * 24 * 60 * 60 * 1000;
+      case '90d': return 90 * 24 * 60 * 60 * 1000;
+      case '1y': return 365 * 24 * 60 * 60 * 1000;
+      default: return 24 * 60 * 60 * 1000;
     }
   };
 
-  // Filtri INDIPENDENTI per ogni sezione
   const [timelineFilter, setTimelineFilter] = useState<TimeFilter>('1h');
-
   const [threatDistFilter, setThreatDistFilter] = useState<TimeFilter>('24h');
-
   const [alertsTimeFilter, setAlertsTimeFilter] = useState<TimeFilter>('24h');
   const [alertsThreatFilter, setAlertsThreatFilter] = useState<string>('all');
-
-  // Filtri per i tre nuovi grafici
   const [maliciousIPsFilter, setMaliciousIPsFilter] = useState<TimeFilter>('24h');
   const [geolocationFilter, setGeolocationFilter] = useState<TimeFilter>('24h');
   const [geolocationCountryFilter, setGeolocationCountryFilter] = useState<string>('all');
   const [threatLevelFilter, setThreatLevelFilter] = useState<TimeFilter>('24h');
   const [threatLevelSeverityFilter, setThreatLevelSeverityFilter] = useState<string>('all');
 
-  // Dati per i tre nuovi grafici
   const [maliciousIPsData, setMaliciousIPsData] = useState<any[]>([]);
   const [geolocationData, setGeolocationData] = useState<any[]>([]);
   const [geolocationMapData, setGeolocationMapData] = useState<any[]>([]);
@@ -271,39 +242,24 @@ const StatsPage: React.FC = () => {
   const [threatLevelData, setThreatLevelData] = useState<any[]>([]);
   const [availableSeverities, setAvailableSeverities] = useState<string[]>([]);
 
-  // Dati filtrati per ogni sezione
   const [filteredAlertsByAllAlerts, setFilteredAlertsByAllAlerts] = useState<WAFEvent[]>([]);
-
-  // Pagination states
   const [allAlertsPage, setAllAlertsPage] = useState(1);
   const itemsPerPage = 10;
-
-  // Sorting states (solo per All Alerts table)
   const [allAlertsSortColumn, setAllAlertsSortColumn] = useState<'timestamp' | 'ip' | 'method' | 'path' | 'threat'>('timestamp');
   const [allAlertsSortOrder, setAllAlertsSortOrder] = useState<'asc' | 'desc'>('desc');
-
-  // Search states
   const [allAlertsSearchQuery, setAllAlertsSearchQuery] = useState<string>('');
 
-  // Carica i dati iniziali
+  // Carica dati iniziali
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        // Carica stats per il timeline
         const data = await fetchStats();
-        initializeTimeline();
-
-        // Carica logs (tutte le threat) dal database
         const token = localStorage.getItem('authToken');
         const logsResponse = await fetch('/api/logs', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: { 'Authorization': `Bearer ${token}` },
         });
-
         if (logsResponse.ok) {
           const logsData = await logsResponse.json();
-          // Mappa i logs al formato WAFEvent
           const mappedLogs = logsData.logs.map((log: any) => ({
             ip: log.client_ip,
             method: log.method,
@@ -315,7 +271,6 @@ const StatsPage: React.FC = () => {
           }));
           setRecentAlerts(mappedLogs);
         } else {
-          // Fallback a stats.recent se logs endpoint fallisce
           setRecentAlerts(data.recent || []);
         }
       } catch (error) {
@@ -325,437 +280,223 @@ const StatsPage: React.FC = () => {
     loadInitialData();
   }, []);
 
-  // Inizializza timeline con dati dai logs storici
-  const initializeTimeline = () => {
-    const now = new Date();
-    const points: ChartDataPoint[] = [];
-    for (let i = 30; i >= 0; i--) {
-      const time = new Date(now.getTime() - i * 60000);
-      points.push({
-        time: time.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00',
-        threats: 0,
-        blocked: 0,
-      });
-    }
-    setTimelineData(points.length > 0 ? points : []);
-  };
-
-  // Aggiorna timeline in base ai logs e ai nuovi events dal WebSocket
+  // Timeline
   useEffect(() => {
-    if (recentAlerts.length === 0) {
-      // Se non abbiamo logs, inizializza vuoto
-      initializeTimeline();
-      return;
-    }
-
     const now = new Date();
     const timeMs = getTimeMs(timelineFilter);
+    const filtered = recentAlerts.filter(a => now.getTime() - new Date(a.timestamp).getTime() < timeMs);
     const points: ChartDataPoint[] = [];
+    const intervalMinutes = timelineFilter === '24h' || timelineFilter === '7d' ? 60 : 1;
+    const numIntervals = Math.ceil(timeMs / 60000 / intervalMinutes);
 
-    // Filtra gli alerts in base al timelineFilter
-    const filteredAlerts = recentAlerts.filter(alert => {
-      const alertTime = new Date(alert.timestamp).getTime();
-      return now.getTime() - alertTime < timeMs;
-    });
-
-    if (filteredAlerts.length === 0) {
-      // Se nessun dato nel periodo, mostra il periodo vuoto
-      const periodInMinutes = Math.ceil(timeMs / 60000);
-      for (let i = periodInMinutes; i >= 0; i--) {
-        const startTime = new Date(now.getTime() - i * 60000);
-        const timeStr = startTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00';
-        points.push({
-          time: timeStr,
-          threats: 0,
-          blocked: 0,
-        });
-      }
-      setTimelineData(points);
-      return;
-    }
-
-    // Determina il numero di intervalli in base al timelineFilter
-    let intervalMinutes = 1;
-    if (timelineFilter === '24h' || timelineFilter === '7d') {
-      intervalMinutes = 60; // Un punto per ora
-    } else if (timelineFilter === '30d' || timelineFilter === '90d' || timelineFilter === '1y') {
-      intervalMinutes = 24 * 60; // Un punto per giorno
-    }
-
-    // Calcola il numero di intervalli
-    const periodInMinutes = Math.ceil(timeMs / 60000);
-    const numIntervals = Math.ceil(periodInMinutes / intervalMinutes);
-
-    // Crea i punti del grafico
     for (let i = numIntervals; i >= 0; i--) {
-      const startTime = new Date(now.getTime() - i * intervalMinutes * 60000);
-      const endTime = new Date(startTime.getTime() + intervalMinutes * 60000);
-
+      const start = new Date(now.getTime() - i * intervalMinutes * 60000);
+      const end = new Date(start.getTime() + intervalMinutes * 60000);
       const timeStr = intervalMinutes === 1
-        ? startTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00'
-        : intervalMinutes === 60
-        ? startTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) || '00:00'
-        : startTime.toLocaleDateString('it-IT', { month: 'short', day: 'numeric' }) || 'Data';
+        ? start.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+        : start.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 
-      // Conta i logs in questo intervallo
-      const threatsInInterval = filteredAlerts.filter(alert => {
-        const alertTime = new Date(alert.timestamp).getTime();
-        return alertTime >= startTime.getTime() && alertTime < endTime.getTime();
+      const threats = filtered.filter(a => {
+        const t = new Date(a.timestamp).getTime();
+        return t >= start.getTime() && t < end.getTime();
       }).length;
 
-      const blockedInInterval = filteredAlerts.filter(alert => {
-        const alertTime = new Date(alert.timestamp).getTime();
-        return alertTime >= startTime.getTime() && alertTime < endTime.getTime() && alert.blocked;
+      const blocked = filtered.filter(a => {
+        const t = new Date(a.timestamp).getTime();
+        return t >= start.getTime() && t < end.getTime() && blockedIPs.has(a.ip);
       }).length;
 
-      points.push({
-        time: timeStr,
-        threats: threatsInInterval,
-        blocked: blockedInInterval,
-      });
+      points.push({ time: timeStr, threats, blocked });
     }
-
     setTimelineData(points);
-  }, [recentAlerts, timelineFilter]);
+  }, [recentAlerts, timelineFilter, blockedIPs]);
 
-  // Calcola threat types solo per Threat Distribution (con suo filtro)
+  // Threat Types
   useEffect(() => {
-    let filtered = [...recentAlerts];
-
     const now = new Date();
     const timeMs = getTimeMs(threatDistFilter);
-    filtered = filtered.filter(alert => {
-      const alertTime = new Date(alert.timestamp).getTime();
-      return now.getTime() - alertTime < timeMs;
-    });
-
-    const threatCounts = filtered.reduce((acc: any[], alert) => {
-      if (!alert || !alert.threat) return acc;
-      const existing = acc.find(t => t && t.name === alert.threat);
+    const filtered = recentAlerts.filter(a => now.getTime() - new Date(a.timestamp).getTime() < timeMs);
+    const counts = filtered.reduce((acc: any[], a) => {
+      const existing = acc.find(t => t.name === a.threat);
       if (existing) {
-        existing.value = (existing.value || 0) + 1;
-        existing.blocked = (existing.blocked || 0) + (alert.blocked ? 1 : 0);
+        existing.value++;
+        existing.blocked += blockedIPs.has(a.ip) ? 1 : 0;
       } else {
-        acc.push({
-          name: alert.threat || 'Unknown',
-          value: 1,
-          blocked: alert.blocked ? 1 : 0,
-        });
+        acc.push({ name: a.threat, value: 1, blocked: blockedIPs.has(a.ip) ? 1 : 0 });
       }
       return acc;
     }, []);
+    setThreatTypeData(counts);
+  }, [recentAlerts, threatDistFilter, blockedIPs]);
 
-    setThreatTypeData(threatCounts && threatCounts.length > 0 ? threatCounts : []);
-  }, [recentAlerts, threatDistFilter]);
-
-  // Calcola Top 10 Malicious IPs
+  // Top 10 Malicious IPs
   useEffect(() => {
-    let filtered = [...recentAlerts];
-
     const now = new Date();
     const timeMs = getTimeMs(maliciousIPsFilter);
-    filtered = filtered.filter(alert => {
-      const alertTime = new Date(alert.timestamp).getTime();
-      return now.getTime() - alertTime < timeMs;
-    });
-
-    // Conta occorrenze per IP
-    const ipCounts = filtered.reduce((acc: any[], alert) => {
-      if (!alert || !alert.ip) return acc;
-      const existing = acc.find(ip => ip && ip.name === alert.ip);
+    const filtered = recentAlerts.filter(a => now.getTime() - new Date(a.timestamp).getTime() < timeMs);
+    const counts = filtered.reduce((acc: any[], a) => {
+      const existing = acc.find(t => t.name === a.ip);
       if (existing) {
-        existing.value = (existing.value || 0) + 1;
-        existing.blocked = (existing.blocked || 0) + (alert.blocked ? 1 : 0);
+        existing.value++;
+        existing.blocked += blockedIPs.has(a.ip) ? 1 : 0;
       } else {
-        acc.push({
-          name: alert.ip || 'Unknown',
-          value: 1,
-          blocked: alert.blocked ? 1 : 0,
-        });
+        acc.push({ name: a.ip, value: 1, blocked: blockedIPs.has(a.ip) ? 1 : 0 });
       }
       return acc;
     }, []);
+    setMaliciousIPsData(counts.sort((a, b) => b.value - a.value).slice(0, 10));
+  }, [recentAlerts, maliciousIPsFilter, blockedIPs]);
 
-    // Ordina e prendi top 10
-    const top10 = ipCounts
-      .sort((a, b) => (b.value || 0) - (a.value || 0))
-      .slice(0, 10);
-
-    setMaliciousIPsData(top10 && top10.length > 0 ? top10 : []);
-  }, [recentAlerts, maliciousIPsFilter]);
-
-  // Calcola Geolocation Data (paese di provenienza) usando API backend
+  // Geolocation
   useEffect(() => {
-    const fetchGeolocation = async () => {
+    const fetchGeo = async () => {
       try {
         const token = localStorage.getItem('authToken');
-        const response = await fetch('/api/geolocation', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-
-          // Filtra per il timeframe selezionato
+        const res = await fetch('/api/geolocation', { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) {
+          const data = await res.json();
           const now = new Date();
           const timeMs = getTimeMs(geolocationFilter);
-
-          // Filtra gli alert nel timeframe
-          const filteredAlerts = recentAlerts.filter(alert => {
-            const alertTime = new Date(alert.timestamp).getTime();
-            return now.getTime() - alertTime < timeMs;
-          });
-
-          // Riconta per paese basato sui dati del backend
-          const countryCounts: { [key: string]: number } = {};
-          filteredAlerts.forEach(() => {
-            // Trova il paese per questo IP dal backend
-            const geoItem = (data.data || []).find((item: any) => item.country);
-            if (geoItem) {
-              countryCounts[geoItem.country] = (countryCounts[geoItem.country] || 0) + 1;
-            }
-          });
-
-          // Se non abbiamo dati filtrati, usa direttamente i dati del backend
-          let filtered = data.data || [];
-          if (Object.keys(countryCounts).length > 0) {
-            filtered = Object.entries(countryCounts)
-              .map(([country, count]) => ({
-                country,
-                count
-              }))
-              .sort((a, b) => (b.count || 0) - (a.count || 0));
-          }
-
-          // Estrai i paesi disponibili per il dropdown filter
-          const countries = filtered.map((item: any) => item.country).filter((c: any) => c);
-          setAvailableCountries(countries);
-
-          // Filtra in base al country selezionato
-          let geoData = (filtered as any[]).map(item => ({
-            country: item.country,
-            value: item.count
-          }));
-
-          if (geolocationCountryFilter !== 'all') {
-            geoData = geoData.filter(item => item.country === geolocationCountryFilter);
-          }
-
-          setGeolocationData(geoData && geoData.length > 0 ? geoData : []);
+          const filtered = recentAlerts.filter(a => now.getTime() - new Date(a.timestamp).getTime() < timeMs);
+          const countryMap = filtered.reduce((acc: any, a) => {
+            const geo = data.data.find((g: any) => g.ip === a.ip);
+            if (geo) acc[geo.country] = (acc[geo.country] || 0) + 1;
+            return acc;
+          }, {});
+          const geoData = Object.entries(countryMap).map(([c, v]) => ({ country: c, value: v }));
+          setAvailableCountries(geoData.map(g => g.country));
+          setGeolocationData(geolocationCountryFilter === 'all' ? geoData : geoData.filter(g => g.country === geolocationCountryFilter));
         }
-      } catch (error) {
-        console.error('Error fetching geolocation data:', error);
+      } catch (err) {
         setGeolocationData([]);
       }
     };
+    fetchGeo();
+  }, [recentAlerts, geolocationFilter, geolocationCountryFilter]);
 
-    fetchGeolocation();
-  }, [recentAlerts, geolocationFilter, geolocationCountryFilter, setAvailableCountries]);
-
-  // Prepara i dati per la mappa Leaflet
   useEffect(() => {
     if (geolocationData.length > 0) {
-      const mapMarkers = geolocationData.map(item => {
-        const coords = countryCoordinates[item.country] || countryCoordinates['Unknown'];
-        return {
-          country: item.country,
-          count: item.value,
-          lat: coords[0],
-          lng: coords[1],
-          color: getSeverityColor(item.value)
-        };
-      });
-      setGeolocationMapData(mapMarkers);
-    } else {
-      setGeolocationMapData([]);
+      setGeolocationMapData(geolocationData.map(d => ({
+        country: d.country,
+        count: d.value,
+        lat: countryCoordinates[d.country]?.[0] || 0,
+        lng: countryCoordinates[d.country]?.[1] || 0,
+        color: getSeverityColor(d.value)
+      })));
     }
   }, [geolocationData]);
 
-  // Calcola Threat Level Distribution
+  // Threat Level
   useEffect(() => {
-    let filtered = [...recentAlerts];
-
     const now = new Date();
     const timeMs = getTimeMs(threatLevelFilter);
-    filtered = filtered.filter(alert => {
-      const alertTime = new Date(alert.timestamp).getTime();
-      return now.getTime() - alertTime < timeMs;
-    });
-
-    // Mappiamo threat types a severity levels
-    const threatSeverityMap: { [key: string]: string } = {
-      'XSS': 'HIGH',
-      'SQL Injection': 'CRITICAL',
-      'CSRF': 'MEDIUM',
-      'XXE': 'HIGH',
-      'Path Traversal': 'HIGH',
-      'Command Injection': 'CRITICAL',
-      'Directory Listing': 'MEDIUM',
-      'Malicious Pattern': 'HIGH',
-      'Brute Force': 'HIGH',
-      'Bot Detection': 'MEDIUM',
-      'Unauthorized Access': 'HIGH',
-      'Suspicious Activity': 'LOW'
+    const filtered = recentAlerts.filter(a => now.getTime() - new Date(a.timestamp).getTime() < timeMs);
+    const map: { [k: string]: string } = {
+      'XSS': 'HIGH', 'SQL Injection': 'CRITICAL', 'CSRF': 'MEDIUM', 'XXE': 'HIGH',
+      'Path Traversal': 'HIGH', 'Command Injection': 'CRITICAL', 'Directory Listing': 'MEDIUM',
+      'Malicious Pattern': 'HIGH', 'Brute Force': 'HIGH', 'Bot Detection': 'MEDIUM',
+      'Unauthorized Access': 'HIGH', 'Suspicious Activity': 'LOW'
     };
-
-    // Conta per severity level
-    const severityCounts: { [key: string]: number } = {
-      'CRITICAL': 0,
-      'HIGH': 0,
-      'MEDIUM': 0,
-      'LOW': 0,
-    };
-
-    filtered.forEach(alert => {
-      const severity = threatSeverityMap[alert.threat] || 'LOW';
-      severityCounts[severity]++;
+    const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+    filtered.forEach(a => {
+      const sev = map[a.threat] || 'LOW';
+      counts[sev as keyof typeof counts]++;
     });
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    const data = [
+      { name: 'Critical', value: counts.CRITICAL, severity: 'CRITICAL', globalTotal: total },
+      { name: 'High', value: counts.HIGH, severity: 'HIGH', globalTotal: total },
+      { name: 'Medium', value: counts.MEDIUM, severity: 'MEDIUM', globalTotal: total },
+      { name: 'Low', value: counts.LOW, severity: 'LOW', globalTotal: total },
+    ].filter(d => d.value > 0);
+    setAvailableSeverities(Object.keys(counts).filter(k => counts[k as keyof typeof counts] > 0));
+    setThreatLevelData(threatLevelSeverityFilter === 'all' ? data : data.filter(d => d.severity === threatLevelSeverityFilter));
+  }, [recentAlerts, threatLevelFilter, threatLevelSeverityFilter, blockedIPs]);
 
-    // Estrai i severity disponibili per il dropdown filter
-    const availableSevs = Object.entries(severityCounts)
-      .filter(([_, count]) => count > 0)
-      .map(([severity, _]) => severity);
-    setAvailableSeverities(availableSevs);
-
-    // Calcola il totale globale di tutti gli attacchi (per il calcolo percentuale corretto nel tooltip)
-    const globalTotal = Object.values(severityCounts).reduce((sum, count) => sum + count, 0);
-
-    let threatLevelDistribution = [
-      { name: 'Critical', value: severityCounts['CRITICAL'], severity: 'CRITICAL', globalTotal },
-      { name: 'High', value: severityCounts['HIGH'], severity: 'HIGH', globalTotal },
-      { name: 'Medium', value: severityCounts['MEDIUM'], severity: 'MEDIUM', globalTotal },
-      { name: 'Low', value: severityCounts['LOW'], severity: 'LOW', globalTotal },
-    ].filter(item => item.value > 0);
-
-    // Filtra in base al severity selezionato
-    if (threatLevelSeverityFilter !== 'all') {
-      threatLevelDistribution = threatLevelDistribution.filter(item => item.severity === threatLevelSeverityFilter);
-    }
-
-    setThreatLevelData(threatLevelDistribution && threatLevelDistribution.length > 0 ? threatLevelDistribution : []);
-  }, [recentAlerts, threatLevelFilter, threatLevelSeverityFilter, setAvailableSeverities]);
-
-  // Funzione per eseguire la ricerca elastica su All Alerts
-  const searchAllAlerts = (alerts: WAFEvent[], query: string): WAFEvent[] => {
-    if (!query.trim()) return alerts;
-    const lowerQuery = query.toLowerCase();
-    return alerts.filter(alert => {
-      return (
-        alert.ip?.toLowerCase().includes(lowerQuery) ||
-        alert.threat?.toLowerCase().includes(lowerQuery) ||
-        alert.method?.toLowerCase().includes(lowerQuery) ||
-        alert.path?.toLowerCase().includes(lowerQuery) ||
-        new Date(alert.timestamp).toLocaleString('it-IT').toLowerCase().includes(lowerQuery)
-      );
-    });
-  };
-
-  // Funzione per ordinare All Alerts
-  const sortAllAlerts = (alerts: WAFEvent[]): WAFEvent[] => {
-    return [...alerts].sort((a, b) => {
-      let aVal: any, bVal: any;
-
-      if (allAlertsSortColumn === 'threat') {
-        aVal = a.threat;
-        bVal = b.threat;
-      } else if (allAlertsSortColumn === 'ip') {
-        aVal = a.ip;
-        bVal = b.ip;
-      } else if (allAlertsSortColumn === 'method') {
-        aVal = a.method;
-        bVal = b.method;
-      } else if (allAlertsSortColumn === 'path') {
-        aVal = a.path;
-        bVal = b.path;
-      } else {
-        aVal = new Date(a.timestamp).getTime();
-        bVal = new Date(b.timestamp).getTime();
-      }
-
-      if (allAlertsSortOrder === 'asc') {
-        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-      } else {
-        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-      }
-    });
-  };
-
-  // Filtra per All Alerts Table (timeframe + threat type + ricerca + ordinamento)
+  // All Alerts Table
   useEffect(() => {
     let filtered = [...recentAlerts];
-
-    if (alertsThreatFilter !== 'all') {
-      filtered = filtered.filter(alert => alert.threat === alertsThreatFilter);
-    }
-
+    if (alertsThreatFilter !== 'all') filtered = filtered.filter(a => a.threat === alertsThreatFilter);
     const now = new Date();
     const timeMs = getTimeMs(alertsTimeFilter);
-    filtered = filtered.filter(alert => {
-      const alertTime = new Date(alert.timestamp).getTime();
-      return now.getTime() - alertTime < timeMs;
+    filtered = filtered.filter(a => now.getTime() - new Date(a.timestamp).getTime() < timeMs);
+    if (allAlertsSearchQuery) {
+      const q = allAlertsSearchQuery.toLowerCase();
+      filtered = filtered.filter(a =>
+        a.ip.toLowerCase().includes(q) ||
+        a.threat.toLowerCase().includes(q) ||
+        a.method.toLowerCase().includes(q) ||
+        a.path.toLowerCase().includes(q) ||
+        new Date(a.timestamp).toLocaleString().toLowerCase().includes(q)
+      );
+    }
+    filtered.sort((a, b) => {
+      let av: any, bv: any;
+      if (allAlertsSortColumn === 'timestamp') { av = new Date(a.timestamp); bv = new Date(b.timestamp); }
+      else if (allAlertsSortColumn === 'ip') { av = a.ip; bv = b.ip; }
+      else if (allAlertsSortColumn === 'method') { av = a.method; bv = b.method; }
+      else if (allAlertsSortColumn === 'path') { av = a.path; bv = b.path; }
+      else { av = a.threat; bv = b.threat; }
+      return allAlertsSortOrder === 'asc' ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
     });
-
-    // Applica ricerca
-    filtered = searchAllAlerts(filtered, allAlertsSearchQuery);
-
-    // Applica ordinamento
-    filtered = sortAllAlerts(filtered);
-
-    setAllAlertsPage(1); // Reset pagination
     setFilteredAlertsByAllAlerts(filtered);
+    setAllAlertsPage(1);
   }, [recentAlerts, alertsTimeFilter, alertsThreatFilter, allAlertsSearchQuery, allAlertsSortColumn, allAlertsSortOrder]);
 
-  // Blocca un IP
-  const handleBlockIP = async (ip: string, alertTimestamp?: string) => {
-    setBlockingIP(ip);
+  // Toggle Block/Unblock
+  const handleToggleBlock = async (alert: WAFEvent) => {
+    if (!alert.ip || !alert.threat) return;
+    const key = `${alert.ip}-${alert.threat}`;
+    setToggling(prev => new Set(prev).add(key));
+
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/blocklist', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ip: ip,
-          reason: 'Manually blocked from Recent Threats',
-          permanent: false,
-        }),
-      });
+      const isBlocked = blockedIPs.has(alert.ip);
+      let res;
 
-      if (response.ok) {
-        console.log('IP blocked successfully:', ip);
+      if (isBlocked) {
+        res = await fetch(`/api/blocklist/${alert.ip}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        res = await fetch('/api/blocklist', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ip: alert.ip, reason: `Manual: ${alert.threat}`, permanent: false }),
+        });
+      }
 
-        // Aggiorna solo l'alert specifico che è stato bloccato
-        setRecentAlerts(prevAlerts =>
-          prevAlerts.map(alert =>
-            alert.ip === ip && alert.timestamp === alertTimestamp ? { ...alert, blocked: true } : alert
+      if (res.ok) {
+        setBlockedIPs(prev => {
+          const next = new Set(prev);
+          isBlocked ? next.delete(alert.ip) : next.add(alert.ip);
+          return next;
+        });
+        setRecentAlerts(prev =>
+          prev.map(a =>
+            a.ip === alert.ip && a.threat === alert.threat
+              ? { ...a, blocked: !isBlocked }
+              : a
           )
         );
-
-        alert(`IP ${ip} bloccato con successo (24 ore)`);
-      } else {
-        alert('Errore nel blocco dell\'IP');
       }
-    } catch (error) {
-      console.error('Failed to block IP:', error);
-      alert('Errore nel blocco dell\'IP');
+    } catch (err) {
+      console.error('Toggle failed', err);
     } finally {
-      setBlockingIP(null);
+      setToggling(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
   };
 
-  const blockRate = stats.total_requests > 0 ? (stats.requests_blocked / stats.total_requests * 100).toFixed(1) : '0';
-  const detectionRate = stats.total_requests > 0 ? (stats.threats_detected / stats.total_requests * 100).toFixed(1) : '0';
-
-  // Get unique threats da recentAlerts
+  const blockedIPsCount = blockedIPs.size;
+  const blockedRequestsCount = recentAlerts.filter(a => blockedIPs.has(a.ip)).length;
+  const blockRate = stats.total_requests > 0 ? ((blockedRequestsCount / stats.total_requests) * 100).toFixed(1) : '0';
+  const detectionRate = stats.total_requests > 0 ? ((stats.threats_detected / stats.total_requests) * 100).toFixed(1) : '0';
   const allUniqueThreats = Array.from(new Set(recentAlerts.map(a => a.threat)));
 
   return (
     <div className="space-y-8">
-      {/* Header with status */}
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Security Analytics</h1>
@@ -776,9 +517,9 @@ const StatsPage: React.FC = () => {
         </div>
 
         <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border border-yellow-500/20 rounded-lg p-6">
-          <h3 className="text-gray-400 text-sm font-medium mb-2">Requests Blocked</h3>
-          <p className="text-3xl font-bold text-yellow-400">{stats.requests_blocked}</p>
-          <p className="text-xs text-gray-500 mt-2">{blockRate}% of all requests</p>
+          <h3 className="text-gray-400 text-sm font-medium mb-2">IPs Blocked</h3>
+          <p className="text-3xl font-bold text-yellow-400">{blockedIPsCount}</p>
+          <p className="text-xs text-gray-500 mt-2">{blockedRequestsCount} requests blocked</p>
         </div>
 
         <div className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20 rounded-lg p-6">
@@ -1323,7 +1064,7 @@ const StatsPage: React.FC = () => {
                   {filteredAlertsByAllAlerts
                     .slice((allAlertsPage - 1) * itemsPerPage, allAlertsPage * itemsPerPage)
                     .map((alert, idx) => (
-                      <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700/50 transition">
+                      <tr key={`${alert.ip}-${alert.timestamp}-${alert.threat}`} className="border-b border-gray-700 hover:bg-gray-700/50 transition">
                         <td className="py-3 px-4 text-gray-300 text-xs">
                           {new Date(alert.timestamp).toLocaleString('it-IT')}
                         </td>
@@ -1351,20 +1092,24 @@ const StatsPage: React.FC = () => {
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          {!alert.blocked && (
-                            <button
-                              onClick={() => handleBlockIP(alert.ip, alert.timestamp)}
-                              disabled={blockingIP === alert.ip}
-                              className={`px-2 py-1 rounded text-xs font-medium transition ${
-                                blockingIP === alert.ip
-                                  ? 'bg-blue-600 text-white'
+                          <button
+                            onClick={() => handleToggleBlock(alert)}
+                            disabled={toggling.has(`${alert.ip}-${alert.threat}`)}
+                            className={`px-3 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${
+                              toggling.has(`${alert.ip}-${alert.threat}`)
+                                ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
+                                : blockedIPs.has(alert.ip)
+                                  ? 'bg-green-600 hover:bg-green-700 text-white'
                                   : 'bg-red-600 hover:bg-red-700 text-white'
-                              }`}
-                            >
-                              {blockingIP === alert.ip ? '...' : 'Block'}
-                            </button>
-                          )}
-                        </td>
+                            }`}
+                          >
+                            {toggling.has(`${alert.ip}-${alert.threat}`)
+                              ? '...'
+                              : blockedIPs.has(alert.ip)
+                                ? 'Unblock'
+                                : 'Block'}
+                          </button>
+                        </td>                      
                       </tr>
                     ))}
                 </tbody>
