@@ -263,8 +263,8 @@ export default function RulesContainer() {
                 </div>
               )}
 
-              {/* Hide timestamps for custom rules */}
-              {defaultRules.some(r => r.id === selectedRule.id) && (
+              {/* Show timestamps only for custom rules (not default) */}
+              {!defaultRules.some(r => r.id === selectedRule.id) && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-400">Created</p>
