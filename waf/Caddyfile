@@ -20,15 +20,42 @@
 :8080 {
     # WebSocket (prima di tutto, ha priorità)
     handle /ws {
-        reverse_proxy localhost:8081 {
+        reverse_proxy {
+            lb_policy least_conn
+            health_checks {
+                path /health
+                interval 10s
+                timeout 2s
+            }
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
             header_up Connection "Upgrade"
             header_up Upgrade "websocket"
+            transport http {
+                read_timeout 0s
+                write_timeout 0s
+                dial_timeout 2s
+                keepalive 30s
+            }
         }
     }
 
     # API (prima di tutto, ha priorità)
     handle /api* {
-        reverse_proxy localhost:8081
+        reverse_proxy {
+            lb_policy least_conn
+            health_checks {
+                path /health
+                interval 10s
+                timeout 2s
+            }
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
     }
     
     # File statici (serviti senza WAF)
@@ -101,15 +128,42 @@
 
     # WebSocket (prima di tutto)
     handle /ws {
-        reverse_proxy localhost:8081 {
+        reverse_proxy {
+            lb_policy least_conn
+            health_checks {
+                path /health
+                interval 10s
+                timeout 2s
+            }
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
             header_up Connection "Upgrade"
             header_up Upgrade "websocket"
+            transport http {
+                read_timeout 0s
+                write_timeout 0s
+                dial_timeout 2s
+                keepalive 30s
+            }
         }
     }
 
     # API
     handle /api* {
-        reverse_proxy localhost:8081
+        reverse_proxy {
+            lb_policy least_conn
+            health_checks {
+                path /health
+                interval 10s
+                timeout 2s
+            }
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
     }
     
     # File statici
@@ -178,15 +232,42 @@
 http://172.16.216.10 {
     # WebSocket (prima di tutto)
     handle /ws {
-        reverse_proxy localhost:8081 {
+        reverse_proxy {
+            lb_policy least_conn
+            health_checks {
+                path /health
+                interval 10s
+                timeout 2s
+            }
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
             header_up Connection "Upgrade"
             header_up Upgrade "websocket"
+            transport http {
+                read_timeout 0s
+                write_timeout 0s
+                dial_timeout 2s
+                keepalive 30s
+            }
         }
     }
 
     # API
     handle /api* {
-        reverse_proxy localhost:8081
+        reverse_proxy {
+            lb_policy least_conn
+            health_checks {
+                path /health
+                interval 10s
+                timeout 2s
+            }
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
     }
     
     # File statici
