@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { RefreshCw, Clipboard } from 'lucide-react'
 
 const Settings: React.FC = () => {
   const { user } = useAuth()
@@ -32,6 +33,16 @@ const Settings: React.FC = () => {
     const data = encodeURIComponent(twoFAOtpauth)
     return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${data}`
   }, [twoFAOtpauth])
+
+  const copySecret = async () => {
+    if (!twoFASecret) return
+    try {
+      await navigator.clipboard.writeText(twoFASecret)
+      alert('Secret copied to clipboard')
+    } catch (e) {
+      console.error('Copy failed', e)
+    }
+  }
 
   const startTwoFASetup = async () => {
     setTwoFAError('')
@@ -152,18 +163,31 @@ const Settings: React.FC = () => {
 
           {!isTwoFAEnabled && isSettingUp2FA && (
             <div>
-              <p className="text-gray-400 mb-4">Scan the QR code with your authenticator app or enter the secret manually.</p>
+              <p className="text-gray-400 mb-4">Scan the QR code below with your authenticator app (recommended), or copy the manual secret and add it to your app.</p>
               {qrImageUrl && (
-                <img src={qrImageUrl} alt="2FA QR" className="w-48 h-48 border border-gray-700 rounded mb-4" />
+                <div className="mb-4">
+                  <img src={qrImageUrl} alt="2FA QR code to scan with an authenticator app" className="w-48 h-48 border border-gray-700 rounded mb-2" />
+                  <p className="text-xs text-gray-400">If your app can't scan the code, use the manual secret shown below.</p>
+                </div>
               )}
               {twoFASecret && (
-                <div className="mb-4">
-                  <p className="text-gray-400 text-sm mb-1">Manual secret</p>
-                  <code className="text-xs bg-gray-900 border border-gray-700 px-2 py-1 rounded text-gray-200">{twoFASecret}</code>
+                <div className="mb-4 flex items-center gap-2">
+                  <div>
+                    <p className="text-gray-400 text-sm mb-1">Manual secret</p>
+                    <code className="text-xs bg-gray-900 border border-gray-700 px-2 py-1 rounded text-gray-200">{twoFASecret}</code>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={copySecret} title="Copy secret" className="p-2 bg-gray-700 hover:bg-gray-600 rounded">
+                      <Clipboard size={14} />
+                    </button>
+                    <button onClick={startTwoFASetup} title="Regenerate secret and QR code" className="p-2 bg-gray-700 hover:bg-gray-600 rounded">
+                      <RefreshCw size={14} />
+                    </button>
+                  </div>
                 </div>
               )}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Enter 6-digit code</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Enter the 6-digit code from your authenticator app to confirm and enable 2FA</label>
                 <input
                   type="text"
                   value={twoFAOtpCode}
