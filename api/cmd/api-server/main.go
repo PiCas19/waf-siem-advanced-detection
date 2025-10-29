@@ -1,18 +1,29 @@
 package main
 
 import (
-	"log"
-	"os"
+    "fmt"
+    "log"
+    "os"
 
-	"github.com/gin-gonic/gin"
-	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/api"
-	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database"
-	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
+    "github.com/gin-gonic/gin"
+    "github.com/PiCas19/waf-siem-advanced-detection/api/internal/api"
+    "github.com/PiCas19/waf-siem-advanced-detection/api/internal/database"
+    "github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
 )
 
 func main() {
-	// Initialize database
-	db, err := database.Initialize("./data/waf.db")
+    // Resolve configuration from env with sensible defaults
+    dbPath := os.Getenv("DATABASE_URL")
+    if dbPath == "" {
+        dbPath = "./data/waf.db"
+    }
+    port := os.Getenv("PORT")
+    if port == "" {
+        port = "8081"
+    }
+
+    // Initialize database
+    db, err := database.Initialize(dbPath)
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}
@@ -57,9 +68,10 @@ func main() {
 	// Initialize stats handler with database
 	api.SetStatsDB(db)
 
-	// Start server
-	log.Println("Starting API server on :8081")
-	if err := r.Run(":8081"); err != nil {
+    // Start server
+    addr := fmt.Sprintf(":%s", port)
+    log.Printf("Starting API server on %s (DB: %s)\n", addr, dbPath)
+    if err := r.Run(addr); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }

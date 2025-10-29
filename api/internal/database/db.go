@@ -1,12 +1,12 @@
 package database
 
 import (
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	"os"
-	"path/filepath"
+    "gorm.io/driver/sqlite"
+    "gorm.io/gorm"
+    "os"
+    "path/filepath"
 
-	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+    "github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 )
 
 // Initialize crea il DB e fa le migrazioni
@@ -17,10 +17,16 @@ func Initialize(dbPath string) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+    db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
+
+    // Improve SQLite concurrency for multi-process access (WAL + reasonable timeouts)
+    // Ignore errors silently to keep compatibility if driver changes
+    _ = db.Exec("PRAGMA journal_mode=WAL;").Error
+    _ = db.Exec("PRAGMA synchronous=NORMAL;").Error
+    _ = db.Exec("PRAGMA busy_timeout=5000;").Error
 	
 	// Migrazioni
 	err = db.AutoMigrate(
