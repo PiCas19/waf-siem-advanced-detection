@@ -21,11 +21,9 @@
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
-            active_health_check {
-                path /health
-                interval 10s
-                timeout 2s
-            }
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
             to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
             header_up Connection "Upgrade"
             header_up Upgrade "websocket"
@@ -42,11 +40,9 @@
     handle /api* {
         reverse_proxy {
             lb_policy least_conn
-            active_health_check {
-                path /health
-                interval 10s
-                timeout 2s
-            }
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
             to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
             transport http {
                 read_timeout 30s
@@ -129,11 +125,9 @@
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
-            active_health_check {
-                path /health
-                interval 10s
-                timeout 2s
-            }
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
             to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
             header_up Connection "Upgrade"
             header_up Upgrade "websocket"
@@ -150,11 +144,9 @@
     handle /api* {
         reverse_proxy {
             lb_policy least_conn
-            active_health_check {
-                path /health
-                interval 10s
-                timeout 2s
-            }
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
             to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
             transport http {
                 read_timeout 30s
@@ -233,11 +225,9 @@ http://172.16.216.10 {
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
-            active_health_check {
-                path /health
-                interval 10s
-                timeout 2s
-            }
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
             to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
             header_up Connection "Upgrade"
             header_up Upgrade "websocket"
@@ -254,11 +244,9 @@ http://172.16.216.10 {
     handle /api* {
         reverse_proxy {
             lb_policy least_conn
-            active_health_check {
-                path /health
-                interval 10s
-                timeout 2s
-            }
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
             to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
             transport http {
                 read_timeout 30s
