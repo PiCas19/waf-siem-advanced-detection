@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import AvatarMenu from './common/AvatarMenu'
 import StatsPage from './stats/StatsPage'
@@ -8,14 +7,8 @@ import BlocklistPage from './blocklist/BlocklistPage'
 import LogsPage from './logs/LogsPage'
 
 const Dashboard: React.FC = () => {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('stats')
-
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
