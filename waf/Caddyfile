@@ -21,7 +21,7 @@
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
-            health_checks {
+            active_health_check {
                 path /health
                 interval 10s
                 timeout 2s
@@ -42,7 +42,7 @@
     handle /api* {
         reverse_proxy {
             lb_policy least_conn
-            health_checks {
+            active_health_check {
                 path /health
                 interval 10s
                 timeout 2s
@@ -129,7 +129,7 @@
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
-            health_checks {
+            active_health_check {
                 path /health
                 interval 10s
                 timeout 2s
@@ -150,7 +150,7 @@
     handle /api* {
         reverse_proxy {
             lb_policy least_conn
-            health_checks {
+            active_health_check {
                 path /health
                 interval 10s
                 timeout 2s
@@ -233,7 +233,7 @@ http://172.16.216.10 {
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
-            health_checks {
+            active_health_check {
                 path /health
                 interval 10s
                 timeout 2s
@@ -254,7 +254,7 @@ http://172.16.216.10 {
     handle /api* {
         reverse_proxy {
             lb_policy least_conn
-            health_checks {
+            active_health_check {
                 path /health
                 interval 10s
                 timeout 2s
