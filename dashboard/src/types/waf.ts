@@ -24,8 +24,9 @@ export interface WAFRule {
 }
 
 // Type guard per verificare se una regola ha i campi richiesti per il test
-export function isTestableRule(rule: WAFRule | null | undefined): rule is WAFRule & { pattern: string; mode: 'block' | 'detect' } {
-  return Boolean(rule && rule.pattern && rule.mode);
+export function isTestableRule(rule: WAFRule | null | undefined): rule is WAFRule & { pattern: string } {
+  // Considera testabile se ha un pattern; la modalità può essere derivata da mode o action
+  return Boolean(rule && rule.pattern);
 }
 
 // Helper per ottenere la data di creazione (supporta sia camelCase che snake_case)

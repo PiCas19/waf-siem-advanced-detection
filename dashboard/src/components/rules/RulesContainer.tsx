@@ -263,20 +263,23 @@ export default function RulesContainer() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-400">Created</p>
-                  <p className="text-gray-300 mt-1">
-                    {getCreatedDate(selectedRule)}
-                  </p>
+              {/* Hide timestamps for custom rules */}
+              {defaultRules.some(r => r.id === selectedRule.id) && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-400">Created</p>
+                    <p className="text-gray-300 mt-1">
+                      {getCreatedDate(selectedRule)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Last Updated</p>
+                    <p className="text-gray-300 mt-1">
+                      {getUpdatedDate(selectedRule)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-400">Last Updated</p>
-                  <p className="text-gray-300 mt-1">
-                    {getUpdatedDate(selectedRule)}
-                  </p>
-                </div>
-              </div>
+              )}
 
               <div>
                 <p className="text-sm text-gray-400">Status</p>

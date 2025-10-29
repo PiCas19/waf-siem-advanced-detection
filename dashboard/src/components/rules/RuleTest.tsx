@@ -12,7 +12,7 @@ export default function RuleTest({ rule }: RuleTestProps) {
 
   const handleTest = () => {
     if (!isTestableRule(rule)) {
-      setTestError('The selected rule does not have a pattern and mode defined');
+      setTestError('The selected rule does not have a pattern defined');
       return;
     }
 
@@ -24,11 +24,12 @@ export default function RuleTest({ rule }: RuleTestProps) {
     try {
       const regex = new RegExp(rule.pattern, 'gi');
       const matched = regex.test(testInput);
+      const effectiveMode = (rule.mode as 'block' | 'detect') || (rule.action === 'block' ? 'block' : 'detect');
 
       setTestResult({
         matched,
         message: matched
-          ? `Pattern found! The rule "${rule.name}" in ${rule.mode === 'block' ? 'BLOCK' : 'DETECT'} mode would ${rule.mode === 'block' ? 'BLOCK' : 'DETECT'} this request.`
+          ? `Pattern found! The rule "${rule.name}" in ${effectiveMode === 'block' ? 'BLOCK' : 'DETECT'} mode would ${effectiveMode === 'block' ? 'BLOCK' : 'DETECT'} this request.`
           : `Pattern not found. This rule would not be triggered for this input.`,
       });
       setTestError('');
