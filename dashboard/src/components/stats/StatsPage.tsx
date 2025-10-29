@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useWebSocketStats } from '@/hooks/useWebSocketStats';
 import { fetchStats } from '@/services/api';
-import WorldMapSVG from '@/components/dashboard/WorldMap';
+import WorldMapSVG from '@/components/stats/WorldMap';
 
 interface WAFEvent {
   ip: string;

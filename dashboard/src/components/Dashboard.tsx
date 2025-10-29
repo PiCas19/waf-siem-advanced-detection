@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import StatsPage from './dashboard/StatsPage'
+import StatsPage from './stats/StatsPage'
 import RulesContainer from './rules/RulesContainer'
 import BlocklistPage from './blocklist/BlocklistPage'
 import LogsPage from './logs/LogsPage'
