@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
 
 const Settings: React.FC = () => {
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   // 2FA state
   const [isTwoFAEnabled, setIsTwoFAEnabled] = useState<boolean>(!!user?.two_fa_enabled)
@@ -124,8 +126,10 @@ const Settings: React.FC = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h2 className="text-2xl font-bold mb-6 text-white">Account Settings</h2>
+    <div className="min-h-screen bg-gray-900 text-white">
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <button onClick={() => navigate(-1)} className="mb-4 flex items-center gap-2 text-gray-300 hover:text-white">← Back</button>
+        <h2 className="text-2xl font-bold mb-6 text-white">Account Settings</h2>
 
       <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-8">
         <h3 className="text-lg font-semibold text-white mb-4">Two-Factor Authentication (2FA)</h3>
