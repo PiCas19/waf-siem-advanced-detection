@@ -165,23 +165,27 @@ const Settings: React.FC = () => {
             <div>
               <p className="text-gray-400 mb-4">Scan the QR code below with your authenticator app (recommended), or copy the manual secret and add it to your app.</p>
               {qrImageUrl && (
-                <div className="mb-4">
-                  <img src={qrImageUrl} alt="2FA QR code to scan with an authenticator app" className="w-48 h-48 border border-gray-700 rounded mb-2" />
+                <div className="mb-4 text-center">
+                  <img src={qrImageUrl} alt="2FA QR code to scan with an authenticator app" className="w-48 h-48 border border-gray-700 rounded mb-2 mx-auto" />
                   <p className="text-xs text-gray-400">If your app can't scan the code, use the manual secret shown below.</p>
                 </div>
               )}
+
               {twoFASecret && (
-                <div className="mb-4 flex items-center gap-2">
-                  <div>
-                    <p className="text-gray-400 text-sm mb-1">Manual secret</p>
-                    <code className="text-xs bg-gray-900 border border-gray-700 px-2 py-1 rounded text-gray-200">{twoFASecret}</code>
-                  </div>
+                <div className="mb-4">
+                  <label className="block text-gray-400 text-sm mb-1">Manual secret</label>
                   <div className="flex items-center gap-2">
-                    <button onClick={copySecret} title="Copy secret" className="p-2 bg-gray-700 hover:bg-gray-600 rounded">
-                      <Clipboard size={14} />
+                    <input
+                      readOnly
+                      value={twoFASecret}
+                      className="flex-1 px-4 py-2 bg-gray-900 text-gray-200 text-sm rounded border border-gray-700 focus:outline-none"
+                      aria-label="Manual 2FA secret"
+                    />
+                    <button onClick={copySecret} title="Copy secret" className="h-10 w-10 flex items-center justify-center bg-gray-700 hover:bg-gray-600 rounded">
+                      <Clipboard size={16} />
                     </button>
-                    <button onClick={startTwoFASetup} title="Regenerate secret and QR code" className="p-2 bg-gray-700 hover:bg-gray-600 rounded">
-                      <RefreshCw size={14} />
+                    <button onClick={startTwoFASetup} title="Regenerate secret and QR code" className="h-10 w-10 flex items-center justify-center bg-gray-700 hover:bg-gray-600 rounded">
+                      <RefreshCw size={16} />
                     </button>
                   </div>
                 </div>
