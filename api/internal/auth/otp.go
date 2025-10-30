@@ -102,11 +102,16 @@ func verifyTOTP(secret, code string, counter int64) bool {
 		return false
 	}
 
-	// Properly extract 4 bytes and clear the sign bit
-	code32 := int32(hash[offset])<<24 | int32(hash[offset+1])<<16 | int32(hash[offset+2])<<8 | int32(hash[offset+3])
-	code32 = (code32 & 0x7fffffff) % 1000000
+	// Properly extract 4 bytes as big-endian unsigned
+	// Clear the high bit and mod by 1000000
+	code32 := uint32(hash[offset]&0x7f)<<24 |
+		uint32(hash[offset+1])<<16 |
+		uint32(hash[offset+2])<<8 |
+		uint32(hash[offset+3])
 
-	generatedCode := fmt.Sprintf("%06d", code32)
+	code := code32 % 1000000
+
+	generatedCode := fmt.Sprintf("%06d", code)
 	fmt.Printf("[TOTP DEBUG] Counter: %d, Offset: %d, Generated: %s, Expected: %s, Match: %v\n", counter, offset, generatedCode, code, generatedCode == code)
 
 	// Verify the code
