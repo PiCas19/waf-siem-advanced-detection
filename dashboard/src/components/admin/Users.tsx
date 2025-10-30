@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import axios from 'axios'
 
 interface User {
@@ -6,91 +6,370 @@ interface User {
   email: string
   name: string
   role: string
+  active: boolean
+  two_fa_enabled: boolean
+  created_at: string
+  updated_at: string
 }
+
+type SortField = 'email' | 'name' | 'role' | 'created_at'
+type SortOrder = 'asc' | 'desc'
 
 const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  // Form state
+  const [showForm, setShowForm] = useState(false)
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [role, setRole] = useState('user')
   const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [formLoading, setFormLoading] = useState(false)
 
+  // Table state
+  const [searchTerm, setSearchTerm] = useState('')
+  const [roleFilter, setRoleFilter] = useState<string>('all')
+  const [sortField, setSortField] = useState<SortField>('created_at')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
+  // Load users
   useEffect(() => {
-    const load = async () => {
-      try {
-        const resp = await axios.get('/api/admin/users')
-        setUsers(resp.data.users || [])
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    load()
+    loadUsers()
   }, [])
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setMessage('')
+  const loadUsers = async () => {
     setLoading(true)
+    setError('')
     try {
-      const resp = await axios.post('/api/admin/users', { email, name, role })
-      const info = resp.data
-      setMessage(`User created. ${info.email || ''}`)
-      setEmail('')
-      setName('')
-      setRole('user')
-      // reload list
-      try {
-        const list = await axios.get('/api/admin/users')
-        setUsers(list.data.users || [])
-      } catch (_e) {
-        // ignore
-      }
-    } catch (err: any) {
-      setMessage(err.response?.data?.error || 'Creation failed')
+      const resp = await axios.get('/api/admin/users')
+      setUsers(resp.data.users || [])
+    } catch (e: any) {
+      setError('Failed to load users')
+      console.error(e)
     } finally {
       setLoading(false)
     }
   }
 
+  // Filter and sort logic
+  const filteredUsers = useMemo(() => {
+    let filtered = users.filter(u => {
+      const matchesSearch =
+        u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.name.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesRole = roleFilter === 'all' || u.role === roleFilter
+      return matchesSearch && matchesRole
+    })
+
+    // Sort
+    filtered.sort((a, b) => {
+      let aVal: any = a[sortField]
+      let bVal: any = b[sortField]
+
+      if (typeof aVal === 'string') {
+        aVal = aVal.toLowerCase()
+        bVal = bVal.toLowerCase()
+      }
+
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return filtered
+  }, [users, searchTerm, roleFilter, sortField, sortOrder])
+
+  // Pagination
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortOrder('asc')
+    }
+  }
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMessage('')
+    setFormLoading(true)
+    try {
+      await axios.post('/api/admin/users', { email, name, role })
+      setMessage('User created successfully!')
+      setEmail('')
+      setName('')
+      setRole('user')
+      setShowForm(false)
+      // Reset pagination to first page
+      setCurrentPage(1)
+      // Reload list
+      await loadUsers()
+    } catch (err: any) {
+      setMessage(err.response?.data?.error || 'Creation failed')
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  const getRoleColor = (role: string) => {
+    const colors: Record<string, string> = {
+      admin: 'bg-red-900 text-red-100',
+      manager: 'bg-orange-900 text-orange-100',
+      operator: 'bg-yellow-900 text-yellow-100',
+      auditor: 'bg-blue-900 text-blue-100',
+      viewer: 'bg-green-900 text-green-100',
+      user: 'bg-gray-700 text-gray-100'
+    }
+    return colors[role] || 'bg-gray-700 text-gray-100'
+  }
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <span className="text-gray-500 ml-1">⇅</span>
+    return <span className="text-white ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+  }
+
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <h2 className="text-xl font-semibold mb-4 text-white">User Management</h2>
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-white">User Management</h2>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white font-medium transition"
+        >
+          {showForm ? 'Cancel' : '+ Add User'}
+        </button>
+      </div>
 
-      <form onSubmit={handleCreate} className="space-y-4 bg-gray-800 p-6 rounded mb-6">
-        <div>
-          <label className="block text-sm text-gray-300 mb-1">Email</label>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required className="w-full px-3 py-2 bg-gray-700 text-white rounded" />
-        </div>
-        <div>
-          <label className="block text-sm text-gray-300 mb-1">Full name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} type="text" required className="w-full px-3 py-2 bg-gray-700 text-white rounded" />
-        </div>
-        <div>
-          <label className="block text-sm text-gray-300 mb-1">Role</label>
-          <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-3 py-2 bg-gray-700 text-white rounded">
-            <option value="admin">Admin</option>
-            <option value="manager">Manager</option>
-            <option value="operator">Operator</option>
-            <option value="auditor">Auditor</option>
-            <option value="viewer">Viewer</option>
-            <option value="user">User</option>
-          </select>
-        </div>
+      {error && <div className="bg-red-900 text-red-100 p-3 rounded mb-4">{error}</div>}
 
-        <div>
-          <button disabled={loading} className="bg-blue-600 px-4 py-2 rounded text-white">{loading ? 'Creating…' : 'Create user'}</button>
+      {/* Create User Form */}
+      {showForm && (
+        <form onSubmit={handleCreate} className="bg-gray-800 p-6 rounded mb-6 border border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4">Create New User</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Email</label>
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                required
+                className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none"
+                placeholder="user@example.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Full Name</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                type="text"
+                required
+                className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none"
+                placeholder="John Doe"
+              />
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm text-gray-300 mb-2">Role</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none"
+            >
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="operator">Operator</option>
+              <option value="auditor">Auditor</option>
+              <option value="viewer">Viewer</option>
+              <option value="user">User</option>
+            </select>
+          </div>
+
+          {message && (
+            <div className={`text-sm p-2 rounded mb-4 ${message.includes('success') || message.includes('successfully') ? 'bg-green-900 text-green-100' : 'bg-red-900 text-red-100'}`}>
+              {message}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={formLoading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-2 rounded text-white font-medium transition"
+            >
+              {formLoading ? 'Creating…' : 'Create User'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded text-white font-medium transition"
+            >
+              Close
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Filters and Search */}
+      <div className="bg-gray-800 p-4 rounded mb-6 border border-gray-700">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm text-gray-300 mb-2">Search</label>
+            <input
+              type="text"
+              placeholder="Search by email or name..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-300 mb-2">Filter by Role</label>
+            <select
+              value={roleFilter}
+              onChange={(e) => {
+                setRoleFilter(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none"
+            >
+              <option value="all">All Roles</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="operator">Operator</option>
+              <option value="auditor">Auditor</option>
+              <option value="viewer">Viewer</option>
+              <option value="user">User</option>
+            </select>
+          </div>
         </div>
-      </form>
+      </div>
 
-      {message && <div className="text-sm text-gray-300 mb-4">{message}</div>}
+      {/* Users Table */}
+      <div className="bg-gray-800 rounded border border-gray-700 overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-gray-400">Loading users...</div>
+        ) : users.length === 0 ? (
+          <div className="p-8 text-center text-gray-400">No users found</div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-900 border-b border-gray-700">
+                  <tr>
+                    <th
+                      onClick={() => handleSort('email')}
+                      className="px-6 py-3 text-left text-sm font-semibold text-gray-300 cursor-pointer hover:text-white transition"
+                    >
+                      Email <SortIcon field="email" />
+                    </th>
+                    <th
+                      onClick={() => handleSort('name')}
+                      className="px-6 py-3 text-left text-sm font-semibold text-gray-300 cursor-pointer hover:text-white transition"
+                    >
+                      Name <SortIcon field="name" />
+                    </th>
+                    <th
+                      onClick={() => handleSort('role')}
+                      className="px-6 py-3 text-left text-sm font-semibold text-gray-300 cursor-pointer hover:text-white transition"
+                    >
+                      Role <SortIcon field="role" />
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Status</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">2FA</th>
+                    <th
+                      onClick={() => handleSort('created_at')}
+                      className="px-6 py-3 text-left text-sm font-semibold text-gray-300 cursor-pointer hover:text-white transition"
+                    >
+                      Created <SortIcon field="created_at" />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedUsers.map((user) => (
+                    <tr key={user.id} className="border-b border-gray-700 hover:bg-gray-750 transition">
+                      <td className="px-6 py-4 text-sm text-gray-300">{user.email}</td>
+                      <td className="px-6 py-4 text-sm text-gray-300">{user.name}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`px-3 py-1 rounded text-xs font-medium ${getRoleColor(user.role)}`}>
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`text-xs font-medium ${user.active ? 'text-green-400' : 'text-red-400'}`}>
+                          {user.active ? '✓ Active' : '✗ Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`text-xs font-medium ${user.two_fa_enabled ? 'text-green-400' : 'text-gray-400'}`}>
+                          {user.two_fa_enabled ? '✓ Enabled' : '✗ Disabled'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-400">
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-      <h3 className="text-lg font-medium text-white mb-2">Existing users</h3>
-      <ul className="space-y-2">
-        {users.map((u) => (
-          <li key={u.id} className="text-gray-300">{u.email} — {u.name} — {u.role}</li>
-        ))}
-      </ul>
+            {/* Pagination */}
+            <div className="bg-gray-900 px-6 py-4 border-t border-gray-700 flex items-center justify-between">
+              <div className="text-sm text-gray-400">
+                Showing {paginatedUsers.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredUsers.length)} of {filteredUsers.length} users
+              </div>
+              <div className="flex gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  className="px-3 py-1 rounded text-sm border border-gray-600 text-gray-300 hover:text-white disabled:opacity-50 transition"
+                >
+                  Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-1 rounded text-sm transition ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white'
+                          : 'border border-gray-600 text-gray-300 hover:text-white'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  className="px-3 py-1 rounded text-sm border border-gray-600 text-gray-300 hover:text-white disabled:opacity-50 transition"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
