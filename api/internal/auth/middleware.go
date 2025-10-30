@@ -75,6 +75,7 @@ func HasPermission(role, permission string) bool {
 	if role == "" {
 		return false
 	}
+	role = strings.ToLower(strings.TrimSpace(role))
 	perms, ok := RolePermissions[role]
 	if !ok {
 		return false

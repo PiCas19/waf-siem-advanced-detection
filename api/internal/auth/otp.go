@@ -30,8 +30,9 @@ func GenerateOTPSecret() (string, error) {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
 
-	// Encode as base32
-	secret := base32.StdEncoding.EncodeToString(randomBytes)
+	// Encode as base32 without padding (common for TOTP secrets)
+	encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
+	secret := encoder.EncodeToString(randomBytes)
 	return secret, nil
 }
 
@@ -58,8 +59,8 @@ func VerifyOTP(secret string, code string) bool {
 	// Get the current time in 30-second intervals
 	counter := time.Now().Unix() / 30
 
-	// Check the current time window and adjacent windows (±1)
-	for _, timeOffset := range []int64{-1, 0, 1} {
+	// Check the current time window and adjacent windows (±2) to account for small clock skew
+	for _, timeOffset := range []int64{-2, -1, 0, 1, 2} {
 		if verifyTOTP(secret, code, counter+timeOffset) {
 			return true
 		}
@@ -71,7 +72,8 @@ func VerifyOTP(secret string, code string) bool {
 // verifyTOTP verifies TOTP for a specific counter value
 func verifyTOTP(secret, code string, counter int64) bool {
 	// Decode the secret
-	decodedSecret, err := base32.StdEncoding.DecodeString(secret)
+	decoder := base32.StdEncoding.WithPadding(base32.NoPadding)
+	decodedSecret, err := decoder.DecodeString(secret)
 	if err != nil {
 		return false
 	}
