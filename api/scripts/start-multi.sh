@@ -13,6 +13,16 @@ LOG_DIR="$REPO_ROOT/logs"
 mkdir -p "$LOG_DIR"
 mkdir -p "$REPO_ROOT/data"
 
+# If an api/.env file exists, load it into the environment for development convenience
+if [[ -f "$REPO_ROOT/api/.env" ]]; then
+  echo "Loading environment variables from $REPO_ROOT/api/.env"
+  # export variables defined in .env
+  set -a
+  # shellcheck disable=SC1090
+  source "$REPO_ROOT/api/.env"
+  set +a
+fi
+
 # Build once (faster startups). If go is not installed or build fails, fallback to go run
 BIN_DIR="$REPO_ROOT/bin"
 mkdir -p "$BIN_DIR"
@@ -21,7 +31,7 @@ BIN_API="$BIN_DIR/api-server"
 build_api() {
   if command -v go >/dev/null 2>&1; then
     echo "Building api-server binary..."
-    (cd "$REPO_ROOT" && go build -o "$BIN_API" ./api/cmd/api-server)
+    (cd "$REPO_ROOT/api" && go build -o "$BIN_API" ./cmd/api-server)
   else
     echo "Go toolchain not found; will use 'go run' fallback"
   fi
@@ -54,6 +64,18 @@ stop_all() {
 
 case "${1:-start}" in
   start)
+    # Ensure module dependencies are tidy before building
+    echo "[INFO] Running: go mod tidy"
+    if command -v go >/dev/null 2>&1; then
+      (cd "$REPO_ROOT/api" && go mod tidy)
+      if [[ $? -ne 0 ]]; then
+        echo "[ERROR] go mod tidy failed!" >&2
+        exit 1
+      fi
+    else
+      echo "[WARN] go toolchain not found; skipping go mod tidy"
+    fi
+
     build_api || true
     for p in "${PORTS[@]}"; do
       start_instance "$p"

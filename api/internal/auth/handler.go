@@ -1,21 +1,28 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"net/http"
-	
+	"strings"
+	"time"
+
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/mailer"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
-	
+
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 )
 
 type AuthHandler struct {
 	db *gorm.DB
+	mailer *mailer.Mailer
 }
 
-func NewAuthHandler(db *gorm.DB) *AuthHandler {
-	return &AuthHandler{db: db}
+func NewAuthHandler(db *gorm.DB, m *mailer.Mailer) *AuthHandler {
+	return &AuthHandler{db: db, mailer: m}
 }
 
 type LoginRequest struct {
@@ -204,6 +211,136 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			"role":  user.Role,
 		},
 	})
+}
+
+// AdminCreateUser allows an admin to create a new user (invite flow)
+func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+		Name  string `json:"name" binding:"required"`
+		Role  string `json:"role" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// validate role
+	if req.Role != "admin" && req.Role != "user" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role"})
+		return
+	}
+
+	// check existing
+	var existing models.User
+	if err := h.db.Where("email = ?", req.Email).First(&existing).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
+		return
+	}
+
+	// generate temporary password (random)
+	tempBytes := make([]byte, 8)
+	if _, err := rand.Read(tempBytes); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate password"})
+		return
+	}
+	tempPassword := hex.EncodeToString(tempBytes)
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+		return
+	}
+
+	// generate reset/invite token
+	tokenBytes := make([]byte, 24)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+	resetToken := hex.EncodeToString(tokenBytes)
+
+	user := models.User{
+		Email:               req.Email,
+		Name:                req.Name,
+		Role:                req.Role,
+		Active:              true,
+		PasswordHash:        string(hashed),
+		PasswordResetToken:  resetToken,
+		PasswordResetExpiry: time.Now().Add(24 * time.Hour),
+	}
+
+	if err := h.db.Create(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+		return
+	}
+
+	// Build reset link. Prefer mailer SiteURL for absolute link, otherwise relative.
+	resetLink := fmt.Sprintf("/set-password?token=%s", resetToken)
+	if h.mailer != nil && h.mailer.SiteURL != "" {
+		resetLink = fmt.Sprintf("%s/set-password?token=%s", strings.TrimRight(h.mailer.SiteURL, "/"), resetToken)
+	}
+
+	emailSent := false
+	if h.mailer != nil {
+		if err := h.mailer.SendInvite(req.Email, req.Name, resetLink, tempPassword); err == nil {
+			emailSent = true
+		} else {
+			// log and continue
+			fmt.Printf("failed to send invite email: %v\n", err)
+		}
+	}
+
+	// Return created response. In production avoid returning tokens; for now include reset_link for convenience if email not sent.
+	resp := gin.H{"message": "User created", "email_sent": emailSent}
+	if !emailSent {
+		resp["temp_password"] = tempPassword
+		resp["reset_token"] = resetToken
+		resp["reset_link"] = resetLink
+	}
+	c.JSON(http.StatusCreated, resp)
+}
+
+// SetPasswordWithToken allows a user to set their password using the invite/reset token
+func (h *AuthHandler) SetPasswordWithToken(c *gin.Context) {
+	var req struct {
+		Token       string `json:"token" binding:"required"`
+		NewPassword string `json:"new_password" binding:"required,min=8"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var user models.User
+	if err := h.db.Where("password_reset_token = ?", req.Token).First(&user).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token"})
+		return
+	}
+
+	if time.Now().After(user.PasswordResetExpiry) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "token expired"})
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+		return
+	}
+
+	user.PasswordHash = string(hashed)
+	user.PasswordResetToken = ""
+	user.PasswordResetExpiry = time.Time{}
+
+	if err := h.db.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update password"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password set successfully"})
 }
 
 // InitiateTwoFASetup initiates 2FA setup for authenticated user
