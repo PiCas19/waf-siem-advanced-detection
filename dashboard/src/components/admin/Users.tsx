@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import axios from 'axios'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface User {
   id: number
@@ -16,6 +17,7 @@ type SortField = 'email' | 'name' | 'role' | 'created_at'
 type SortOrder = 'asc' | 'desc'
 
 const Users: React.FC = () => {
+  const { token, isLoading: authLoading } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -36,19 +38,25 @@ const Users: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
-  // Load users
+  // Load users when auth is ready
   useEffect(() => {
-    loadUsers()
-  }, [])
+    if (!authLoading && token) {
+      loadUsers()
+    }
+  }, [authLoading, token])
 
   const loadUsers = async () => {
     setLoading(true)
     setError('')
     try {
-      const resp = await axios.get('/api/admin/users')
+      const resp = await axios.get('/api/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       setUsers(resp.data.users || [])
     } catch (e: any) {
-      setError('Failed to load users')
+      setError(e.response?.data?.error || 'Failed to load users')
       console.error(e)
     } finally {
       setLoading(false)
@@ -104,7 +112,11 @@ const Users: React.FC = () => {
     setMessage('')
     setFormLoading(true)
     try {
-      await axios.post('/api/admin/users', { email, name, role })
+      await axios.post('/api/admin/users', { email, name, role }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       setMessage('User created successfully!')
       setEmail('')
       setName('')

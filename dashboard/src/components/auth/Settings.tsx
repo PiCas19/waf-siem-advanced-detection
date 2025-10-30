@@ -56,16 +56,6 @@ const Settings: React.FC = () => {
         <button onClick={() => navigate(-1)} className="mb-4 flex items-center gap-2 text-gray-300 hover:text-white">← Back</button>
         <h2 className="text-2xl font-bold mb-6 text-white">Account Settings</h2>
 
-        <section className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-8">
-          <h3 className="text-lg font-semibold text-white mb-4">Two-Factor Authentication (2FA)</h3>
-          <p className="text-gray-300 mb-4">
-            Status: <span className="text-green-400 font-semibold">Required & Enabled</span>
-          </p>
-          <p className="text-gray-400 text-sm">
-            Two-factor authentication is required for all accounts to ensure maximum security. It was set up when you first logged in.
-          </p>
-        </section>
-
         <section className="bg-gray-800 p-6 rounded-lg border border-gray-700">
           <h3 className="text-lg font-semibold text-white mb-4">Change Password</h3>
           <form onSubmit={changePassword} className="space-y-4">

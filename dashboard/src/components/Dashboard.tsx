@@ -6,6 +6,7 @@ import StatsPage from './stats/StatsPage'
 import RulesContainer from './rules/RulesContainer'
 import BlocklistPage from './blocklist/BlocklistPage'
 import LogsPage from './logs/LogsPage'
+import Users from './admin/Users'
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth()
@@ -73,7 +74,18 @@ const Dashboard: React.FC = () => {
             >
               Access Control
             </button>
-            {/* Settings moved to a dedicated page */}
+            {user && String(user.role).toLowerCase().trim() === 'admin' && (
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`px-4 py-3 border-b-2 font-medium transition ${
+                  activeTab === 'users'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Users
+              </button>
+            )}
           </div>
         </div>
       </nav>
@@ -98,6 +110,11 @@ const Dashboard: React.FC = () => {
         {/* Blocklist Tab */}
         {activeTab === 'blocklist' && (
           <BlocklistPage />
+        )}
+
+        {/* Users Tab (Admin Only) */}
+        {activeTab === 'users' && user && String(user.role).toLowerCase().trim() === 'admin' && (
+          <Users />
         )}
 
         {/* Settings moved: use the header Settings button */}
