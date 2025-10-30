@@ -1,11 +1,16 @@
 [2FA Setup DEBUG] User 13 attempting 2FA confirmation
 [2FA Setup DEBUG] Secret length: 32, Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS
-[2FA Setup DEBUG] OTP Code: 449188
-[TOTP DEBUG] Checking TOTP code '449188' at base counter: 58728097
-[TOTP DEBUG] Counter: 58728095, Generated: 000246, Expected: 449188, Match: false
-[TOTP DEBUG] Counter: 58728096, Generated: 000236, Expected: 449188, Match: false
-[TOTP DEBUG] Counter: 58728097, Generated: 000100, Expected: 449188, Match: false
-[TOTP DEBUG] Counter: 58728098, Generated: 000049, Expected: 449188, Match: false
-[TOTP DEBUG] Counter: 58728099, Generated: 000209, Expected: 449188, Match: false
+[2FA Setup DEBUG] OTP Code: 716080
+[TOTP DEBUG] Checking TOTP code '716080' at base counter: 58728108
+[DECODE DEBUG] Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS, Decoded length: 20, Decoded hex: f3079b70a3d27adf8dd1ea6029bc579e4078b052
+[TOTP DEBUG] Counter: 58728106, Generated: 000145, Expected: 716080, Match: false
+[DECODE DEBUG] Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS, Decoded length: 20, Decoded hex: f3079b70a3d27adf8dd1ea6029bc579e4078b052
+[TOTP DEBUG] Counter: 58728107, Generated: 000072, Expected: 716080, Match: false
+[DECODE DEBUG] Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS, Decoded length: 20, Decoded hex: f3079b70a3d27adf8dd1ea6029bc579e4078b052
+[TOTP DEBUG] Counter: 58728108, Generated: 000049, Expected: 716080, Match: false
+[DECODE DEBUG] Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS, Decoded length: 20, Decoded hex: f3079b70a3d27adf8dd1ea6029bc579e4078b052
+[TOTP DEBUG] Counter: 58728109, Generated: 000216, Expected: 716080, Match: false
+[DECODE DEBUG] Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS, Decoded length: 20, Decoded hex: f3079b70a3d27adf8dd1ea6029bc579e4078b052
+[TOTP DEBUG] Counter: 58728110, Generated: 000006, Expected: 716080, Match: false
 [TOTP DEBUG] FAILED: Code not verified at any time window
 [2FA Setup DEBUG] OTP verification FAILED
