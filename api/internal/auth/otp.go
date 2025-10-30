@@ -59,7 +59,11 @@ func VerifyOTP(secret string, code string) bool {
 	}
 
 	// Get the current time in 30-second intervals
-	counter := time.Now().Unix() / 30
+	now := time.Now()
+	unixTime := now.Unix()
+	counter := unixTime / 30
+	fmt.Printf("[TOTP DEBUG] Current time: %s\n", now.Format("2006-01-02 15:04:05 MST"))
+	fmt.Printf("[TOTP DEBUG] Unix timestamp: %d\n", unixTime)
 	fmt.Printf("[TOTP DEBUG] Checking TOTP code '%s' at base counter: %d\n", code, counter)
 
 	// Check the current time window and adjacent windows (±2) to account for small clock skew
