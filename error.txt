@@ -1,16 +1,18 @@
 [2FA Setup DEBUG] User 13 attempting 2FA confirmation
 [2FA Setup DEBUG] Secret length: 32, Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS
-[2FA Setup DEBUG] OTP Code: 716080
-[TOTP DEBUG] Checking TOTP code '716080' at base counter: 58728108
+[2FA Setup DEBUG] OTP Code: 148512
+[TOTP DEBUG] Current time: 2025-10-30 18:04:24 CET
+[TOTP DEBUG] Unix timestamp: 1761843864
+[TOTP DEBUG] Checking TOTP code '148512' at base counter: 58728128
 [DECODE DEBUG] Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS, Decoded length: 20, Decoded hex: f3079b70a3d27adf8dd1ea6029bc579e4078b052
-[TOTP DEBUG] Counter: 58728106, Generated: 000145, Expected: 716080, Match: false
+[TOTP DEBUG] Counter: 58728126, Generated: 000126, Expected: 148512, Match: false
 [DECODE DEBUG] Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS, Decoded length: 20, Decoded hex: f3079b70a3d27adf8dd1ea6029bc579e4078b052
-[TOTP DEBUG] Counter: 58728107, Generated: 000072, Expected: 716080, Match: false
+[TOTP DEBUG] Counter: 58728127, Generated: 000226, Expected: 148512, Match: false
 [DECODE DEBUG] Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS, Decoded length: 20, Decoded hex: f3079b70a3d27adf8dd1ea6029bc579e4078b052
-[TOTP DEBUG] Counter: 58728108, Generated: 000049, Expected: 716080, Match: false
+[TOTP DEBUG] Counter: 58728128, Generated: 000224, Expected: 148512, Match: false
 [DECODE DEBUG] Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS, Decoded length: 20, Decoded hex: f3079b70a3d27adf8dd1ea6029bc579e4078b052
-[TOTP DEBUG] Counter: 58728109, Generated: 000216, Expected: 716080, Match: false
+[TOTP DEBUG] Counter: 58728129, Generated: 000163, Expected: 148512, Match: false
 [DECODE DEBUG] Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS, Decoded length: 20, Decoded hex: f3079b70a3d27adf8dd1ea6029bc579e4078b052
-[TOTP DEBUG] Counter: 58728110, Generated: 000006, Expected: 716080, Match: false
+[TOTP DEBUG] Counter: 58728130, Generated: 000214, Expected: 148512, Match: false
 [TOTP DEBUG] FAILED: Code not verified at any time window
 [2FA Setup DEBUG] OTP verification FAILED
