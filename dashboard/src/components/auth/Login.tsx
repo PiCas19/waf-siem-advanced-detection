@@ -177,14 +177,7 @@ const Login: React.FC = () => {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-gray-400">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-blue-400 hover:text-blue-300">
-              Register here
-            </Link>
-          </p>
-        </div>
+        {/* Registration is disabled - admin should create users */}
       </div>
     </div>
   )

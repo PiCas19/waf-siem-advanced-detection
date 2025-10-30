@@ -2,10 +2,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import Login from '@/components/auth/Login'
-import Register from '@/components/auth/Register'
+import SetPassword from '@/components/auth/SetPassword'
 import Dashboard from '@/components/Dashboard'
 import Settings from '@/components/auth/Settings'
 import Profile from '@/components/auth/Profile'
+import Users from '@/components/admin/Users'
 
 function App() {
   return (
@@ -14,7 +15,7 @@ function App() {
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/set-password" element={<SetPassword />} />
 
           {/* Protected routes */}
           <Route
@@ -40,6 +41,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute>
+                <Users />
               </ProtectedRoute>
             }
           />
