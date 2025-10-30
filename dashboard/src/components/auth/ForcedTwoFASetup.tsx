@@ -44,7 +44,21 @@ const ForcedTwoFASetup: React.FC = () => {
       setTwoFAError('')
       setIsInitializing(true)
       try {
-        const data = await setupTwoFA()
+        const token = localStorage.getItem('authToken')
+        if (!token) {
+          throw new Error('No token found. Please login first.')
+        }
+        const response = await fetch('/api/auth/2fa/setup', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        if (!response.ok) {
+          throw new Error('Failed to initialize 2FA setup')
+        }
+        const data = await response.json()
         setTwoFASecret(data.secret || '')
         setTwoFAOtpauth(data.qr_code_url || '')
       } catch (e: any) {
@@ -54,7 +68,7 @@ const ForcedTwoFASetup: React.FC = () => {
       }
     }
     init()
-  }, [setupTwoFA])
+  }, [])
 
   const copySecret = async () => {
     if (!twoFASecret) return
