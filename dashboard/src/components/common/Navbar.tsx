@@ -8,7 +8,12 @@ export default function Navbar() {
   return (
     <nav className="bg-gray-800 border-b border-gray-700 px-4 py-3">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <Link to="/" className="text-xl font-bold">WAF Dashboard</Link>
+        <div className="flex items-center gap-4">
+          <Link to="/" className="text-xl font-bold">WAF Dashboard</Link>
+          {user?.role === 'admin' && (
+            <Link to="/admin/users" className="text-sm text-gray-300 hover:text-white">Users</Link>
+          )}
+        </div>
         <div>
           {user ? <AvatarMenu /> : <Link to="/login" className="text-sm">Login</Link>}
         </div>

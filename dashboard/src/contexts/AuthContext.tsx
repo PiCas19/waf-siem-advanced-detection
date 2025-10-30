@@ -15,7 +15,6 @@ interface AuthContextType {
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   verifyOTP: (email: string, otpCode: string, backupCode?: string) => Promise<void>
-  register: (email: string, password: string, name: string) => Promise<void>
   logout: () => void
   setupTwoFA: () => Promise<TwoFASetup>
   completeTwoFASetup: (secret: string, otpCode: string) => Promise<void>
@@ -102,24 +101,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }
 
-  const register = async (email: string, password: string, name: string) => {
-    try {
-      const response = await axios.post('/api/auth/register', {
-        email,
-        password,
-        name,
-      })
-
-      setToken(response.data.token)
-      setUser(response.data.user)
-      localStorage.setItem('authToken', response.data.token)
-      localStorage.setItem('authUser', JSON.stringify(response.data.user))
-      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`
-    } catch (error) {
-      console.error('Registration failed:', error)
-      throw error
-    }
-  }
+  // register removed: admin-only user creation handled by admin UI
 
   const logout = () => {
     setUser(null)
@@ -180,7 +162,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isLoading,
         login,
         verifyOTP,
-        register,
+  // register removed: admin should create users
         logout,
         setupTwoFA,
         completeTwoFASetup,
