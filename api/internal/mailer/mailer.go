@@ -15,18 +15,27 @@ type Mailer struct {
     Port     int
     Username string
     Password string
-    From     string
+    FromEmail string
+    FromName  string
+    ReplyTo   string
     SiteURL  string // e.g. https://dashboard.example.com
 }
 
 // NewMailerFromEnv builds a Mailer from environment variables.
-// Required env vars: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, NO_REPLY_EMAIL, SITE_URL
+// Expected env vars:
+//   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+//   NO_REPLY_EMAIL (email address used as From)
+//   NO_REPLY_NAME (optional display name for From)
+//   SUPPORT_EMAIL (optional Reply-To address)
+//   SITE_URL
 func NewMailerFromEnv() *Mailer {
     host := strings.TrimSpace(os.Getenv("SMTP_HOST"))
     portStr := strings.TrimSpace(os.Getenv("SMTP_PORT"))
     user := strings.TrimSpace(os.Getenv("SMTP_USER"))
     pass := strings.TrimSpace(os.Getenv("SMTP_PASS"))
     from := strings.TrimSpace(os.Getenv("NO_REPLY_EMAIL"))
+    fromName := strings.TrimSpace(os.Getenv("NO_REPLY_NAME"))
+    replyTo := strings.TrimSpace(os.Getenv("SUPPORT_EMAIL"))
     site := strings.TrimSpace(os.Getenv("SITE_URL"))
 
     if host == "" || portStr == "" || from == "" {
@@ -40,12 +49,14 @@ func NewMailerFromEnv() *Mailer {
     }
 
     return &Mailer{
-        Host:     host,
-        Port:     port,
-        Username: user,
-        Password: pass,
-        From:     from,
-        SiteURL:  site,
+        Host:      host,
+        Port:      port,
+        Username:  user,
+        Password:  pass,
+        FromEmail: from,
+        FromName:  fromName,
+        ReplyTo:   replyTo,
+        SiteURL:   site,
     }
 }
 
@@ -79,7 +90,15 @@ func (m *Mailer) SendInvite(toEmail, fullName, resetLink, tempPassword string) e
     plain := fmt.Sprintf("Hello %s,\n\nAn administrator created an account for you. Temporary password: %s\nSet your password: %s\n\n-- WAF Dashboard (no-reply)", fullName, tempPassword, fullLink)
 
     msg := gomail.NewMessage()
-    msg.SetHeader("From", m.From)
+    // Format From header: "Name <email>" if a name is provided
+    fromHeader := m.FromEmail
+    if m.FromName != "" {
+        fromHeader = fmt.Sprintf("%s <%s>", m.FromName, m.FromEmail)
+    }
+    msg.SetHeader("From", fromHeader)
+    if m.ReplyTo != "" {
+        msg.SetHeader("Reply-To", m.ReplyTo)
+    }
     msg.SetHeader("To", toEmail)
     msg.SetHeader("Subject", subject)
     msg.SetBody("text/plain", plain)
