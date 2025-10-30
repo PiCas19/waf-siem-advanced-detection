@@ -1,0 +1,7 @@
+[2FA Setup DEBUG] OTP Code: 905493
+[TOTP DEBUG] Checking TOTP code '905493' at base counter: 58728052
+[TOTP DEBUG] Counter: 58728050, Generated: 000043, Expected: 905493, Match: false
+[TOTP DEBUG] Counter: 58728051, Generated: 000069, Expected: 905493, Match: false
+[TOTP DEBUG] Counter: 58728052, Generated: 000149, Expected: 905493, Match: false
+[TOTP DEBUG] Counter: 58728053, Generated: 000056, Expected: 905493, Match: false
+[TOTP DEBUG] Counter: 58728054, Generated: 000246, Expected: 905493, Match: false
