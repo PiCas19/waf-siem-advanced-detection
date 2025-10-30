@@ -22,8 +22,9 @@ type OTPConfig struct {
 
 // GenerateOTPSecret generates a new TOTP secret for 2FA
 func GenerateOTPSecret() (string, error) {
-	// Generate 32 random bytes for the secret
-	randomBytes := make([]byte, 32)
+	// Generate 20 random bytes for the secret (RFC 4648 recommends 20 bytes for TOTP)
+	// This will produce ~32 characters when base32 encoded
+	randomBytes := make([]byte, 20)
 	_, err := rand.Read(randomBytes)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
@@ -32,6 +33,7 @@ func GenerateOTPSecret() (string, error) {
 	// Encode as base32 without padding (common for TOTP secrets)
 	encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 	secret := encoder.EncodeToString(randomBytes)
+	fmt.Printf("[OTP Secret Generation] Generated secret: %s (length: %d)\n", secret, len(secret))
 	return secret, nil
 }
 
