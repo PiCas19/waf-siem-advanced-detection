@@ -1,7 +1,11 @@
-[2FA Setup DEBUG] OTP Code: 905493
-[TOTP DEBUG] Checking TOTP code '905493' at base counter: 58728052
-[TOTP DEBUG] Counter: 58728050, Generated: 000043, Expected: 905493, Match: false
-[TOTP DEBUG] Counter: 58728051, Generated: 000069, Expected: 905493, Match: false
-[TOTP DEBUG] Counter: 58728052, Generated: 000149, Expected: 905493, Match: false
-[TOTP DEBUG] Counter: 58728053, Generated: 000056, Expected: 905493, Match: false
-[TOTP DEBUG] Counter: 58728054, Generated: 000246, Expected: 905493, Match: false
+[2FA Setup DEBUG] User 13 attempting 2FA confirmation
+[2FA Setup DEBUG] Secret length: 32, Secret: 6MDZW4FD2J5N7DOR5JQCTPCXTZAHRMCS
+[2FA Setup DEBUG] OTP Code: 449188
+[TOTP DEBUG] Checking TOTP code '449188' at base counter: 58728097
+[TOTP DEBUG] Counter: 58728095, Generated: 000246, Expected: 449188, Match: false
+[TOTP DEBUG] Counter: 58728096, Generated: 000236, Expected: 449188, Match: false
+[TOTP DEBUG] Counter: 58728097, Generated: 000100, Expected: 449188, Match: false
+[TOTP DEBUG] Counter: 58728098, Generated: 000049, Expected: 449188, Match: false
+[TOTP DEBUG] Counter: 58728099, Generated: 000209, Expected: 449188, Match: false
+[TOTP DEBUG] FAILED: Code not verified at any time window
+[2FA Setup DEBUG] OTP verification FAILED
