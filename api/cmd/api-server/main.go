@@ -1,17 +1,26 @@
 package main
 
 import (
-    "fmt"
-    "log"
-    "os"
+	"fmt"
+	"log"
+	"os"
 
-    "github.com/gin-gonic/gin"
-    "github.com/PiCas19/waf-siem-advanced-detection/api/internal/api"
-    "github.com/PiCas19/waf-siem-advanced-detection/api/internal/database"
-    "github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
+	"github.com/joho/godotenv"
+	"github.com/gin-gonic/gin"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/api"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
 )
 
 func main() {
+	// Try to load variables from a local .env file for development.
+	// This is non-fatal: if the file doesn't exist we continue reading from the environment.
+	if err := godotenv.Load(); err == nil {
+		log.Println("Loaded environment variables from .env")
+	} else {
+		log.Println("No .env file found or failed to load; using environment variables")
+	}
+
     // Resolve configuration from env with sensible defaults
     dbPath := os.Getenv("DATABASE_URL")
     if dbPath == "" {

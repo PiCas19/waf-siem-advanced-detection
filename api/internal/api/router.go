@@ -5,19 +5,24 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/auth"
+	mailerpkg "github.com/PiCas19/waf-siem-advanced-detection/api/internal/mailer"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/websocket"
 )
 
 func SetupRoutes(r *gin.Engine, db *gorm.DB) {
-	authHandler := auth.NewAuthHandler(db)
+	// init mailer (reads env vars). If not configured, mailer will be nil.
+	mailer := mailerpkg.NewMailerFromEnv()
+	authHandler := auth.NewAuthHandler(db, mailer)
 
 	r.GET("/ws", websocket.WSHub)
 
 	public := r.Group("/api")
 	{
 		public.POST("/auth/login", authHandler.Login)
-		public.POST("/auth/register", authHandler.Register)
+		// self-registration removed: admin-only user creation
 		public.POST("/auth/verify-otp", authHandler.VerifyOTPLogin)
+		// endpoint for users to set password using an invite/reset token
+		public.POST("/auth/set-password", authHandler.SetPasswordWithToken)
 		public.POST("/waf/event", NewWAFEventHandler(db))
 	}
 
@@ -67,5 +72,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	admin.Use(auth.AuthMiddleware(), auth.AdminMiddleware())
 	{
 		admin.GET("/users", GetUsers)
+		// Admin-only user creation (invite flow)
+		admin.POST("/users", authHandler.AdminCreateUser)
 	}
 }

@@ -22,4 +22,8 @@ type User struct {
 	TwoFAEnabled bool   `gorm:"default:false" json:"two_fa_enabled"`
 	OTPSecret    string `gorm:"default:''" json:"-"` // TOTP secret key (keep private)
 	BackupCodes  string `gorm:"type:text" json:"-"` // JSON-encoded backup codes
+
+	// Password reset / invite token (admin-created users)
+	PasswordResetToken  string    `gorm:"index;size:128" json:"-"`
+	PasswordResetExpiry time.Time `json:"-"`
 }
