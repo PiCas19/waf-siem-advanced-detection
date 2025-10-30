@@ -33,7 +33,7 @@ type LoginRequest struct {
 
 type LoginOTPRequest struct {
 	Email string `json:"email" binding:"required,email"`
-	OTPCode string `json:"otp_code" binding:"required,len=6"`
+	OTPCode string `json:"otp_code"`
 	BackupCode string `json:"backup_code"`
 }
 
@@ -108,6 +108,18 @@ func (h *AuthHandler) VerifyOTPLogin(c *gin.Context) {
 	var req LoginOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate that at least one of OTP code or backup code is provided
+	if req.OTPCode == "" && req.BackupCode == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Either OTP code or backup code must be provided"})
+		return
+	}
+
+	// Validate OTP code length if provided
+	if req.OTPCode != "" && len(req.OTPCode) != 6 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "OTP code must be 6 digits"})
 		return
 	}
 
