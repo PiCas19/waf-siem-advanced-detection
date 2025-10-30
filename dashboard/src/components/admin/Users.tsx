@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import axios from 'axios'
+import { Trash2, Edit2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface User {
@@ -29,6 +30,18 @@ const Users: React.FC = () => {
   const [role, setRole] = useState('user')
   const [message, setMessage] = useState('')
   const [formLoading, setFormLoading] = useState(false)
+
+  // Edit modal state
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editRole, setEditRole] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
+
+  // Delete confirmation state
+  const [deleteUserId, setDeleteUserId] = useState<number | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   // Table state
   const [searchTerm, setSearchTerm] = useState('')
@@ -130,6 +143,51 @@ const Users: React.FC = () => {
       setMessage(err.response?.data?.error || 'Creation failed')
     } finally {
       setFormLoading(false)
+    }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!deleteUserId) return
+    setDeleteLoading(true)
+    try {
+      await axios.delete(`/api/admin/users/${deleteUserId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      setShowDeleteConfirm(false)
+      setDeleteUserId(null)
+      await loadUsers()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to delete user')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user)
+    setEditName(user.name)
+    setEditRole(user.role)
+    setShowEditModal(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingUser) return
+    setEditLoading(true)
+    try {
+      await axios.put(`/api/admin/users/${editingUser.id}`, { name: editName, role: editRole }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      setShowEditModal(false)
+      setEditingUser(null)
+      await loadUsers()
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to update user')
+    } finally {
+      setEditLoading(false)
     }
   }
 
@@ -311,6 +369,7 @@ const Users: React.FC = () => {
                     >
                       Created <SortIcon field="created_at" />
                     </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -335,6 +394,25 @@ const Users: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-400">
                         {new Date(user.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 text-sm flex gap-2">
+                        <button
+                          onClick={() => handleEditUser(user)}
+                          className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition"
+                          title="Edit user"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeleteUserId(user.id)
+                            setShowDeleteConfirm(true)
+                          }}
+                          className="p-2 bg-red-600 hover:bg-red-700 text-white rounded transition"
+                          title="Delete user"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -381,6 +459,87 @@ const Users: React.FC = () => {
             </div>
           </>
         )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-sm border border-gray-700">
+            <h2 className="text-lg font-bold text-white mb-4">Confirm Delete</h2>
+            <p className="text-gray-300 mb-6">Are you sure you want to delete this user? This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteUser}
+                disabled={deleteLoading}
+                className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium py-2 px-4 rounded transition"
+              >
+                {deleteLoading ? 'Deleting...' : 'Delete'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setDeleteUserId(null)
+                }}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md border border-gray-700">
+            <h2 className="text-lg font-bold text-white mb-4">Edit User</h2>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Name</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Role</label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="manager">Manager</option>
+                  <option value="operator">Operator</option>
+                  <option value="auditor">Auditor</option>
+                  <option value="viewer">Viewer</option>
+                  <option value="user">User</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleSaveEdit}
+                disabled={editLoading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2 px-4 rounded transition"
+              >
+                {editLoading ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowEditModal(false)
+                  setEditingUser(null)
+                }}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   )

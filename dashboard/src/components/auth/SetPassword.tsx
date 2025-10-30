@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 import axios from 'axios'
 
 const SetPassword: React.FC = () => {
@@ -7,6 +8,8 @@ const SetPassword: React.FC = () => {
   const token = searchParams.get('token') || ''
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const navigate = useNavigate()
@@ -38,13 +41,41 @@ const SetPassword: React.FC = () => {
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="block text-sm text-gray-300 mb-1">New password</label>
-            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" className="w-full px-3 py-2 bg-gray-700 text-white rounded" />
+            <div className="relative">
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type={showPassword ? 'text' : 'password'}
+                className="w-full px-3 py-2 bg-gray-700 text-white rounded"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-sm text-gray-300 mb-1">Confirm password</label>
-            <input value={confirm} onChange={(e) => setConfirm(e.target.value)} type="password" className="w-full px-3 py-2 bg-gray-700 text-white rounded" />
+            <div className="relative">
+              <input
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                type={showConfirm ? 'text' : 'password'}
+                className="w-full px-3 py-2 bg-gray-700 text-white rounded"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(!showConfirm)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition"
+              >
+                {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
-          <button className="bg-blue-600 px-4 py-2 rounded text-white">Set password</button>
+          <button className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white font-medium transition">Set password</button>
         </form>
       </div>
     </div>
