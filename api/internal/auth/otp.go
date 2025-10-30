@@ -109,9 +109,9 @@ func verifyTOTP(secret, code string, counter int64) bool {
 		uint32(hash[offset+2])<<8 |
 		uint32(hash[offset+3])
 
-	code := code32 % 1000000
+	codeValue := int(code32 % 1000000)
 
-	generatedCode := fmt.Sprintf("%06d", code)
+	generatedCode := fmt.Sprintf("%06d", codeValue)
 	fmt.Printf("[TOTP DEBUG] Counter: %d, Offset: %d, Generated: %s, Expected: %s, Match: %v\n", counter, offset, generatedCode, code, generatedCode == code)
 
 	// Verify the code
