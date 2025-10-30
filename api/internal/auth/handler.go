@@ -36,12 +36,6 @@ type LoginOTPRequest struct {
 	BackupCode string `json:"backup_code"`
 }
 
-type RegisterRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
-	Name     string `json:"name" binding:"required"`
-}
-
 type TwoFASetupRequest struct {
 	OTPCode string `json:"otp_code" binding:"required,len=6"`
 }
@@ -160,57 +154,9 @@ func (h *AuthHandler) VerifyOTPLogin(c *gin.Context) {
 
 // Register handles user registration
 func (h *AuthHandler) Register(c *gin.Context) {
-	var req RegisterRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	
-	// Check if email exists
-	var count int64
-	h.db.Model(&models.User{}).Where("email = ?", req.Email).Count(&count)
-	if count > 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
-		return
-	}
-	
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
-		return
-	}
-	
-	// Create user
-	user := models.User{
-		Email:        req.Email,
-		PasswordHash: string(hashedPassword),
-		Name:         req.Name,
-		Role:         "user",
-		Active:       true,
-	}
-	
-	if err := h.db.Create(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
-		return
-	}
-	
-	// Generate token
-	token, err := GenerateToken(user.ID, user.Email, user.Role)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
-		return
-	}
-	
-	c.JSON(http.StatusCreated, gin.H{
-		"token": token,
-		"user": gin.H{
-			"id":    user.ID,
-			"email": user.Email,
-			"name":  user.Name,
-			"role":  user.Role,
-		},
-	})
+	// Self-registration is disabled. Users must be created by an administrator.
+	// This endpoint intentionally returns 403 to avoid accidental public registration.
+	c.JSON(http.StatusForbidden, gin.H{"error": "Registration is disabled. Contact an administrator to create an account."})
 }
 
 // AdminCreateUser allows an admin to create a new user (invite flow)

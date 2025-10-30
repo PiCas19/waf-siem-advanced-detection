@@ -71,7 +71,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	admin := r.Group("/api/admin")
 	admin.Use(auth.AuthMiddleware(), auth.AdminMiddleware())
 	{
-		admin.GET("/users", GetUsers)
+		// List users (admin-only)
+		admin.GET("/users", NewGetUsersHandler(db))
 		// Admin-only user creation (invite flow)
 		admin.POST("/users", authHandler.AdminCreateUser)
 	}

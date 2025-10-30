@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import AvatarMenu from './common/AvatarMenu'
 import StatsPage from './stats/StatsPage'
@@ -20,6 +21,9 @@ const Dashboard: React.FC = () => {
             <p className="text-sm text-gray-400">Welcome, {user?.name}</p>
           </div>
           <div className="flex items-center gap-2">
+            {user && String(user.role).toLowerCase().trim() === 'admin' && (
+              <Link to="/admin/users" className="text-sm text-gray-300 hover:text-white mr-2">Users</Link>
+            )}
             <AvatarMenu />
           </div>
         </div>
