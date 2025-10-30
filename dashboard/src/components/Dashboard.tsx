@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import PermissionGate from './PermissionGate'
 import AvatarMenu from './common/AvatarMenu'
 import StatsPage from './stats/StatsPage'
 import RulesContainer from './rules/RulesContainer'
@@ -22,9 +22,6 @@ const Dashboard: React.FC = () => {
             <p className="text-sm text-gray-400">Welcome, {user?.name}</p>
           </div>
           <div className="flex items-center gap-2">
-            {user && String(user.role).toLowerCase().trim() === 'admin' && (
-              <Link to="/admin/users" className="text-sm text-gray-300 hover:text-white mr-2">Users</Link>
-            )}
             <AvatarMenu />
           </div>
         </div>
@@ -34,6 +31,7 @@ const Dashboard: React.FC = () => {
       <nav className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex space-x-4">
+            {/* Always visible */}
             <button
               onClick={() => setActiveTab('stats')}
               className={`px-4 py-3 border-b-2 font-medium transition ${
@@ -44,37 +42,51 @@ const Dashboard: React.FC = () => {
             >
               Statistics
             </button>
-            <button
-              onClick={() => setActiveTab('rules')}
-              className={`px-4 py-3 border-b-2 font-medium transition ${
-                activeTab === 'rules'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-white'
-              }`}
-            >
-              Rules
-            </button>
-            <button
-              onClick={() => setActiveTab('logs')}
-              className={`px-4 py-3 border-b-2 font-medium transition ${
-                activeTab === 'logs'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-white'
-              }`}
-            >
-              Logs
-            </button>
-            <button
-              onClick={() => setActiveTab('blocklist')}
-              className={`px-4 py-3 border-b-2 font-medium transition ${
-                activeTab === 'blocklist'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-white'
-              }`}
-            >
-              Access Control
-            </button>
-            {user && String(user.role).toLowerCase().trim() === 'admin' && (
+
+            {/* Rules - needs rules_view permission */}
+            <PermissionGate permission="rules_view">
+              <button
+                onClick={() => setActiveTab('rules')}
+                className={`px-4 py-3 border-b-2 font-medium transition ${
+                  activeTab === 'rules'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Rules
+              </button>
+            </PermissionGate>
+
+            {/* Logs - needs logs_view permission */}
+            <PermissionGate permission="logs_view">
+              <button
+                onClick={() => setActiveTab('logs')}
+                className={`px-4 py-3 border-b-2 font-medium transition ${
+                  activeTab === 'logs'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Logs
+              </button>
+            </PermissionGate>
+
+            {/* Access Control - needs blocklist_view permission */}
+            <PermissionGate permission="blocklist_view">
+              <button
+                onClick={() => setActiveTab('blocklist')}
+                className={`px-4 py-3 border-b-2 font-medium transition ${
+                  activeTab === 'blocklist'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+              >
+                Access Control
+              </button>
+            </PermissionGate>
+
+            {/* Users Management - needs users_view permission */}
+            <PermissionGate permission="users_view">
               <button
                 onClick={() => setActiveTab('users')}
                 className={`px-4 py-3 border-b-2 font-medium transition ${
@@ -85,7 +97,7 @@ const Dashboard: React.FC = () => {
               >
                 Users
               </button>
-            )}
+            </PermissionGate>
           </div>
         </div>
       </nav>
