@@ -7,7 +7,6 @@ import (
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"time"
 
@@ -53,19 +52,23 @@ func GenerateBackupCodes() ([]string, error) {
 // VerifyOTP verifies a TOTP code (6 digits)
 func VerifyOTP(secret string, code string) bool {
 	if len(code) != 6 {
+		fmt.Printf("[TOTP DEBUG] Code length invalid: %d\n", len(code))
 		return false
 	}
 
 	// Get the current time in 30-second intervals
 	counter := time.Now().Unix() / 30
+	fmt.Printf("[TOTP DEBUG] Checking TOTP code '%s' at base counter: %d\n", code, counter)
 
 	// Check the current time window and adjacent windows (±2) to account for small clock skew
 	for _, timeOffset := range []int64{-2, -1, 0, 1, 2} {
 		if verifyTOTP(secret, code, counter+timeOffset) {
+			fmt.Printf("[TOTP DEBUG] SUCCESS: Code verified at offset %d\n", timeOffset)
 			return true
 		}
 	}
 
+	fmt.Printf("[TOTP DEBUG] FAILED: Code not verified at any time window\n")
 	return false
 }
 
@@ -75,6 +78,7 @@ func verifyTOTP(secret, code string, counter int64) bool {
 	decoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 	decodedSecret, err := decoder.DecodeString(secret)
 	if err != nil {
+		fmt.Printf("[TOTP DEBUG] Failed to decode secret: %v\n", err)
 		return false
 	}
 
@@ -84,10 +88,13 @@ func verifyTOTP(secret, code string, counter int64) bool {
 	// Get last 4 bits to determine offset
 	offset := hash[len(hash)-1] & 0xf
 	code32 := int32((hash[offset]&0x7f)<<24 | (hash[offset+1]&0xff)<<16 | (hash[offset+2]&0xff)<<8 | (hash[offset+3] & 0xff))
-	code32 = int32(math.Abs(float64(code32))) % 1000000
+	code32 = int32(code32 & 0x7fffffff) % 1000000
+
+	generatedCode := fmt.Sprintf("%06d", code32)
+	fmt.Printf("[TOTP DEBUG] Counter: %d, Generated: %s, Expected: %s, Match: %v\n", counter, generatedCode, code, generatedCode == code)
 
 	// Verify the code
-	return fmt.Sprintf("%06d", code32) == code
+	return generatedCode == code
 }
 
 // calculateHMAC calculates HMAC-SHA1
