@@ -83,6 +83,7 @@ func verifyTOTP(secret, code string, counter int64) bool {
 		fmt.Printf("[TOTP DEBUG] Failed to decode secret: %v\n", err)
 		return false
 	}
+	fmt.Printf("[DECODE DEBUG] Secret: %s, Decoded length: %d, Decoded hex: %x\n", secret, len(decodedSecret), decodedSecret)
 
 	// Calculate HMAC-SHA1
 	hash := calculateHMAC(decodedSecret, counter)
