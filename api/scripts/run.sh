@@ -45,8 +45,8 @@ fi
 # Check if binary exists, if not build it
 if [ ! -f "./bin/api-server" ]; then
     echo "[INFO] Binary not found, building the server..."
-    echo "[INFO] Running: (cd api && go build -o ../bin/api-server ./cmd/api-server)"
-    (go build -o ../bin/api-server ./cmd/api-server)
+    echo "[INFO] Running: (cd api && go build -o ./bin/api-server ./cmd/api-server)"
+    (go build -o ./bin/api-server ./cmd/api-server)
     if [ $? -ne 0 ]; then
         echo "[ERROR] Build failed!"
         exit 1
