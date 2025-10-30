@@ -84,8 +84,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const response = await axios.post('/api/auth/verify-otp', {
         email,
-        otp_code: otpCode,
-        backup_code: backupCode,
+        otp_code: otpCode || '',
+        backup_code: backupCode || '',
       })
 
       setToken(response.data.token)

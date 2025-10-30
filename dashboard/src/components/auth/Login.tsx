@@ -44,7 +44,7 @@ const Login: React.FC = () => {
     setLoading(true)
 
     try {
-      await verifyOTP(currentUserEmail || email, otpCode, backupCode || undefined)
+      await verifyOTP(currentUserEmail || email, otpCode, backupCode)
       navigate('/dashboard')
     } catch (err: any) {
       setError(err.response?.data?.error || '2FA verification failed')
