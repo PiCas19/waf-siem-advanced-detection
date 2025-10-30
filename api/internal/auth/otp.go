@@ -92,13 +92,22 @@ func verifyTOTP(secret, code string, counter int64) bool {
 	// Calculate HMAC-SHA1
 	hash := calculateHMAC(decodedSecret, counter)
 
+	// Dynamic truncation (RFC 4226)
 	// Get last 4 bits to determine offset
 	offset := hash[len(hash)-1] & 0xf
-	code32 := int32((hash[offset]&0x7f)<<24 | (hash[offset+1]&0xff)<<16 | (hash[offset+2]&0xff)<<8 | (hash[offset+3] & 0xff))
-	code32 = int32(code32 & 0x7fffffff) % 1000000
+
+	// Extract 4 bytes starting at offset (with bounds checking)
+	if int(offset) > len(hash)-4 {
+		fmt.Printf("[TOTP DEBUG] Offset out of bounds: %d, hash length: %d\n", offset, len(hash))
+		return false
+	}
+
+	// Properly extract 4 bytes and clear the sign bit
+	code32 := int32(hash[offset])<<24 | int32(hash[offset+1])<<16 | int32(hash[offset+2])<<8 | int32(hash[offset+3])
+	code32 = (code32 & 0x7fffffff) % 1000000
 
 	generatedCode := fmt.Sprintf("%06d", code32)
-	fmt.Printf("[TOTP DEBUG] Counter: %d, Generated: %s, Expected: %s, Match: %v\n", counter, generatedCode, code, generatedCode == code)
+	fmt.Printf("[TOTP DEBUG] Counter: %d, Offset: %d, Generated: %s, Expected: %s, Match: %v\n", counter, offset, generatedCode, code, generatedCode == code)
 
 	// Verify the code
 	return generatedCode == code
