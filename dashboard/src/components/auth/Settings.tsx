@@ -1,21 +1,8 @@
-import React, { useEffect, useState } from 'react'
-import QRCode from 'qrcode'
-import { useAuth } from '@/contexts/AuthContext'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Clipboard } from 'lucide-react'
 
 const Settings: React.FC = () => {
-  const { user } = useAuth()
   const navigate = useNavigate()
-
-  // 2FA state
-  const [isTwoFAEnabled, setIsTwoFAEnabled] = useState<boolean>(!!user?.two_fa_enabled)
-  const [isSettingUp2FA, setIsSettingUp2FA] = useState<boolean>(false)
-  const [twoFASecret, setTwoFASecret] = useState<string>('')
-  const [twoFAOtpauth, setTwoFAOtpauth] = useState<string>('')
-  const [twoFAOtpCode, setTwoFAOtpCode] = useState<string>('')
-  const [twoFAError, setTwoFAError] = useState<string>('')
-  const [twoFALoading, setTwoFALoading] = useState<boolean>(false)
 
   // Change password state
   const [currentPassword, setCurrentPassword] = useState('')
@@ -24,100 +11,6 @@ const Settings: React.FC = () => {
   const [pwError, setPwError] = useState('')
   const [pwLoading, setPwLoading] = useState(false)
   const [pwSuccess, setPwSuccess] = useState('')
-
-  useEffect(() => {
-    setIsTwoFAEnabled(!!user?.two_fa_enabled)
-  }, [user?.two_fa_enabled])
-
-  // Generate QR image as data URL locally to avoid external requests/CSP issues
-  const [qrDataUrl, setQrDataUrl] = useState<string>('')
-  useEffect(() => {
-    let mounted = true
-    const build = async () => {
-      if (!twoFAOtpauth) {
-        setQrDataUrl('')
-        return
-      }
-      try {
-        const dataUrl = await QRCode.toDataURL(twoFAOtpauth, { margin: 1, width: 200 })
-        if (mounted) setQrDataUrl(dataUrl)
-      } catch (err) {
-        console.error('Failed to generate QR', err)
-        if (mounted) setQrDataUrl('')
-      }
-    }
-    build()
-    return () => { mounted = false }
-  }, [twoFAOtpauth])
-
-  const copySecret = async () => {
-    if (!twoFASecret) return
-    try {
-      await navigator.clipboard.writeText(twoFASecret)
-      alert('Secret copied to clipboard')
-    } catch (e) {
-      console.error('Copy failed', e)
-    }
-  }
-
-  // removed copyOtpauth debug helper (not needed now)
-
-  const startTwoFASetup = async () => {
-    setTwoFAError('')
-    setTwoFALoading(true)
-    try {
-      const token = localStorage.getItem('authToken')
-      const resp = await fetch('/api/auth/2fa/setup', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      })
-      if (!resp.ok) {
-        throw new Error('Failed to start 2FA setup')
-      }
-      const data = await resp.json()
-      setTwoFASecret(data.secret || '')
-      setTwoFAOtpauth(data.qr_code_url || '')
-      setIsSettingUp2FA(true)
-    } catch (e: any) {
-      setTwoFAError(e?.message || 'Error starting 2FA setup')
-    } finally {
-      setTwoFALoading(false)
-    }
-  }
-
-  const confirmEnableTwoFA = async () => {
-    setTwoFAError('')
-    setTwoFALoading(true)
-    try {
-      const token = localStorage.getItem('authToken')
-      const resp = await fetch('/api/auth/2fa/confirm', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ secret: twoFASecret, otp_code: twoFAOtpCode }),
-      })
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}))
-        throw new Error(err?.error || 'Enable 2FA failed')
-      }
-      setIsTwoFAEnabled(true)
-      setIsSettingUp2FA(false)
-      setTwoFASecret('')
-      setTwoFAOtpauth('')
-      setTwoFAOtpCode('')
-      alert('Two-factor authentication enabled')
-    } catch (e: any) {
-      setTwoFAError(e?.message || 'Error enabling 2FA')
-    } finally {
-      setTwoFALoading(false)
-    }
-  }
 
   const changePassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -166,71 +59,11 @@ const Settings: React.FC = () => {
         <section className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-8">
           <h3 className="text-lg font-semibold text-white mb-4">Two-Factor Authentication (2FA)</h3>
           <p className="text-gray-300 mb-4">
-            Status: {isTwoFAEnabled ? (<span className="text-green-400">Enabled</span>) : (<span className="text-red-400">Disabled</span>)}
+            Status: <span className="text-green-400 font-semibold">Required & Enabled</span>
           </p>
-
-          {!isTwoFAEnabled && !isSettingUp2FA && (
-            <button
-              onClick={startTwoFASetup}
-              disabled={twoFALoading}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-medium px-4 py-2 rounded"
-            >
-              {twoFALoading ? 'Preparing…' : 'Enable 2FA'}
-            </button>
-          )}
-
-          {!isTwoFAEnabled && isSettingUp2FA && (
-            <div>
-              <p className="text-gray-400 mb-4">Scan the QR code below with your authenticator app (recommended), or copy the manual secret and add it to your app.</p>
-              {qrDataUrl && (
-                <div className="mb-4 text-center">
-                  <img src={qrDataUrl} alt="2FA QR code to scan with an authenticator app" className="w-48 h-48 border border-gray-700 rounded mb-2 mx-auto" />
-                  <p className="text-xs text-gray-400">If your app can't scan the code, use the manual secret shown below.</p>
-                </div>
-              )}
-
-              {twoFASecret && (
-                <div className="mb-4">
-                  <label className="block text-gray-400 text-sm mb-1">Manual secret</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      readOnly
-                      value={twoFASecret}
-                      className="flex-1 px-4 py-2 bg-gray-900 text-gray-200 text-sm rounded border border-gray-700 focus:outline-none"
-                      aria-label="Manual 2FA secret"
-                    />
-                    <button onClick={copySecret} title="Copy secret" className="h-10 w-10 flex items-center justify-center bg-gray-700 hover:bg-gray-600 rounded">
-                      <Clipboard size={16} />
-                    </button>
-                    <button onClick={startTwoFASetup} title="Regenerate secret and QR code" className="h-10 w-10 flex items-center justify-center bg-gray-700 hover:bg-gray-600 rounded">
-                      <RefreshCw size={16} />
-                    </button>
-                  </div>
-                </div>
-              )}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Enter the 6-digit code from your authenticator app to confirm and enable 2FA</label>
-                <input
-                  type="text"
-                  value={twoFAOtpCode}
-                  onChange={(e) => setTwoFAOtpCode(e.target.value)}
-                  placeholder="000000"
-                  maxLength={6}
-                  className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              {twoFAError && (
-                <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded mb-3 text-sm">{twoFAError}</div>
-              )}
-              <button
-                onClick={confirmEnableTwoFA}
-                disabled={twoFALoading || twoFAOtpCode.length < 6}
-                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-medium px-4 py-2 rounded"
-              >
-                {twoFALoading ? 'Enabling…' : 'Confirm & Enable'}
-              </button>
-            </div>
-          )}
+          <p className="text-gray-400 text-sm">
+            Two-factor authentication is required for all accounts to ensure maximum security. It was set up when you first logged in.
+          </p>
         </section>
 
         <section className="bg-gray-800 p-6 rounded-lg border border-gray-700">

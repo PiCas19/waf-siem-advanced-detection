@@ -3,6 +3,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import Login from '@/components/auth/Login'
 import SetPassword from '@/components/auth/SetPassword'
+import ForcedTwoFASetup from '@/components/auth/ForcedTwoFASetup'
 import Dashboard from '@/components/Dashboard'
 import Settings from '@/components/auth/Settings'
 import Profile from '@/components/auth/Profile'
@@ -16,6 +17,16 @@ function App() {
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/set-password" element={<SetPassword />} />
+
+          {/* Protected routes - 2FA Setup (required after first login) */}
+          <Route
+            path="/setup-2fa"
+            element={
+              <ProtectedRoute>
+                <ForcedTwoFASetup />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Protected routes */}
           <Route

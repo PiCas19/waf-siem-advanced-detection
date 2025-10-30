@@ -19,7 +19,10 @@ const SetPassword: React.FC = () => {
     if (password !== confirm) return setError('Passwords do not match')
     try {
       await axios.post('/api/auth/set-password', { token, new_password: password })
-      setSuccess('Password set. You can now log in')
+      setSuccess('Password set. Redirecting to setup 2FA...')
+      // Mark that user needs to complete 2FA setup on first login
+      localStorage.setItem('needsTwoFASetup', 'true')
+      // Redirect to login after a short delay
       setTimeout(() => navigate('/login'), 1500)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed')

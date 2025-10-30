@@ -21,8 +21,16 @@ const Login: React.FC = () => {
 
     try {
       await login(email, password)
-      // If no 2FA required, navigate to dashboard
-      navigate('/dashboard')
+
+      // Check if this is first login and needs 2FA setup
+      const needsTwoFASetup = localStorage.getItem('needsTwoFASetup') === 'true'
+      if (needsTwoFASetup) {
+        localStorage.removeItem('needsTwoFASetup')
+        navigate('/setup-2fa')
+      } else {
+        // If no 2FA required, navigate to dashboard
+        navigate('/dashboard')
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed')
     } finally {

@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -349,11 +350,24 @@ func (h *AuthHandler) CompleteTwoFASetup(c *gin.Context) {
 		return
 	}
 
+	// Generate fresh backup codes
+	backupCodes, err := GenerateBackupCodes()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate backup codes"})
+		return
+	}
+
+	// Encode backup codes as JSON
+	backupCodesJSON, err := json.Marshal(backupCodes)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process backup codes"})
+		return
+	}
+
 	// Update user with 2FA
 	user.TwoFAEnabled = true
 	user.OTPSecret = req.Secret
-	// Backup codes were already generated in InitiateTwoFASetup
-	// We need to recalculate them here since they're not persisted yet
+	user.BackupCodes = string(backupCodesJSON)
 
 	if err := h.db.Save(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save 2FA setup"})
@@ -362,6 +376,7 @@ func (h *AuthHandler) CompleteTwoFASetup(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "2FA setup completed successfully",
+		"backup_codes": backupCodes,
 	})
 }
 
