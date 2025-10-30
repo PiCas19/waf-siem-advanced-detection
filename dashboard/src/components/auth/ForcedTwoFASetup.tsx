@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 
 const ForcedTwoFASetup: React.FC = () => {
   const navigate = useNavigate()
-  const { setupTwoFA, completeTwoFASetup } = useAuth()
+  const { setupTwoFA } = useAuth()
 
   const [twoFASecret, setTwoFASecret] = useState<string>('')
   const [twoFAOtpauth, setTwoFAOtpauth] = useState<string>('')
