@@ -48,9 +48,57 @@ func AuthMiddleware() gin.HandlerFunc {
 // AdminMiddleware checks if user is admin
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		role, exists := c.Get("user_role")
-		if !exists || role != "admin" {
+		roleVal, exists := c.Get("user_role")
+		roleStr, _ := roleVal.(string)
+		if !exists || !HasPermission(roleStr, "manage_users") {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// RolePermissions maps roles to a list of capabilities/permissions.
+// Add or adjust permissions here to control what each role can do.
+var RolePermissions = map[string][]string{
+	"admin":   {"manage_users", "manage_rules", "view_logs", "manage_blocklist", "manage_whitelist", "manage_false_positives"},
+	"manager": {"manage_rules", "manage_false_positives", "view_logs"},
+	"operator": {"manage_blocklist", "manage_whitelist", "view_logs"},
+	"auditor": {"view_logs"},
+	"viewer":  {"view_logs"},
+	"user":    {},
+}
+
+// HasPermission returns true if the role has the requested permission.
+func HasPermission(role, permission string) bool {
+	if role == "" {
+		return false
+	}
+	perms, ok := RolePermissions[role]
+	if !ok {
+		return false
+	}
+	for _, p := range perms {
+		if p == permission {
+			return true
+		}
+	}
+	return false
+}
+
+// PermissionMiddleware verifies that the authenticated user has the given permission.
+func PermissionMiddleware(permission string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		roleVal, exists := c.Get("user_role")
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
+			c.Abort()
+			return
+		}
+		roleStr, _ := roleVal.(string)
+		if !HasPermission(roleStr, permission) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Permission denied"})
 			c.Abort()
 			return
 		}

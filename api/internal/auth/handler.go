@@ -226,8 +226,8 @@ func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
 		return
 	}
 
-	// validate role
-	if req.Role != "admin" && req.Role != "user" {
+	// validate role against supported roles
+	if _, ok := RolePermissions[req.Role]; !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role"})
 		return
 	}
