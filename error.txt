@@ -1,18 +1,16 @@
-[2FA Setup DEBUG] User 14 attempting 2FA confirmation
-[2FA Setup DEBUG] Secret length: 32, Secret: VUO5A4BCD6YPE6XUGE2QE6GY6PPFLRRD
-[2FA Setup DEBUG] OTP Code: 693013
-[TOTP DEBUG] Current time: 2025-10-30 18:48:42 CET
-[TOTP DEBUG] Unix timestamp: 1761846522
-[TOTP DEBUG] Checking TOTP code '693013' at base counter: 58728217
-[DECODE DEBUG] Secret: VUO5A4BCD6YPE6XUGE2QE6GY6PPFLRRD, Decoded length: 20, Decoded hex: ad1dd070221fb0f27af431350278d8f3de55c623
-[TOTP DEBUG] Counter: 58728215, Generated: 000223, Expected: 693013, Match: false
-[DECODE DEBUG] Secret: VUO5A4BCD6YPE6XUGE2QE6GY6PPFLRRD, Decoded length: 20, Decoded hex: ad1dd070221fb0f27af431350278d8f3de55c623
-[TOTP DEBUG] Counter: 58728216, Generated: 000213, Expected: 693013, Match: false
-[DECODE DEBUG] Secret: VUO5A4BCD6YPE6XUGE2QE6GY6PPFLRRD, Decoded length: 20, Decoded hex: ad1dd070221fb0f27af431350278d8f3de55c623
-[TOTP DEBUG] Counter: 58728217, Generated: 000251, Expected: 693013, Match: false
-[DECODE DEBUG] Secret: VUO5A4BCD6YPE6XUGE2QE6GY6PPFLRRD, Decoded length: 20, Decoded hex: ad1dd070221fb0f27af431350278d8f3de55c623
-[TOTP DEBUG] Counter: 58728218, Generated: 000083, Expected: 693013, Match: false
-[DECODE DEBUG] Secret: VUO5A4BCD6YPE6XUGE2QE6GY6PPFLRRD, Decoded length: 20, Decoded hex: ad1dd070221fb0f27af431350278d8f3de55c623
-[TOTP DEBUG] Counter: 58728219, Generated: 000179, Expected: 693013, Match: false
+[2FA Setup DEBUG] Secret length: 32, Secret: UABFFFV2JKRE7VOPXGGQVZQMKW7PXCB2
+[2FA Setup DEBUG] OTP Code: 418714
+[TOTP DEBUG] Current time: 2025-10-30 20:54:18 CET
+[TOTP DEBUG] Unix timestamp: 1761854058
+[TOTP DEBUG] Checking TOTP code '418714' at base counter: 58728468
+[DECODE DEBUG] Secret: UABFFFV2JKRE7VOPXGGQVZQMKW7PXCB2, Decoded length: 20, Decoded hex: a0025296ba4aa24fd5cfb98d0ae60c55befb883a
+[TOTP DEBUG] Counter: 58728466, Offset: 3, Generated: 128583, Expected: 418714, Match: false
+[DECODE DEBUG] Secret: UABFFFV2JKRE7VOPXGGQVZQMKW7PXCB2, Decoded length: 20, Decoded hex: a0025296ba4aa24fd5cfb98d0ae60c55befb883a
+[TOTP DEBUG] Counter: 58728467, Offset: 6, Generated: 981962, Expected: 418714, Match: false
+[DECODE DEBUG] Secret: UABFFFV2JKRE7VOPXGGQVZQMKW7PXCB2, Decoded length: 20, Decoded hex: a0025296ba4aa24fd5cfb98d0ae60c55befb883a
+[TOTP DEBUG] Counter: 58728468, Offset: 8, Generated: 957080, Expected: 418714, Match: false
+[DECODE DEBUG] Secret: UABFFFV2JKRE7VOPXGGQVZQMKW7PXCB2, Decoded length: 20, Decoded hex: a0025296ba4aa24fd5cfb98d0ae60c55befb883a
+[TOTP DEBUG] Counter: 58728469, Offset: 15, Generated: 599122, Expected: 418714, Match: false
+[DECODE DEBUG] Secret: UABFFFV2JKRE7VOPXGGQVZQMKW7PXCB2, Decoded length: 20, Decoded hex: a0025296ba4aa24fd5cfb98d0ae60c55befb883a
+[TOTP DEBUG] Counter: 58728470, Offset: 1, Generated: 902840, Expected: 418714, Match: false
 [TOTP DEBUG] FAILED: Code not verified at any time window
-[2FA Setup DEBUG] OTP verification FAILED
