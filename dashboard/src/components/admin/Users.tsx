@@ -194,10 +194,8 @@ const Users: React.FC = () => {
   const getRoleColor = (role: string) => {
     const colors: Record<string, string> = {
       admin: 'bg-red-900 text-red-100',
-      manager: 'bg-orange-900 text-orange-100',
-      operator: 'bg-yellow-900 text-yellow-100',
-      auditor: 'bg-blue-900 text-blue-100',
-      viewer: 'bg-green-900 text-green-100',
+      operator: 'bg-blue-900 text-blue-100',
+      analyst: 'bg-green-900 text-green-100',
       user: 'bg-gray-700 text-gray-100'
     }
     return colors[role] || 'bg-gray-700 text-gray-100'
@@ -260,10 +258,8 @@ const Users: React.FC = () => {
               className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none"
             >
               <option value="admin">Admin</option>
-              <option value="manager">Manager</option>
               <option value="operator">Operator</option>
-              <option value="auditor">Auditor</option>
-              <option value="viewer">Viewer</option>
+              <option value="analyst">Analyst</option>
               <option value="user">User</option>
             </select>
           </div>
@@ -321,10 +317,8 @@ const Users: React.FC = () => {
             >
               <option value="all">All Roles</option>
               <option value="admin">Admin</option>
-              <option value="manager">Manager</option>
               <option value="operator">Operator</option>
-              <option value="auditor">Auditor</option>
-              <option value="viewer">Viewer</option>
+              <option value="analyst">Analyst</option>
               <option value="user">User</option>
             </select>
           </div>
@@ -521,10 +515,8 @@ const Users: React.FC = () => {
                   className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none"
                 >
                   <option value="admin">Admin</option>
-                  <option value="manager">Manager</option>
                   <option value="operator">Operator</option>
-                  <option value="auditor">Auditor</option>
-                  <option value="viewer">Viewer</option>
+                  <option value="analyst">Analyst</option>
                   <option value="user">User</option>
                 </select>
               </div>
