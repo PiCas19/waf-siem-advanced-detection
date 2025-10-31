@@ -3,7 +3,7 @@
  * Defines which pages/features each role can access
  */
 
-export type UserRole = 'admin' | 'manager' | 'operator' | 'auditor' | 'viewer' | 'user'
+export type UserRole = 'admin' | 'operator' | 'analyst' | 'user'
 
 export interface RolePermissions {
   // Dashboard & Main
@@ -86,8 +86,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     settings: true,
   },
 
-  manager: {
-    // Managers can do most things but can't delete users
+  operator: {
+    // Operators: can block/unblock threats, create/modify rules, manage access control, view logs, view users (no create/edit/delete)
     dashboard: true,
     rules_view: true,
     rules_create: true,
@@ -102,100 +102,38 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     whitelist_view: true,
     whitelist_add: true,
     whitelist_remove: true,
-    false_positives_view: true,
-    false_positives_report: true,
-    false_positives_resolve: true,
-    false_positives_delete: false,
-    threats_block: true,
-    threats_unblock: true,
-    users_view: true,
-    users_create: false,
-    users_edit: false,
-    users_delete: false,
-    users_change_role: false,
-    access_control: false,
-    settings: true,
-  },
-
-  operator: {
-    // Operators can manage blocks/whitelist and view rules/logs
-    dashboard: true,
-    rules_view: true,
-    rules_create: false,
-    rules_edit: false,
-    rules_delete: false,
-    logs_view: true,
-    logs_export: true,
-    logs_delete: false,
-    blocklist_view: true,
-    blocklist_add: true,
-    blocklist_remove: true,
-    whitelist_view: true,
-    whitelist_add: true,
-    whitelist_remove: true,
-    false_positives_view: true,
-    false_positives_report: true,
-    false_positives_resolve: false,
-    false_positives_delete: false,
-    threats_block: true,
-    threats_unblock: true,
-    users_view: false,
-    users_create: false,
-    users_edit: false,
-    users_delete: false,
-    users_change_role: false,
-    access_control: false,
-    settings: false,
-  },
-
-  auditor: {
-    // Auditors can view everything but can't modify anything
-    dashboard: true,
-    rules_view: true,
-    rules_create: false,
-    rules_edit: false,
-    rules_delete: false,
-    logs_view: true,
-    logs_export: true,
-    logs_delete: false,
-    blocklist_view: true,
-    blocklist_add: false,
-    blocklist_remove: false,
-    whitelist_view: true,
-    whitelist_add: false,
-    whitelist_remove: false,
-    false_positives_view: true,
+    false_positives_view: false,
     false_positives_report: false,
     false_positives_resolve: false,
     false_positives_delete: false,
-    threats_block: false,
-    threats_unblock: false,
+    threats_block: true,
+    threats_unblock: true,
     users_view: true,
     users_create: false,
     users_edit: false,
     users_delete: false,
     users_change_role: false,
-    access_control: false,
+    access_control: true,
     settings: false,
   },
 
-  viewer: {
-    // Viewers can only view basic stats and logs
+  analyst: {
+    // Analysts: can only view stats (no threat actions) and view logs
     dashboard: true,
-    rules_view: true,
+    rules_view: false,
     rules_create: false,
     rules_edit: false,
     rules_delete: false,
     logs_view: true,
     logs_export: false,
     logs_delete: false,
-    blocklist_view: true,
+    blocklist_view: false,
     blocklist_add: false,
     blocklist_remove: false,
-    whitelist_view: true,
+    whitelist_view: false,
     whitelist_add: false,
     whitelist_remove: false,
-    false_positives_view: true,
+    false_positives_view: false,
     false_positives_report: false,
     false_positives_resolve: false,
     false_positives_delete: false,
