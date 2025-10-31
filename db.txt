@@ -1,4 +1,0 @@
-id|created_at|updated_at|deleted_at|email|password_hash|name|role|active|two_fa_enabled|otp_secret|backup_codes|password_reset_token|password_reset_expiry
-1|2025-10-25 15:54:51.355663694+02:00|2025-10-25 15:54:51.355663694+02:00||pierpaolo.casati@bluewin.ch|$2a$10$njfyLzsAgac4MarDQV2ceOXmSAoshTwwSmi7Csbqo/S.Bk9lLdbpC|Pierpaolo Casati|admin|1|0||||
-14|2025-10-30 18:45:26.282291957+01:00|2025-10-30 20:52:15.286171963+01:00||pierpaolo.casati@student.supsi.ch|$2a$10$UkBU8nEph3.eaes.U/KAbeFVhQ.zYRF5HWVoojSfFNeQGrnw.ttSK|Pierpaolo Casati|admin|1|1|VUO5A4BCD6YPE6XUGE2QE6GY6PPFLRRD|["34610964","32718173","70203618","29697587","17876406","22940267","25043172","91106795","61371948"]||0001-01-01 00:00:00+00:00
-15|2025-10-30 20:52:47.834523219+01:00|2025-10-30 20:53:35.079729302+01:00||pierpacas01@gmail.com|$2a$10$r20jvNAXfwaAw2xBbahPveq8mHEpdzDoDacTsJcBNOSs6VdsBcYYq|Pierpaolo  Casati|user|1|0||||0001-01-01 00:00:00+00:00

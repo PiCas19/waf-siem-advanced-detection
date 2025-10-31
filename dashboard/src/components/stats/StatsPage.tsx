@@ -10,6 +10,8 @@ import {
 import { useWebSocketStats } from '@/hooks/useWebSocketStats';
 import { fetchStats } from '@/services/api';
 import WorldMapSVG from '@/components/stats/WorldMap';
+import { useAuth } from '@/contexts/AuthContext';
+import { hasPermission } from '@/types/rbac';
 
 interface WAFEvent {
   ip: string;
@@ -203,10 +205,15 @@ const getSeverityColor = (count: number): string => {
 
 const StatsPage: React.FC = () => {
   const { stats, isConnected, onAlertReceived } = useWebSocketStats();
+  const { user } = useAuth();
   const [timelineData, setTimelineData] = useState<ChartDataPoint[]>([]);
   const [threatTypeData, setThreatTypeData] = useState<any[]>([]);
   const [recentAlerts, setRecentAlerts] = useState<WAFEvent[]>([]);
   const [processingKey, setProcessingKey] = useState<string | null>(null);
+
+  // Calcola i permessi dell'utente
+  const canBlockThreats = user && hasPermission(user.role as any, 'threats_block');
+  const canUnblockThreats = user && hasPermission(user.role as any, 'threats_unblock');
 
   // Registra callback per aggiornamenti real-time degli alert
   useEffect(() => {
@@ -1371,7 +1378,12 @@ const StatsPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 text-gray-300">{alert.threat}</td>
                         <td className="py-3 px-4">
-                          {alert.blocked ? (
+                          {alert.originallyBlocked ? (
+                            <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium inline-flex items-center gap-1">
+                              <Lock size={12} />
+                              Automatically Blocked
+                            </span>
+                          ) : alert.blocked ? (
                             <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium inline-flex items-center gap-1">
                               <Lock size={12} />
                               Manually Blocked
@@ -1385,18 +1397,21 @@ const StatsPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4">
                           {alert.originallyBlocked ? (
-                            // Threat originariamente bloccata - nessun pulsante
+                            // Threat Automatically Blocked - nessun pulsante
                             <span className="text-gray-500 text-xs">—</span>
                           ) : !alert.blocked ? (
                             // Threat Detected (non bloccata adesso) - mostra pulsante Block
                             <button
                               onClick={() => handleBlockThreat(alert.ip, alert.threat, alert.timestamp)}
-                              disabled={processingKey === getAlertKey(alert.ip, alert.threat)}
+                              disabled={processingKey === getAlertKey(alert.ip, alert.threat) || !canBlockThreats}
                               className={`px-2 py-1 rounded text-xs font-medium transition ${
-                                processingKey === getAlertKey(alert.ip, alert.threat)
+                                !canBlockThreats
+                                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                  : processingKey === getAlertKey(alert.ip, alert.threat)
                                   ? 'bg-blue-600 text-white'
                                   : 'bg-red-600 hover:bg-red-700 text-white'
                               }`}
+                              title={!canBlockThreats ? 'You do not have permission to block threats' : ''}
                             >
                               {processingKey === getAlertKey(alert.ip, alert.threat) ? '...' : 'Block'}
                             </button>
@@ -1404,12 +1419,15 @@ const StatsPage: React.FC = () => {
                             // Threat Manually Blocked adesso (original non bloccata ma adesso sì) - mostra pulsante Unblock
                             <button
                               onClick={() => handleUnblockThreat(alert.ip, alert.threat, alert.timestamp)}
-                              disabled={processingKey === getAlertKey(alert.ip, alert.threat)}
+                              disabled={processingKey === getAlertKey(alert.ip, alert.threat) || !canUnblockThreats}
                               className={`px-2 py-1 rounded text-xs font-medium transition ${
-                                processingKey === getAlertKey(alert.ip, alert.threat)
+                                !canUnblockThreats
+                                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                  : processingKey === getAlertKey(alert.ip, alert.threat)
                                   ? 'bg-blue-600 text-white'
                                   : 'bg-orange-600 hover:bg-orange-700 text-white'
                               }`}
+                              title={!canUnblockThreats ? 'You do not have permission to unblock threats' : ''}
                             >
                               {processingKey === getAlertKey(alert.ip, alert.threat) ? '...' : 'Unblock'}
                             </button>

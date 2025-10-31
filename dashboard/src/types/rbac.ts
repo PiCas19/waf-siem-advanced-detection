@@ -34,6 +34,10 @@ export interface RolePermissions {
   false_positives_resolve: boolean
   false_positives_delete: boolean
 
+  // Threat Management (Stats page)
+  threats_block: boolean
+  threats_unblock: boolean
+
   // Admin Functions
   users_view: boolean
   users_create: boolean
@@ -71,6 +75,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     false_positives_report: true,
     false_positives_resolve: true,
     false_positives_delete: true,
+    threats_block: true,
+    threats_unblock: true,
     users_view: true,
     users_create: true,
     users_edit: true,
@@ -100,6 +106,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     false_positives_report: true,
     false_positives_resolve: true,
     false_positives_delete: false,
+    threats_block: true,
+    threats_unblock: true,
     users_view: true,
     users_create: false,
     users_edit: false,
@@ -129,6 +137,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     false_positives_report: true,
     false_positives_resolve: false,
     false_positives_delete: false,
+    threats_block: true,
+    threats_unblock: true,
     users_view: false,
     users_create: false,
     users_edit: false,
@@ -158,6 +168,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     false_positives_report: false,
     false_positives_resolve: false,
     false_positives_delete: false,
+    threats_block: false,
+    threats_unblock: false,
     users_view: true,
     users_create: false,
     users_edit: false,
@@ -187,6 +199,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     false_positives_report: false,
     false_positives_resolve: false,
     false_positives_delete: false,
+    threats_block: false,
+    threats_unblock: false,
     users_view: false,
     users_create: false,
     users_edit: false,
@@ -216,6 +230,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     false_positives_report: false,
     false_positives_resolve: false,
     false_positives_delete: false,
+    threats_block: false,
+    threats_unblock: false,
     users_view: false,
     users_create: false,
     users_edit: false,
