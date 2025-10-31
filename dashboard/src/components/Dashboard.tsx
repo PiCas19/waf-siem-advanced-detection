@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import PermissionGate from './PermissionGate'
+import PermissionGate from '@/components/auth/PermissionGate'
 import AvatarMenu from './common/AvatarMenu'
 import StatsPage from './stats/StatsPage'
 import RulesContainer from './rules/RulesContainer'
