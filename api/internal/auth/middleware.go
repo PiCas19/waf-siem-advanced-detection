@@ -62,12 +62,10 @@ func AdminMiddleware() gin.HandlerFunc {
 // RolePermissions maps roles to a list of capabilities/permissions.
 // Add or adjust permissions here to control what each role can do.
 var RolePermissions = map[string][]string{
-	"admin":   {"manage_users", "manage_rules", "view_logs", "manage_blocklist", "manage_whitelist", "manage_false_positives"},
-	"manager": {"manage_rules", "manage_false_positives", "view_logs"},
-	"operator": {"manage_blocklist", "manage_whitelist", "view_logs"},
-	"auditor": {"view_logs"},
-	"viewer":  {"view_logs"},
-	"user":    {},
+	"admin":    {"manage_users", "manage_rules", "view_logs", "manage_blocklist", "manage_whitelist", "manage_false_positives", "manage_threats"},
+	"operator": {"manage_rules", "manage_blocklist", "manage_whitelist", "view_logs", "manage_threats"},
+	"analyst":  {"view_logs"},
+	"user":     {},
 }
 
 // HasPermission returns true if the role has the requested permission.
