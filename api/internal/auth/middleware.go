@@ -64,7 +64,7 @@ func AdminMiddleware() gin.HandlerFunc {
 var RolePermissions = map[string][]string{
 	"admin":    {"manage_users", "manage_rules", "view_logs", "manage_blocklist", "manage_whitelist", "manage_false_positives", "manage_threats"},
 	"operator": {"manage_rules", "manage_blocklist", "manage_whitelist", "view_logs", "manage_threats"},
-	"analyst":  {"view_logs"},
+	"analyst":  {},
 	"user":     {},
 }
 
