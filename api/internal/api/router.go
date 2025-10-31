@@ -75,5 +75,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		admin.GET("/users", NewGetUsersHandler(db))
 		// Admin-only user creation (invite flow)
 		admin.POST("/users", authHandler.AdminCreateUser)
+		// Update user (admin-only)
+		admin.PUT("/users/:id", NewUpdateUserHandler(db))
+		// Delete user (admin-only)
+		admin.DELETE("/users/:id", NewDeleteUserHandler(db))
 	}
 }

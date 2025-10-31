@@ -224,7 +224,7 @@ func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
 		Email:               req.Email,
 		Name:                req.Name,
 		Role:                req.Role,
-		Active:              true,
+		Active:              false,
 		PasswordHash:        string(hashed),
 		PasswordResetToken:  resetToken,
 		PasswordResetExpiry: time.Now().Add(24 * time.Hour),
@@ -293,6 +293,7 @@ func (h *AuthHandler) SetPasswordWithToken(c *gin.Context) {
 	user.PasswordHash = string(hashed)
 	user.PasswordResetToken = ""
 	user.PasswordResetExpiry = time.Time{}
+	user.Active = true
 
 	if err := h.db.Save(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update password"})
