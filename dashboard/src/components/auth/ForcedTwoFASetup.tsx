@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { RefreshCw, Clipboard, Download } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useToast } from '@/contexts/ToastContext'
+import { useToast } from '@/contexts/SnackbarContext'
 
 const ForcedTwoFASetup: React.FC = () => {
   const navigate = useNavigate()
