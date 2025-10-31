@@ -58,6 +58,10 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 		statsMu.Unlock()
 
 		// Save event to database
+		blockedBy := ""
+		if event.Blocked {
+			blockedBy = "auto" // Bloccato automaticamente da una regola
+		}
 		log := models.Log{
 			ThreatType:  event.Threat,
 			ClientIP:    event.IP,
@@ -66,6 +70,7 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 			UserAgent:   event.UA,
 			CreatedAt:   time.Now(),
 			Blocked:     event.Blocked,
+			BlockedBy:   blockedBy,
 		}
 		if err := db.Create(&log).Error; err != nil {
 			fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)

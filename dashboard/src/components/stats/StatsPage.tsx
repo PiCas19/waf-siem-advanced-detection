@@ -23,7 +23,7 @@ interface WAFEvent {
   timestamp: string;
   threat: string;
   blocked: boolean;
-  originallyBlocked?: boolean; // Traccia se era bloccata quando caricata da API
+  blockedBy?: string; // "auto" = automatically blocked by rule, "manual" = manually blocked by operator, "" = not blocked
   // Da API logs endpoint
   id?: number;
   client_ip?: string;
@@ -321,7 +321,7 @@ const StatsPage: React.FC = () => {
             timestamp: log.created_at || new Date().toISOString(),
             threat: log.threat_type,
             blocked: log.blocked,
-            originallyBlocked: log.blocked, // Traccia lo stato originale dal DB
+            blockedBy: log.blocked_by || '', // "auto", "manual", or ""
             user_agent: log.user_agent,
           }));
           setRecentAlerts(mappedLogs);
@@ -727,7 +727,7 @@ const StatsPage: React.FC = () => {
     setProcessingKey(key);
 
     // Optimistic update: marca come blocked tutti gli alert con stesso ip+threat
-    setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true } : a)));
+    setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
 
     try {
       const token = localStorage.getItem('authToken');
@@ -742,12 +742,12 @@ const StatsPage: React.FC = () => {
 
       if (!resp.ok) {
         // rollback
-        setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false } : a)));
+        setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false, blockedBy: '' } : a)));
         showToast('Error blocking threat', 'error');
       }
     } catch (e) {
       // rollback
-      setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false } : a)));
+      setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false, blockedBy: '' } : a)));
       showToast('Network error blocking threat', 'error');
     } finally {
       setProcessingKey(null);
@@ -760,7 +760,7 @@ const StatsPage: React.FC = () => {
     setProcessingKey(key);
 
     // Optimistic update: marca come unblocked tutti gli alert con stesso ip+threat
-    setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false } : a)));
+    setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false, blockedBy: '' } : a)));
 
     try {
       const token = localStorage.getItem('authToken');
@@ -775,12 +775,12 @@ const StatsPage: React.FC = () => {
 
       if (!resp.ok) {
         // rollback
-        setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true } : a)));
+        setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
         showToast('Error unblocking threat', 'error');
       }
     } catch (e) {
       // rollback
-      setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true } : a)));
+      setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
       showToast('Network error unblocking threat', 'error');
     } finally {
       setProcessingKey(null);
@@ -1378,15 +1378,15 @@ const StatsPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 text-gray-300">{alert.threat}</td>
                         <td className="py-3 px-4">
-                          {alert.originallyBlocked ? (
+                          {alert.blockedBy === 'auto' ? (
                             <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium inline-flex items-center gap-1">
                               <Lock size={12} />
-                              Automatically Blocked
+                              Blocked
                             </span>
-                          ) : alert.blocked ? (
+                          ) : alert.blockedBy === 'manual' ? (
                             <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium inline-flex items-center gap-1">
                               <Lock size={12} />
-                              Manually Blocked
+                              Blocked
                             </span>
                           ) : (
                             <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium inline-flex items-center gap-1">
@@ -1396,27 +1396,11 @@ const StatsPage: React.FC = () => {
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          {alert.originallyBlocked ? (
-                            // Threat Automatically Blocked - nessun pulsante
+                          {alert.blockedBy === 'auto' ? (
+                            // Threat Automatically Blocked by rule - nessun pulsante
                             <span className="text-gray-500 text-xs">—</span>
-                          ) : !alert.blocked ? (
-                            // Threat Detected (non bloccata adesso) - mostra pulsante Block
-                            <button
-                              onClick={() => handleBlockThreat(alert.ip, alert.threat, alert.timestamp)}
-                              disabled={processingKey === getAlertKey(alert.ip, alert.threat) || !canBlockThreats}
-                              className={`px-2 py-1 rounded text-xs font-medium transition ${
-                                !canBlockThreats
-                                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                  : processingKey === getAlertKey(alert.ip, alert.threat)
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-red-600 hover:bg-red-700 text-white'
-                              }`}
-                              title={!canBlockThreats ? 'You do not have permission to block threats' : ''}
-                            >
-                              {processingKey === getAlertKey(alert.ip, alert.threat) ? '...' : 'Block'}
-                            </button>
-                          ) : (
-                            // Threat Manually Blocked adesso (original non bloccata ma adesso sì) - mostra pulsante Unblock
+                          ) : alert.blockedBy === 'manual' ? (
+                            // Threat Manually Blocked by operator - mostra pulsante Unblock
                             <button
                               onClick={() => handleUnblockThreat(alert.ip, alert.threat, alert.timestamp)}
                               disabled={processingKey === getAlertKey(alert.ip, alert.threat) || !canUnblockThreats}
@@ -1430,6 +1414,22 @@ const StatsPage: React.FC = () => {
                               title={!canUnblockThreats ? 'You do not have permission to unblock threats' : ''}
                             >
                               {processingKey === getAlertKey(alert.ip, alert.threat) ? '...' : 'Unblock'}
+                            </button>
+                          ) : (
+                            // Threat Detected (non bloccata) - mostra pulsante Block
+                            <button
+                              onClick={() => handleBlockThreat(alert.ip, alert.threat, alert.timestamp)}
+                              disabled={processingKey === getAlertKey(alert.ip, alert.threat) || !canBlockThreats}
+                              className={`px-2 py-1 rounded text-xs font-medium transition ${
+                                !canBlockThreats
+                                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                  : processingKey === getAlertKey(alert.ip, alert.threat)
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-red-600 hover:bg-red-700 text-white'
+                              }`}
+                              title={!canBlockThreats ? 'You do not have permission to block threats' : ''}
+                            >
+                              {processingKey === getAlertKey(alert.ip, alert.threat) ? '...' : 'Block'}
                             </button>
                           )}
                         </td>
