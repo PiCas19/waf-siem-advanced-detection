@@ -33,7 +33,6 @@ func GenerateOTPSecret() (string, error) {
 	// Encode as base32 without padding (common for TOTP secrets)
 	encoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 	secret := encoder.EncodeToString(randomBytes)
-	fmt.Printf("[OTP Secret Generation] Generated secret: %s (length: %d)\n", secret, len(secret))
 	return secret, nil
 }
 
@@ -54,7 +53,6 @@ func GenerateBackupCodes() ([]string, error) {
 // VerifyOTP verifies a TOTP code (6 digits)
 func VerifyOTP(secret string, code string) bool {
 	if len(code) != 6 {
-		fmt.Printf("[TOTP DEBUG] Code length invalid: %d\n", len(code))
 		return false
 	}
 
@@ -62,19 +60,14 @@ func VerifyOTP(secret string, code string) bool {
 	now := time.Now()
 	unixTime := now.Unix()
 	counter := unixTime / 30
-	fmt.Printf("[TOTP DEBUG] Current time: %s\n", now.Format("2006-01-02 15:04:05 MST"))
-	fmt.Printf("[TOTP DEBUG] Unix timestamp: %d\n", unixTime)
-	fmt.Printf("[TOTP DEBUG] Checking TOTP code '%s' at base counter: %d\n", code, counter)
 
 	// Check the current time window and adjacent windows (±2) to account for small clock skew
 	for _, timeOffset := range []int64{-2, -1, 0, 1, 2} {
 		if verifyTOTP(secret, code, counter+timeOffset) {
-			fmt.Printf("[TOTP DEBUG] SUCCESS: Code verified at offset %d\n", timeOffset)
 			return true
 		}
 	}
 
-	fmt.Printf("[TOTP DEBUG] FAILED: Code not verified at any time window\n")
 	return false
 }
 

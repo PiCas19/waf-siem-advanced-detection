@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { useToast } from '@/contexts/ToastContext';
 
 interface BlockedEntry {
   id: string | number;
@@ -30,6 +31,7 @@ interface FalsePositive {
 type Tab = 'blocklist' | 'whitelist' | 'false-positives';
 
 const BlocklistPage: React.FC = () => {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('blocklist');
   const [blocklist, setBlocklist] = useState<BlockedEntry[]>([]);
   const [whitelist, setWhitelist] = useState<WhitelistedEntry[]>([]);
@@ -91,7 +93,7 @@ const BlocklistPage: React.FC = () => {
   const handleAddBlock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!blockForm.ip) {
-      alert('IP is required');
+      showToast('IP is required', 'info', 4000);
       return;
     }
 
@@ -111,21 +113,20 @@ const BlocklistPage: React.FC = () => {
       });
 
       if (response.ok) {
-        alert('IP blocked successfully');
+        showToast('IP blocked successfully', 'success', 4000);
         setBlockForm({ ip: '', reason: '', permanent: false });
         setShowAddBlockForm(false);
         loadData();
       }
     } catch (error) {
-      console.error('Error blocking IP:', error);
-      alert('Failed to block IP');
+      showToast('Failed to block IP', 'error', 4000);
     }
   };
 
   const handleAddWhite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!whiteForm.ip) {
-      alert('IP is required');
+      showToast('IP is required', 'info', 4000);
       return;
     }
 
@@ -144,14 +145,13 @@ const BlocklistPage: React.FC = () => {
       });
 
       if (response.ok) {
-        alert('IP whitelisted successfully');
+        showToast('IP whitelisted successfully', 'success', 4000);
         setWhiteForm({ ip: '', reason: '' });
         setShowAddWhiteForm(false);
         loadData();
       }
     } catch (error) {
-      console.error('Error whitelisting IP:', error);
-      alert('Failed to whitelist IP');
+      showToast('Failed to whitelist IP', 'error', 4000);
     }
   };
 
@@ -166,12 +166,11 @@ const BlocklistPage: React.FC = () => {
       });
 
       if (response.ok) {
-        alert('Entry removed successfully');
+        showToast('Entry removed successfully', 'success', 4000);
         loadData();
       }
     } catch (error) {
-      console.error('Error deleting entry:', error);
-      alert('Failed to delete entry');
+      showToast('Failed to delete entry', 'error', 4000);
     }
   };
 
@@ -186,12 +185,11 @@ const BlocklistPage: React.FC = () => {
       });
 
       if (response.ok) {
-        alert('Entry removed successfully');
+        showToast('Entry removed successfully', 'success', 4000);
         loadData();
       }
     } catch (error) {
-      console.error('Error deleting entry:', error);
-      alert('Failed to delete entry');
+      showToast('Failed to delete entry', 'error', 4000);
     }
   };
 
@@ -208,12 +206,11 @@ const BlocklistPage: React.FC = () => {
       });
 
       if (response.ok) {
-        alert('Status updated successfully');
+        showToast('Status updated successfully', 'success', 4000);
         loadData();
       }
     } catch (error) {
-      console.error('Error updating status:', error);
-      alert('Failed to update status');
+      showToast('Failed to update status', 'error', 4000);
     }
   };
 

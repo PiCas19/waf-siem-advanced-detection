@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { RefreshCw, Clipboard, Download } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 
 const ForcedTwoFASetup: React.FC = () => {
   const navigate = useNavigate()
   const { setupTwoFA } = useAuth()
+  const { showToast } = useToast()
 
   const [twoFASecret, setTwoFASecret] = useState<string>('')
   const [twoFAOtpauth, setTwoFAOtpauth] = useState<string>('')
@@ -74,9 +76,9 @@ const ForcedTwoFASetup: React.FC = () => {
     if (!twoFASecret) return
     try {
       await navigator.clipboard.writeText(twoFASecret)
-      alert('Secret copied to clipboard')
+      showToast('Secret copied to clipboard', 'success')
     } catch (e) {
-      console.error('Copy failed', e)
+      showToast('Failed to copy secret', 'error')
     }
   }
 
@@ -140,9 +142,9 @@ const ForcedTwoFASetup: React.FC = () => {
   const copyBackupCodes = async () => {
     try {
       await navigator.clipboard.writeText(backupCodes.join('\n'))
-      alert('Backup codes copied to clipboard')
+      showToast('Backup codes copied to clipboard', 'success')
     } catch (e) {
-      console.error('Copy failed', e)
+      showToast('Failed to copy backup codes', 'error')
     }
   }
 

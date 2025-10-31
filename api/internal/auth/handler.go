@@ -351,17 +351,11 @@ func (h *AuthHandler) CompleteTwoFASetup(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("[2FA Setup DEBUG] User %v attempting 2FA confirmation\n", userID)
-	fmt.Printf("[2FA Setup DEBUG] Secret length: %d, Secret: %s\n", len(req.Secret), req.Secret)
-	fmt.Printf("[2FA Setup DEBUG] OTP Code: %s\n", req.OTPCode)
-
 	// Verify OTP code
 	if !VerifyOTP(req.Secret, req.OTPCode) {
-		fmt.Printf("[2FA Setup DEBUG] OTP verification FAILED\n")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid OTP code"})
 		return
 	}
-	fmt.Printf("[2FA Setup DEBUG] OTP verification PASSED\n")
 
 	var user models.User
 	if err := h.db.First(&user, userID).Error; err != nil {

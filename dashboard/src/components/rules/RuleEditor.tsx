@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { WAFRule } from '../../types/waf';
+import { useToast } from '@/contexts/ToastContext';
 
 interface RuleEditorProps {
   rule: WAFRule;
@@ -8,6 +9,7 @@ interface RuleEditorProps {
 }
 
 export default function RuleEditor({ rule, onRuleUpdated, onCancel }: RuleEditorProps) {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState({
     name: rule.name,
     pattern: rule.pattern,
@@ -43,7 +45,7 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel }: RuleEditor
     e.preventDefault();
 
     if (!formData.name || !formData.pattern) {
-      alert('Nome e Pattern sono obbligatori');
+      showToast('Nome e Pattern sono obbligatori', 'info', 4000);
       return;
     }
 
@@ -76,13 +78,12 @@ export default function RuleEditor({ rule, onRuleUpdated, onCancel }: RuleEditor
       if (response.ok) {
         const data = await response.json();
         onRuleUpdated(data.rule);
-        alert('Regola aggiornata con successo');
+        showToast('Regola aggiornata con successo', 'success', 4000);
       } else {
-        alert('Errore nell\'aggiornamento della regola');
+        showToast('Errore nell\'aggiornamento della regola', 'error', 4000);
       }
     } catch (error) {
-      console.error('Error updating rule:', error);
-      alert('Errore nel salvataggio della regola');
+      showToast('Errore nel salvataggio della regola', 'error', 4000);
     }
   };
 

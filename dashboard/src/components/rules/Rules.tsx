@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Shield } from 'lucide-react';
+import { useToast } from '@/contexts/ToastContext';
 
 interface WAFRule {
   id: string;
@@ -14,6 +15,7 @@ interface WAFRule {
 }
 
 const Rules: React.FC = () => {
+  const { showToast } = useToast();
   const [rules, setRules] = useState<WAFRule[]>([]);
   const [filteredRules, setFilteredRules] = useState<WAFRule[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -82,7 +84,7 @@ const Rules: React.FC = () => {
     e.preventDefault();
 
     if (!formData.name || !formData.pattern) {
-      alert('Nome e Pattern sono obbligatori');
+      showToast('Nome e Pattern sono obbligatori', 'info', 4000);
       return;
     }
 
@@ -108,7 +110,7 @@ const Rules: React.FC = () => {
             )
           );
           setEditingRule(null);
-          alert('Regola aggiornata con successo');
+          showToast('Regola aggiornata con successo', 'success', 4000);
         }
       } else {
         // Crea nuova regola
@@ -124,7 +126,7 @@ const Rules: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           setRules([...rules, data.rule]);
-          alert('Regola creata con successo');
+          showToast('Regola creata con successo', 'success', 4000);
         }
       }
 
@@ -138,8 +140,7 @@ const Rules: React.FC = () => {
       });
       setShowForm(false);
     } catch (error) {
-      console.error('Error saving rule:', error);
-      alert('Errore nel salvataggio della regola');
+      showToast('Errore nel salvataggio della regola', 'error', 4000);
     }
   };
 
@@ -158,11 +159,10 @@ const Rules: React.FC = () => {
         if (response.ok) {
           setRules(rules.filter(r => r.id !== id));
           setShowDetails(false);
-          alert('Regola eliminata con successo');
+          showToast('Regola eliminata con successo', 'success', 4000);
         }
       } catch (error) {
-        console.error('Error deleting rule:', error);
-        alert('Errore nell\'eliminazione della regola');
+        showToast('Errore nell\'eliminazione della regola', 'error', 4000);
       }
     }
   };

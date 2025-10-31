@@ -4,8 +4,10 @@ import RuleEditor from './RuleEditor';
 import RulesList from './RulesList';
 import RuleTest from './RuleTest';
 import { WAFRule, RulesResponse, getCreatedDate, getUpdatedDate } from '../../types/waf';
+import { useToast } from '@/contexts/ToastContext';
 
 export default function RulesContainer() {
+  const { showToast } = useToast();
   const [defaultRules, setDefaultRules] = useState<WAFRule[]>([]);
   const [customRules, setCustomRules] = useState<WAFRule[]>([]);
   const [view, setView] = useState<'list' | 'add' | 'edit'>('list');
@@ -56,7 +58,7 @@ export default function RulesContainer() {
     // Don't allow deleting default rules
     const isDefault = defaultRules.some(r => r.id === id);
     if (isDefault) {
-      alert('Cannot delete default rules');
+      showToast('Cannot delete default rules', 'info', 4000);
       return;
     }
 
@@ -74,11 +76,10 @@ export default function RulesContainer() {
         if (response.ok) {
           setCustomRules(customRules.filter(r => r.id !== id));
           setShowDetailsModal(false);
-          alert('Rule deleted successfully');
+          showToast('Rule deleted successfully', 'success', 4000);
         }
       } catch (error) {
-        console.error('Error deleting rule:', error);
-        alert('Error deleting rule');
+        showToast('Error deleting rule', 'error', 4000);
       }
     }
   };
@@ -87,7 +88,7 @@ export default function RulesContainer() {
     // Don't allow modifying default rules
     const isDefault = defaultRules.some(r => r.id === id);
     if (isDefault) {
-      alert('Cannot modify default rules');
+      showToast('Cannot modify default rules', 'info', 4000);
       return;
     }
 
