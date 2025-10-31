@@ -36,3 +36,6 @@ export const useToast = () => {
   }
   return context
 }
+
+// Alias for useToast (same functionality, different name)
+export const useSnackbar = useToast
