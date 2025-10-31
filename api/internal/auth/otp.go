@@ -113,6 +113,9 @@ func verifyTOTP(secret, code string, counter int64) bool {
 
 	generatedCode := fmt.Sprintf("%06d", codeValue)
 	fmt.Printf("[TOTP DEBUG] Counter: %d, Offset: %d, Generated: %s, Expected: %s, Match: %v\n", counter, offset, generatedCode, code, generatedCode == code)
+	fmt.Printf("[TOTP DEBUG] HMAC hex: %x\n", hash)
+	fmt.Printf("[TOTP DEBUG] code32 calculation: %x (offset+0)=%x (offset+1)=%x (offset+2)=%x (offset+3)=%x\n",
+		code32, hash[offset], hash[offset+1], hash[offset+2], hash[offset+3])
 
 	// Verify the code
 	return generatedCode == code
