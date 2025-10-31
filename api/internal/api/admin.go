@@ -73,7 +73,7 @@ func NewUpdateUserHandler(db *gorm.DB) gin.HandlerFunc {
 		var req struct {
 			Name   string `json:"name"`
 			Role   string `json:"role"`
-			Active bool   `json:"active"`
+			Active *bool  `json:"active"` // Optional: only update if provided
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -98,7 +98,10 @@ func NewUpdateUserHandler(db *gorm.DB) gin.HandlerFunc {
 		if req.Role != "" {
 			user.Role = req.Role
 		}
-		user.Active = req.Active
+		// Only update Active if explicitly provided
+	if req.Active != nil {
+		user.Active = *req.Active
+	}
 
 		if err := db.Save(&user).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user"})
