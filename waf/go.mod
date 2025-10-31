@@ -7,6 +7,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+// Local path for development
+replace github.com/PiCas19/waf-siem-advanced-detection/waf => ./
+
 require (
 	filippo.io/edwards25519 v1.0.0 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
