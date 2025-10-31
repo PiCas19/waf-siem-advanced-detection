@@ -4,7 +4,7 @@ import RuleEditor from './RuleEditor';
 import RulesList from './RulesList';
 import RuleTest from './RuleTest';
 import { WAFRule, RulesResponse, getCreatedDate, getUpdatedDate } from '../../types/waf';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/SnackbarContext';
 
 export default function RulesContainer() {
   const { showToast } = useToast();

@@ -11,7 +11,7 @@ import { useWebSocketStats } from '@/hooks/useWebSocketStats';
 import { fetchStats } from '@/services/api';
 import WorldMapSVG from '@/components/stats/WorldMap';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/SnackbarContext';
 import { hasPermission } from '@/types/rbac';
 
 interface WAFEvent {

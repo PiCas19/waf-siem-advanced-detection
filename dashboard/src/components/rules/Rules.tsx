@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Shield } from 'lucide-react';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/SnackbarContext';
 
 interface WAFRule {
   id: string;

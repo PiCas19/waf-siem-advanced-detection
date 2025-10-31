@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { WAFRule } from '../../types/waf';
-import { useToast } from '@/contexts/ToastContext';
+import { useToast } from '@/contexts/SnackbarContext';
 
 interface AddRuleProps {
   onRuleAdded: (rule: WAFRule) => void;
