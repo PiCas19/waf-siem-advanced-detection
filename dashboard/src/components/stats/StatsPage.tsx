@@ -11,6 +11,7 @@ import { useWebSocketStats } from '@/hooks/useWebSocketStats';
 import { fetchStats } from '@/services/api';
 import WorldMapSVG from '@/components/stats/WorldMap';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { hasPermission } from '@/types/rbac';
 
 interface WAFEvent {
@@ -206,6 +207,7 @@ const getSeverityColor = (count: number): string => {
 const StatsPage: React.FC = () => {
   const { stats, isConnected, onAlertReceived } = useWebSocketStats();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [timelineData, setTimelineData] = useState<ChartDataPoint[]>([]);
   const [threatTypeData, setThreatTypeData] = useState<any[]>([]);
   const [recentAlerts, setRecentAlerts] = useState<WAFEvent[]>([]);
@@ -741,13 +743,12 @@ const StatsPage: React.FC = () => {
       if (!resp.ok) {
         // rollback
         setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false } : a)));
-        alert('Errore nel blocco della threat');
+        showToast('Error blocking threat', 'error');
       }
     } catch (e) {
-      console.error('Block threat failed', e);
       // rollback
       setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false } : a)));
-      alert('Errore di rete nel blocco della threat');
+      showToast('Network error blocking threat', 'error');
     } finally {
       setProcessingKey(null);
     }
@@ -775,13 +776,12 @@ const StatsPage: React.FC = () => {
       if (!resp.ok) {
         // rollback
         setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true } : a)));
-        alert('Errore nello sblocco della threat');
+        showToast('Error unblocking threat', 'error');
       }
     } catch (e) {
-      console.error('Unblock threat failed', e);
       // rollback
       setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true } : a)));
-      alert('Errore di rete nello sblocco della threat');
+      showToast('Network error unblocking threat', 'error');
     } finally {
       setProcessingKey(null);
     }

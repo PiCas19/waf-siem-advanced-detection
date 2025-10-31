@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { WAFRule } from '../../types/waf';
+import { useToast } from '@/contexts/ToastContext';
 
 interface AddRuleProps {
   onRuleAdded: (rule: WAFRule) => void;
@@ -7,6 +8,7 @@ interface AddRuleProps {
 }
 
 export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
+  const { showToast } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     pattern: '',
@@ -41,7 +43,7 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
     e.preventDefault();
 
     if (!formData.name || !formData.pattern) {
-      alert('Rule name and pattern are required');
+      showToast('Rule name and pattern are required', 'info', 4000);
       return;
     }
 
@@ -74,7 +76,7 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
       if (response.ok) {
         const data = await response.json();
         onRuleAdded(data.rule);
-        alert('Rule created successfully');
+        showToast('Rule created successfully', 'success', 4000);
         setFormData({
           name: '',
           pattern: '',
@@ -88,11 +90,10 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
           redirectUrl: '',
         });
       } else {
-        alert('Error creating rule');
+        showToast('Error creating rule', 'error', 4000);
       }
     } catch (error) {
-      console.error('Error creating rule:', error);
-      alert('Error saving rule');
+      showToast('Error saving rule', 'error', 4000);
     }
   };
 
