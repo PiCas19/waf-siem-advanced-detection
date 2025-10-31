@@ -18,7 +18,7 @@ type SortField = 'email' | 'name' | 'role' | 'created_at'
 type SortOrder = 'asc' | 'desc'
 
 const Users: React.FC = () => {
-  const { token, isLoading: authLoading } = useAuth()
+  const { token, user: currentUser, isLoading: authLoading } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -398,8 +398,13 @@ const Users: React.FC = () => {
                       <td className="px-6 py-4 text-sm flex gap-2">
                         <button
                           onClick={() => handleEditUser(user)}
-                          className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition"
-                          title="Edit user"
+                          disabled={currentUser && user.id === currentUser.id}
+                          className={`p-2 rounded transition ${
+                            currentUser && user.id === currentUser.id
+                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                              : 'bg-blue-600 hover:bg-blue-700 text-white'
+                          }`}
+                          title={currentUser && user.id === currentUser.id ? 'Cannot edit your own account' : 'Edit user'}
                         >
                           <Edit2 size={16} />
                         </button>
@@ -408,8 +413,13 @@ const Users: React.FC = () => {
                             setDeleteUserId(user.id)
                             setShowDeleteConfirm(true)
                           }}
-                          className="p-2 bg-red-600 hover:bg-red-700 text-white rounded transition"
-                          title="Delete user"
+                          disabled={currentUser && user.id === currentUser.id}
+                          className={`p-2 rounded transition ${
+                            currentUser && user.id === currentUser.id
+                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                              : 'bg-red-600 hover:bg-red-700 text-white'
+                          }`}
+                          title={currentUser && user.id === currentUser.id ? 'Cannot delete your own account' : 'Delete user'}
                         >
                           <Trash2 size={16} />
                         </button>
