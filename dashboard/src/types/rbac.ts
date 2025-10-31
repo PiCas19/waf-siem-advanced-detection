@@ -118,13 +118,13 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   },
 
   analyst: {
-    // Analysts: can only view stats (no threat actions) and view logs
+    // Analysts: can only view dashboard/stats (no threat actions)
     dashboard: true,
     rules_view: false,
     rules_create: false,
     rules_edit: false,
     rules_delete: false,
-    logs_view: true,
+    logs_view: false,
     logs_export: false,
     logs_delete: false,
     blocklist_view: false,
