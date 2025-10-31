@@ -45,8 +45,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 		// Blocklist endpoints
 		protected.GET("/blocklist", GetBlocklist)
-		protected.POST("/blocklist", BlockIP)
-		protected.DELETE("/blocklist/:ip", UnblockIP)
+		protected.POST("/blocklist", NewBlockIPHandler(db))
+		protected.DELETE("/blocklist/:ip", NewUnblockIPHandler(db))
 
 		// Whitelist endpoints
 		protected.GET("/whitelist", NewGetWhitelistHandler(db))

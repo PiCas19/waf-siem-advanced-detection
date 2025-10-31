@@ -5,6 +5,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 )
 
 // BlockedIP - IP bloccato dal WAF
@@ -43,8 +46,22 @@ func GetBlocklist(c *gin.Context) {
 	})
 }
 
-// BlockIP - Blocca un IP (aggiunge alla blocklist)
-func BlockIP(c *gin.Context) {
+// NewBlockIPHandler - Factory function per creare un handler per bloccare IP
+func NewBlockIPHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		BlockIPWithDB(db, c)
+	}
+}
+
+// NewUnblockIPHandler - Factory function per creare un handler per sbloccare IP
+func NewUnblockIPHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		UnblockIPWithDB(db, c)
+	}
+}
+
+// BlockIPWithDB - Blocca un IP (aggiunge alla blocklist e aggiorna i log nel DB)
+func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 	var req struct {
 		IP        string `json:"ip" binding:"required"`
 		Reason    string `json:"reason"`
@@ -89,6 +106,13 @@ func BlockIP(c *gin.Context) {
 
 	blockedIPs[req.IP] = blockedIP
 
+	// Update all logs for this IP to set BlockedBy = "manual"
+	if err := db.Model(&models.Log{}).Where("client_ip = ?", req.IP).Update("blocked_by", "manual").Error; err != nil {
+		// Log the error but don't fail the request
+		c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
+		return
+	}
+
 	c.JSON(201, gin.H{
 		"message": "IP blocked successfully",
 		"ip": req.IP,
@@ -96,8 +120,8 @@ func BlockIP(c *gin.Context) {
 	})
 }
 
-// UnblockIP - Sblocca un IP
-func UnblockIP(c *gin.Context) {
+// UnblockIPWithDB - Sblocca un IP e ripristina lo status dei log
+func UnblockIPWithDB(db *gorm.DB, c *gin.Context) {
 	ip := c.Param("ip")
 
 	blockedMu.Lock()
@@ -105,11 +129,26 @@ func UnblockIP(c *gin.Context) {
 
 	if _, exists := blockedIPs[ip]; exists {
 		delete(blockedIPs, ip)
+
+		// Update all logs for this IP to remove "manual" BlockedBy status
+		// Set BlockedBy back to "auto" if they were originally blocked, else "" if not blocked
+		if err := db.Model(&models.Log{}).
+			Where("client_ip = ? AND blocked_by = ?", ip, "manual").
+			Update("blocked_by", "").Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
+			return
+		}
+
 		c.JSON(200, gin.H{"message": "IP unblocked successfully"})
 		return
 	}
 
 	c.JSON(404, gin.H{"error": "IP not found in blocklist"})
+}
+
+// UnblockIP - Deprecated: use NewUnblockIPHandler instead
+func UnblockIP(c *gin.Context) {
+	c.JSON(400, gin.H{"error": "use NewUnblockIPHandler"})
 }
 
 // IsIPBlocked - Controlla se un IP è bloccato
