@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
-import { ToastProvider, useToast } from '@/contexts/ToastContext'
-import ProtectedRoute from '@/components/auth/ProtectedRoute'
+import { ToastProvider, useToast } from '@/contexts/SnackbarContext'
+import ProtectedRoute from '@/components/ProtectedRoute'
 import Login from '@/components/auth/Login'
 import SetPassword from '@/components/auth/SetPassword'
 import ForcedTwoFASetup from '@/components/auth/ForcedTwoFASetup'
@@ -9,15 +9,17 @@ import Dashboard from '@/components/Dashboard'
 import Settings from '@/components/auth/Settings'
 import Profile from '@/components/auth/Profile'
 import Users from '@/components/admin/Users'
-import Toast from '@/components/Toast'
+import Snackbar from '@/components/common/Snackbar'
 
-function ToastContainer() {
+function SnackbarContainer() {
   const { toasts, removeToast } = useToast()
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
-      {toasts.map(toast => (
-        <Toast key={toast.id} message={toast} onClose={removeToast} />
+    <div className="fixed bottom-4 left-4 z-9999 space-y-2 max-w-sm pointer-events-none">
+      {toasts.map(snackbar => (
+        <div key={snackbar.id} className="pointer-events-auto">
+          <Snackbar message={snackbar} onClose={removeToast} />
+        </div>
       ))}
     </div>
   )
@@ -26,7 +28,7 @@ function ToastContainer() {
 function AppContent() {
   return (
     <>
-      <ToastContainer />
+      <SnackbarContainer />
       <Routes>
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
