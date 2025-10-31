@@ -377,10 +377,11 @@ func (h *AuthHandler) CompleteTwoFASetup(c *gin.Context) {
 		return
 	}
 
-	// Update user with 2FA
+	// Update user with 2FA and activate account
 	user.TwoFAEnabled = true
 	user.OTPSecret = req.Secret
 	user.BackupCodes = string(backupCodesJSON)
+	user.Active = true
 
 	if err := h.db.Save(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save 2FA setup"})
