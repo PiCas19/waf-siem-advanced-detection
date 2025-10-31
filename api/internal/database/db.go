@@ -34,6 +34,7 @@ func Initialize(dbPath string) (*gorm.DB, error) {
 		&models.Rule{},
 		&models.Log{},
 		&models.BlockedIP{},
+		&models.AuditLog{},
 	)
 	if err != nil {
 		return nil, err
