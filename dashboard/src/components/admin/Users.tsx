@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react'
 import axios from 'axios'
 import { Trash2, Edit2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useSnackbar } from '@/contexts/SnackbarContext'
 
 interface User {
   id: number
@@ -19,6 +20,7 @@ type SortOrder = 'asc' | 'desc'
 
 const Users: React.FC = () => {
   const { token, user: currentUser, isLoading: authLoading } = useAuth()
+  const { showToast } = useSnackbar()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -28,7 +30,6 @@ const Users: React.FC = () => {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [role, setRole] = useState('user')
-  const [message, setMessage] = useState('')
   const [formLoading, setFormLoading] = useState(false)
 
   // Edit modal state
@@ -122,7 +123,6 @@ const Users: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    setMessage('')
     setFormLoading(true)
     try {
       await axios.post('/api/admin/users', { email, name, role }, {
@@ -130,7 +130,7 @@ const Users: React.FC = () => {
           'Authorization': `Bearer ${token}`
         }
       })
-      setMessage('User created successfully!')
+      showToast('User created successfully!', 'success')
       setEmail('')
       setName('')
       setRole('user')
@@ -140,7 +140,7 @@ const Users: React.FC = () => {
       // Reload list
       await loadUsers()
     } catch (err: any) {
-      setMessage(err.response?.data?.error || 'Creation failed')
+      showToast(err.response?.data?.error || 'Creation failed', 'error')
     } finally {
       setFormLoading(false)
     }
@@ -155,11 +155,12 @@ const Users: React.FC = () => {
           'Authorization': `Bearer ${token}`
         }
       })
+      showToast('User deleted successfully!', 'success')
       setShowDeleteConfirm(false)
       setDeleteUserId(null)
       await loadUsers()
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to delete user')
+      showToast(err.response?.data?.error || 'Failed to delete user', 'error')
     } finally {
       setDeleteLoading(false)
     }
@@ -181,11 +182,12 @@ const Users: React.FC = () => {
           'Authorization': `Bearer ${token}`
         }
       })
+      showToast('User updated successfully!', 'success')
       setShowEditModal(false)
       setEditingUser(null)
       await loadUsers()
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update user')
+      showToast(err.response?.data?.error || 'Failed to update user', 'error')
     } finally {
       setEditLoading(false)
     }
@@ -263,12 +265,6 @@ const Users: React.FC = () => {
               <option value="user">User</option>
             </select>
           </div>
-
-          {message && (
-            <div className={`text-sm p-2 rounded mb-4 ${message.includes('success') || message.includes('successfully') ? 'bg-green-900 text-green-100' : 'bg-red-900 text-red-100'}`}>
-              {message}
-            </div>
-          )}
 
           <div className="flex gap-2">
             <button
