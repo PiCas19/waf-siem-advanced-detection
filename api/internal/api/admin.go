@@ -162,7 +162,7 @@ func NewDeleteUserHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		if err := db.Delete(&user).Error; err != nil {
+		if err := db.Unscoped().Delete(&user).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user"})
 			return
 		}
