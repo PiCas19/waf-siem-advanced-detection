@@ -398,7 +398,7 @@ const Users: React.FC = () => {
                       <td className="px-6 py-4 text-sm flex gap-2">
                         <button
                           onClick={() => handleEditUser(user)}
-                          disabled={currentUser && user.id === currentUser.id}
+                          disabled={!!(currentUser && user.id === currentUser.id)}
                           className={`p-2 rounded transition ${
                             currentUser && user.id === currentUser.id
                               ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
@@ -413,7 +413,7 @@ const Users: React.FC = () => {
                             setDeleteUserId(user.id)
                             setShowDeleteConfirm(true)
                           }}
-                          disabled={currentUser && user.id === currentUser.id}
+                          disabled={!!(currentUser && user.id === currentUser.id)}
                           className={`p-2 rounded transition ${
                             currentUser && user.id === currentUser.id
                               ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
