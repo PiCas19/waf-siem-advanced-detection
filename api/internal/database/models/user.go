@@ -16,7 +16,7 @@ type User struct {
 	PasswordHash string `gorm:"not null" json:"-"`
 	Name         string `json:"name"`
 	Role         string `gorm:"default:'user'" json:"role"` // user, admin
-	Active       bool   `gorm:"default:true" json:"active"`
+	Active       bool   `gorm:"default:false" json:"active"`
 
 	// 2FA (OTP) fields
 	TwoFAEnabled bool   `gorm:"default:false" json:"two_fa_enabled"`
