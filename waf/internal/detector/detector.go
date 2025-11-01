@@ -12,7 +12,8 @@ type Threat struct {
 	Severity    string
 	ClientIP    string
 	Payload     string
-	IsDefault   bool // Indicates if this threat was detected by a default rule (always blocks)
+	IsDefault   bool   // Indicates if this threat was detected by a default rule (always blocks)
+	Action      string // "log" or "block" - action to take for custom rules
 }
 
 type Detector struct {
@@ -29,6 +30,7 @@ type Detector struct {
 	respSplit        *ResponseSplittingDetector
 	protoPollution   *PrototypePollutionDetector
 	pathTraversal    *PathTraversalDetector
+	customRules      *CustomRuleDetector
 }
 
 func NewDetector() *Detector {
@@ -46,7 +48,13 @@ func NewDetector() *Detector {
 		respSplit:      NewResponseSplittingDetector(),
 		protoPollution: NewPrototypePollutionDetector(),
 		pathTraversal:  NewPathTraversalDetector(),
+		customRules:    NewCustomRuleDetector(),
 	}
+}
+
+// UpdateCustomRules updates the detector with custom rules from database
+func (d *Detector) UpdateCustomRules(rules []*CustomRule) error {
+	return d.customRules.UpdateRules(rules)
 }
 
 func (d *Detector) Inspect(r *http.Request) *Threat {
@@ -88,6 +96,7 @@ func (d *Detector) Inspect(r *http.Request) *Threat {
 }
 
 func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
+	// Check default detectors first
 	if detected, desc := d.xss.Detect(value); detected {
 		return &Threat{Type: "XSS", Description: desc, Severity: "HIGH", Payload: value, IsDefault: true}
 	}
@@ -127,5 +136,18 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 	if detected, desc := d.protoPollution.Detect(value); detected {
 		return &Threat{Type: "PROTOTYPE_POLLUTION", Description: desc, Severity: "HIGH", Payload: value, IsDefault: true}
 	}
+
+	// Check custom rules
+	if customRule := d.customRules.Detect(value); customRule != nil {
+		return &Threat{
+			Type:        customRule.Type,
+			Description: customRule.Name,
+			Severity:    customRule.Severity,
+			Payload:     value,
+			IsDefault:   false, // Mark as custom rule
+			Action:      customRule.Action, // "log" or "block"
+		}
+	}
+
 	return nil
 }

@@ -12,6 +12,8 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/detector"
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/logger"
@@ -24,14 +26,16 @@ func init() {
 
 // Middleware implements WAF functionality for Caddy
 type Middleware struct {
-	RulesFile  string `json:"rules_file,omitempty"`
-	LogFile    string `json:"log_file,omitempty"`
-	BlockMode  bool   `json:"block_mode,omitempty"`
+	RulesFile   string `json:"rules_file,omitempty"`
+	LogFile     string `json:"log_file,omitempty"`
+	BlockMode   bool   `json:"block_mode,omitempty"`
 	APIEndpoint string `json:"api_endpoint,omitempty"`
+	DBPath      string `json:"db_path,omitempty"` // SQLite database path for custom rules
 
-	detector *detector.Detector
-	logger   *logger.Logger
+	detector   *detector.Detector
+	logger     *logger.Logger
 	httpClient *http.Client
+	db         *gorm.DB
 }
 
 // CaddyModule returns the Caddy module information
@@ -61,6 +65,66 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		Timeout: 5 * time.Second,
 	}
 
+	// Initialize database connection and load custom rules
+	if m.DBPath != "" {
+		db, err := gorm.Open(sqlite.Open(m.DBPath), &gorm.Config{})
+		if err != nil {
+			return fmt.Errorf("failed to connect to database: %v", err)
+		}
+		m.db = db
+
+		// Load custom rules from database
+		if err := m.loadCustomRules(); err != nil {
+			fmt.Printf("[WARN] Failed to load custom rules: %v\n", err)
+			// Don't fail if custom rules can't be loaded, WAF should still work with default rules
+		}
+	}
+
+	return nil
+}
+
+// loadCustomRules loads custom rules from the database and updates the detector
+func (m *Middleware) loadCustomRules() error {
+	if m.db == nil {
+		return nil
+	}
+
+	// Define Rule struct inline to avoid circular imports
+	type Rule struct {
+		ID          uint
+		Name        string
+		Pattern     string
+		Type        string
+		Severity    string
+		Enabled     bool
+		Action      string
+	}
+
+	var rules []Rule
+	if err := m.db.Where("enabled = ?", true).Find(&rules).Error; err != nil {
+		return err
+	}
+
+	// Convert to detector CustomRule format
+	customRules := make([]*detector.CustomRule, 0)
+	for _, rule := range rules {
+		customRules = append(customRules, &detector.CustomRule{
+			ID:       rule.ID,
+			Name:     rule.Name,
+			Pattern:  rule.Pattern,
+			Type:     rule.Type,
+			Severity: rule.Severity,
+			Enabled:  rule.Enabled,
+			Action:   rule.Action,
+		})
+	}
+
+	// Update detector with custom rules
+	if err := m.detector.UpdateCustomRules(customRules); err != nil {
+		return fmt.Errorf("failed to update custom rules in detector: %v", err)
+	}
+
+	fmt.Printf("[INFO] WAF: Loaded %d custom rules from database\n", len(customRules))
 	return nil
 }
 
@@ -92,8 +156,16 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			go m.sendEventToAPI(r, clientIP, threat)
 		}
 
-		// Block request if in block mode OR if it's a default rule (default rules always block)
-		if m.BlockMode || threat.IsDefault {
+		// Determine if we should block the request:
+		// 1. Default rules always block (IsDefault: true)
+		// 2. Custom rules block if action is "block"
+		// 3. Global block mode blocks everything
+		shouldBlock := m.BlockMode || threat.IsDefault
+		if !threat.IsDefault && threat.Action == "block" {
+			shouldBlock = true
+		}
+
+		if shouldBlock {
 			return m.blockRequest(w, threat)
 		}
 	}
@@ -120,8 +192,14 @@ func (m *Middleware) blockRequest(w http.ResponseWriter, threat *detector.Threat
 
 // sendEventToAPI sends a threat event to the backend API
 func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *detector.Threat) {
-	// Default rules always block, regardless of BlockMode setting
+	// Determine if the request is actually blocked:
+	// 1. Default rules always block (IsDefault: true)
+	// 2. Custom rules block if action is "block"
+	// 3. Global block mode blocks everything
 	blocked := m.BlockMode || threat.IsDefault
+	if !threat.IsDefault && threat.Action == "block" {
+		blocked = true
+	}
 
 	eventPayload := map[string]interface{}{
 		"ip":         clientIP,
@@ -203,6 +281,10 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				m.BlockMode = mode == "true"
 			case "api_endpoint":
 				if !d.Args(&m.APIEndpoint) {
+					return d.ArgErr()
+				}
+			case "db_path":
+				if !d.Args(&m.DBPath) {
 					return d.ArgErr()
 				}
 			default:
