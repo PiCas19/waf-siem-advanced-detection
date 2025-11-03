@@ -86,7 +86,6 @@
             log_file /var/log/caddy/waf_wan.log
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
-            db_path /home/caddy/waf-siem-advanced-detection/api/waf.db
         }
         
         root * /var/www/html
@@ -191,7 +190,6 @@
             log_file /var/log/caddy/waf_lan.log
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
-            db_path /home/caddy/waf-siem-advanced-detection/api/waf.db
         }
 
         root * /var/www/html
@@ -292,7 +290,6 @@ http://172.16.216.10 {
             log_file /var/log/caddy/waf_lan.log
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
-            db_path /home/caddy/waf-siem-advanced-detection/api/waf.db
         }
 
         root * /var/www/html
