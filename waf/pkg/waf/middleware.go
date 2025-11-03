@@ -12,8 +12,6 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/detector"
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/logger"
@@ -26,16 +24,15 @@ func init() {
 
 // Middleware implements WAF functionality for Caddy
 type Middleware struct {
-	RulesFile   string `json:"rules_file,omitempty"`
-	LogFile     string `json:"log_file,omitempty"`
-	BlockMode   bool   `json:"block_mode,omitempty"`
-	APIEndpoint string `json:"api_endpoint,omitempty"`
-	DBPath      string `json:"db_path,omitempty"` // SQLite database path for custom rules
+	RulesFile     string `json:"rules_file,omitempty"`
+	LogFile       string `json:"log_file,omitempty"`
+	BlockMode     bool   `json:"block_mode,omitempty"`
+	APIEndpoint   string `json:"api_endpoint,omitempty"`
+	RulesEndpoint string `json:"rules_endpoint,omitempty"` // API endpoint to fetch custom rules
 
 	detector       *detector.Detector
 	logger         *logger.Logger
 	httpClient     *http.Client
-	db             *gorm.DB
 	stopRuleReload chan bool // Channel to stop rule reloading goroutine
 }
 
@@ -66,21 +63,14 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		Timeout: 5 * time.Second,
 	}
 
-	// Initialize database connection and load custom rules
-	if m.DBPath != "" {
-		db, err := gorm.Open(sqlite.Open(m.DBPath), &gorm.Config{})
-		if err != nil {
-			return fmt.Errorf("failed to connect to database: %v", err)
-		}
-		m.db = db
-
-		// Load custom rules from database
-		if err := m.loadCustomRules(); err != nil {
-			fmt.Printf("[WARN] Failed to load custom rules: %v\n", err)
+	// Load initial custom rules from API endpoint
+	if m.RulesEndpoint != "" {
+		if err := m.loadCustomRulesFromAPI(); err != nil {
+			fmt.Printf("[WARN] Failed to load custom rules from API: %v\n", err)
 			// Don't fail if custom rules can't be loaded, WAF should still work with default rules
 		}
 
-		// Start background goroutine to periodically reload rules from database
+		// Start background goroutine to periodically reload rules from API
 		m.stopRuleReload = make(chan bool, 1)
 		go m.reloadRulesBackground()
 	}
@@ -88,31 +78,47 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	return nil
 }
 
-// loadCustomRules loads custom rules from the database and updates the detector
-func (m *Middleware) loadCustomRules() error {
-	if m.db == nil {
+// loadCustomRulesFromAPI fetches custom rules from the API endpoint and updates the detector
+func (m *Middleware) loadCustomRulesFromAPI() error {
+	if m.RulesEndpoint == "" {
 		return nil
+	}
+
+	// Fetch rules from API
+	resp, err := m.httpClient.Get(m.RulesEndpoint)
+	if err != nil {
+		return fmt.Errorf("failed to fetch rules from API: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("API returned status %d", resp.StatusCode)
 	}
 
 	// Define Rule struct inline to avoid circular imports
 	type Rule struct {
-		ID          uint
-		Name        string
-		Pattern     string
-		Type        string
-		Severity    string
-		Enabled     bool
-		Action      string
+		ID          uint   `json:"id"`
+		Name        string `json:"name"`
+		Pattern     string `json:"pattern"`
+		Type        string `json:"type"`
+		Severity    string `json:"severity"`
+		Enabled     bool   `json:"enabled"`
+		Action      string `json:"action"`
 	}
 
-	var rules []Rule
-	if err := m.db.Where("enabled = ?", true).Find(&rules).Error; err != nil {
-		return err
+	type APIResponse struct {
+		Rules []Rule `json:"rules"`
+		Count int    `json:"count"`
+	}
+
+	var apiResponse APIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
+		return fmt.Errorf("failed to decode API response: %v", err)
 	}
 
 	// Convert to detector CustomRule format
 	customRules := make([]*detector.CustomRule, 0)
-	for _, rule := range rules {
+	for _, rule := range apiResponse.Rules {
 		customRules = append(customRules, &detector.CustomRule{
 			ID:       rule.ID,
 			Name:     rule.Name,
@@ -129,16 +135,16 @@ func (m *Middleware) loadCustomRules() error {
 		return fmt.Errorf("failed to update custom rules in detector: %v", err)
 	}
 
-	fmt.Printf("[INFO] WAF: Loaded %d custom rules from database\n", len(customRules))
+	fmt.Printf("[INFO] WAF: Loaded %d custom rules from API\n", len(customRules))
 	return nil
 }
 
-// reloadRulesBackground periodically reloads custom rules from database
+// reloadRulesBackground periodically reloads custom rules from API
 func (m *Middleware) reloadRulesBackground() {
 	ticker := time.NewTicker(60 * time.Second) // Reload every 60 seconds
 	defer ticker.Stop()
 
-	fmt.Printf("[INFO] WAF: Started background rule reloading (every 60 seconds)\n")
+	fmt.Printf("[INFO] WAF: Started background rule reloading from API (every 60 seconds)\n")
 
 	for {
 		select {
@@ -146,8 +152,8 @@ func (m *Middleware) reloadRulesBackground() {
 			fmt.Printf("[INFO] WAF: Stopped background rule reloading\n")
 			return
 		case <-ticker.C:
-			if err := m.loadCustomRules(); err != nil {
-				fmt.Printf("[WARN] WAF: Failed to reload custom rules: %v\n", err)
+			if err := m.loadCustomRulesFromAPI(); err != nil {
+				fmt.Printf("[WARN] WAF: Failed to reload custom rules from API: %v\n", err)
 			}
 		}
 	}
@@ -319,8 +325,8 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				if !d.Args(&m.APIEndpoint) {
 					return d.ArgErr()
 				}
-			case "db_path":
-				if !d.Args(&m.DBPath) {
+			case "rules_endpoint":
+				if !d.Args(&m.RulesEndpoint) {
 					return d.ArgErr()
 				}
 			default:

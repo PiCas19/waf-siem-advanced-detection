@@ -16,6 +16,12 @@ type RulesResponse struct {
 	TotalRules   int            `json:"total_rules"`
 }
 
+// CustomRulesResponse contiene solo le regole custom per il WAF
+type CustomRulesResponse struct {
+	Rules []models.Rule `json:"rules"`
+	Count int           `json:"count"`
+}
+
 // GetRules - Ritorna sia le regole di default che quelle custom dal database
 func NewGetRulesHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -33,6 +39,25 @@ func NewGetRulesHandler(db *gorm.DB) gin.HandlerFunc {
 			DefaultRules: defaultRules,
 			CustomRules:  customRules,
 			TotalRules:   len(defaultRules) + len(customRules),
+		}
+
+		c.JSON(200, response)
+	}
+}
+
+// GetCustomRules - Ritorna solo le regole custom abilitate per il WAF
+func NewGetCustomRulesHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var customRules []models.Rule
+		if err := db.Where("enabled = ?", true).Find(&customRules).Error; err != nil {
+			fmt.Printf("[ERROR] Failed to fetch custom rules: %v\n", err)
+			c.JSON(500, gin.H{"error": "failed to fetch custom rules"})
+			return
+		}
+
+		response := CustomRulesResponse{
+			Rules: customRules,
+			Count: len(customRules),
 		}
 
 		c.JSON(200, response)

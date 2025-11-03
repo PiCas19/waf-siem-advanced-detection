@@ -24,6 +24,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		// endpoint for users to set password using an invite/reset token
 		public.POST("/auth/set-password", authHandler.SetPasswordWithToken)
 		public.POST("/waf/event", NewWAFEventHandler(db))
+		// WAF endpoint to fetch custom rules
+		public.GET("/waf/custom-rules", NewGetCustomRulesHandler(db))
 	}
 
 	protected := r.Group("/api")
