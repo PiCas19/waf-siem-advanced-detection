@@ -76,6 +76,8 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 			fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)
 		}
 
+		// Set BlockedBy before broadcasting
+		event.BlockedBy = blockedBy
 		websocket.Broadcast(event)
 
 		c.JSON(200, gin.H{"status": "event_received"})
@@ -117,6 +119,7 @@ func WAFStatsHandler(c *gin.Context) {
 				IP:        log.ClientIP,
 				Threat:    log.ThreatType,
 				Blocked:   log.Blocked,
+				BlockedBy: log.BlockedBy,
 				Timestamp: log.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 				Method:    log.Method,
 				Path:      log.URL,

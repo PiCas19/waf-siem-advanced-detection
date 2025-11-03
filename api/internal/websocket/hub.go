@@ -31,6 +31,7 @@ type WAFEvent struct {
 	Timestamp string `json:"timestamp"`
 	Threat    string `json:"threat"`
 	Blocked   bool   `json:"blocked"`
+	BlockedBy string `json:"blocked_by"`
 }
 
 func init() {

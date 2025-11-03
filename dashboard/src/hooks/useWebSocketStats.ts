@@ -14,6 +14,7 @@ interface WAFEvent {
   timestamp: string;
   threat: string;
   blocked: boolean;
+  blockedBy?: string;
   user_agent?: string;
 }
 
@@ -135,6 +136,7 @@ export function useWebSocketStats() {
               timestamp: wafEvent.timestamp || new Date().toISOString(),
               threat: wafEvent.threat || 'Unknown',
               blocked: wafEvent.blocked || false,
+              blockedBy: wafEvent.blocked_by || wafEvent.blockedBy || '',
               user_agent: wafEvent.user_agent,
             };
 
