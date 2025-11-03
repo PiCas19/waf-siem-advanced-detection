@@ -32,10 +32,11 @@ type Middleware struct {
 	APIEndpoint string `json:"api_endpoint,omitempty"`
 	DBPath      string `json:"db_path,omitempty"` // SQLite database path for custom rules
 
-	detector   *detector.Detector
-	logger     *logger.Logger
-	httpClient *http.Client
-	db         *gorm.DB
+	detector       *detector.Detector
+	logger         *logger.Logger
+	httpClient     *http.Client
+	db             *gorm.DB
+	stopRuleReload chan bool // Channel to stop rule reloading goroutine
 }
 
 // CaddyModule returns the Caddy module information
@@ -78,6 +79,10 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 			fmt.Printf("[WARN] Failed to load custom rules: %v\n", err)
 			// Don't fail if custom rules can't be loaded, WAF should still work with default rules
 		}
+
+		// Start background goroutine to periodically reload rules from database
+		m.stopRuleReload = make(chan bool, 1)
+		go m.reloadRulesBackground()
 	}
 
 	return nil
@@ -126,6 +131,26 @@ func (m *Middleware) loadCustomRules() error {
 
 	fmt.Printf("[INFO] WAF: Loaded %d custom rules from database\n", len(customRules))
 	return nil
+}
+
+// reloadRulesBackground periodically reloads custom rules from database
+func (m *Middleware) reloadRulesBackground() {
+	ticker := time.NewTicker(60 * time.Second) // Reload every 60 seconds
+	defer ticker.Stop()
+
+	fmt.Printf("[INFO] WAF: Started background rule reloading (every 60 seconds)\n")
+
+	for {
+		select {
+		case <-m.stopRuleReload:
+			fmt.Printf("[INFO] WAF: Stopped background rule reloading\n")
+			return
+		case <-ticker.C:
+			if err := m.loadCustomRules(); err != nil {
+				fmt.Printf("[WARN] WAF: Failed to reload custom rules: %v\n", err)
+			}
+		}
+	}
 }
 
 // ServeHTTP implements the middleware handler
