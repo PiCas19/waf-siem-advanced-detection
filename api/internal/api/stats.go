@@ -41,6 +41,14 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 
 		event.Timestamp = time.Now().Format("2006-01-02T15:04:05Z07:00")
 
+		// Determine blockedBy BEFORE saving to memory or database
+		blockedBy := ""
+		if event.Blocked {
+			blockedBy = "auto" // Bloccato automaticamente da una regola
+		}
+		event.BlockedBy = blockedBy
+		fmt.Printf("[INFO] Setting BlockedBy=%s for threat=%s (blocked=%v)\n", blockedBy, event.Threat, event.Blocked)
+
 		statsMu.Lock()
 		stats.ThreatsDetected++
 		if event.Blocked {
@@ -58,10 +66,6 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 		statsMu.Unlock()
 
 		// Save event to database
-		blockedBy := ""
-		if event.Blocked {
-			blockedBy = "auto" // Bloccato automaticamente da una regola
-		}
 		log := models.Log{
 			ThreatType:  event.Threat,
 			ClientIP:    event.IP,
@@ -76,8 +80,6 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 			fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)
 		}
 
-		// Set BlockedBy before broadcasting
-		event.BlockedBy = blockedBy
 		websocket.Broadcast(event)
 
 		c.JSON(200, gin.H{"status": "event_received"})
