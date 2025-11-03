@@ -201,6 +201,16 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 		blocked = true
 	}
 
+	// Determine blocked_by field for dashboard display
+	blockedBy := ""
+	if blocked {
+		if m.BlockMode || threat.IsDefault {
+			blockedBy = "auto" // Blocked by default/global rule
+		} else if threat.Action == "block" {
+			blockedBy = "auto" // Blocked by custom rule with action "block"
+		}
+	}
+
 	eventPayload := map[string]interface{}{
 		"ip":         clientIP,
 		"threat":     threat.Type,
@@ -210,6 +220,7 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 		"user_agent": r.UserAgent(),
 		"timestamp":  time.Now().Format(time.RFC3339),
 		"blocked":    blocked,
+		"blocked_by": blockedBy,
 	}
 
 	jsonData, err := json.Marshal(eventPayload)
