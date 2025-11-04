@@ -1,7 +1,6 @@
 package api
 
 import (
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -10,42 +9,24 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 )
 
-// BlockedIP - IP bloccato dal WAF per uno specifico tipo di minaccia
-type BlockedIP struct {
-	ID        string    `json:"id" gorm:"primaryKey"`
-	IP        string    `json:"ip" gorm:"index"`
-	ThreatType string   `json:"threat_type"` // Tipo di minaccia per cui l'IP è bloccato
-	Reason    string    `json:"reason"`
-	BlockedAt time.Time `json:"blocked_at"`
-	ExpiresAt *time.Time `json:"expires_at"`
-	Permanent bool      `json:"permanent"`
-}
+// GetBlocklist - Ritorna la lista degli IP bloccati da database
+func GetBlocklist(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var blockedIPs []models.BlockedIP
+		now := time.Now()
 
-var (
-	blockedMu sync.RWMutex
-	// Mappa: "ip::threatType" -> BlockedIP (così possiamo avere lo stesso IP bloccato per minacce diverse)
-	blockedIPs = make(map[string]BlockedIP)
-)
-
-// GetBlocklist - Ritorna la lista degli IP bloccati
-func GetBlocklist(c *gin.Context) {
-	blockedMu.RLock()
-	defer blockedMu.RUnlock()
-
-	result := make([]BlockedIP, 0)
-	now := time.Now()
-
-	// Filtra IP non scaduti
-	for _, ip := range blockedIPs {
-		if ip.Permanent || (ip.ExpiresAt != nil && ip.ExpiresAt.After(now)) {
-			result = append(result, ip)
+		// Recupera IP bloccati non scaduti dal database
+		if err := db.Where("permanent = ? OR expires_at > ?", true, now).
+			Find(&blockedIPs).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to fetch blocked IPs"})
+			return
 		}
-	}
 
-	c.JSON(200, gin.H{
-		"blocked_ips": result,
-		"count": len(result),
-	})
+		c.JSON(200, gin.H{
+			"blocked_ips": blockedIPs,
+			"count":       len(blockedIPs),
+		})
+	}
 }
 
 // NewBlockIPHandler - Factory function per creare un handler per bloccare IP
@@ -66,7 +47,7 @@ func NewUnblockIPHandler(db *gorm.DB) gin.HandlerFunc {
 func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 	var req struct {
 		IP        string `json:"ip" binding:"required"`
-		Threat    string `json:"threat" binding:"required"` // Nome della regola/minaccia (es: "Detect API Enumeration", "XSS")
+		Threat    string `json:"threat" binding:"required"` // Nome della regola/descrizione (es: "Detect API Enumeration", "XSS")
 		Reason    string `json:"reason"`
 		Permanent bool   `json:"permanent"`
 	}
@@ -76,34 +57,16 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		return
 	}
 
-	blockedMu.Lock()
-	defer blockedMu.Unlock()
+	// Controlla se esiste già un blocco per questo IP + descrizione
+	var existingBlock models.BlockedIP
+	blockExists := db.Where("ip_address = ? AND description = ?", req.IP, req.Threat).
+		First(&existingBlock).Error == nil
 
-	// Chiave composita: "ip::threat" (dove threat è il nome della regola/descrizione)
-	blockKey := req.IP + "::" + req.Threat
-
-	// Se l'IP è già bloccato per questa regola, aggiorna il record
-	if existing, exists := blockedIPs[blockKey]; exists {
-		existing.Reason = req.Reason
-		existing.Permanent = req.Permanent
-		blockedIPs[blockKey] = existing
-
-		c.JSON(200, gin.H{
-			"message": "IP already blocked for this rule, reason updated",
-			"ip": req.IP,
-			"threat": req.Threat,
-		})
-		return
-	}
-
-	// Crea nuovo record di blocco per questo IP + regola
-	blockedIP := BlockedIP{
-		ID:         blockKey,
-		IP:         req.IP,
-		ThreatType: req.Threat, // Usa il campo ThreatType per memorizzare il nome della regola
-		Reason:     req.Reason,
-		BlockedAt:  time.Now(),
-		Permanent:  req.Permanent,
+	blockedIP := models.BlockedIP{
+		IPAddress:   req.IP,
+		Description: req.Threat,
+		Reason:      req.Reason,
+		Permanent:   req.Permanent,
 	}
 
 	// Se non è permanente, imposta la scadenza a 24 ore
@@ -112,25 +75,40 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		blockedIP.ExpiresAt = &expiresAt
 	}
 
-	blockedIPs[blockKey] = blockedIP
+	// Se esiste, aggiorna; altrimenti crea
+	if blockExists {
+		if err := db.Model(&existingBlock).Updates(blockedIP).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update blocked IP", "details": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{
+			"message": "IP block updated successfully",
+			"ip":      req.IP,
+			"threat":  req.Threat,
+		})
+	} else {
+		if err := db.Create(&blockedIP).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to create blocked IP", "details": err.Error()})
+			return
+		}
+		c.JSON(201, gin.H{
+			"message": "IP blocked successfully",
+			"ip":      req.IP,
+			"threat":  req.Threat,
+		})
+	}
 
-	// Update logs for this IP AND regola/descrizione, ma solo se non erano già bloccati da una regola
+	// Update logs for this IP AND descrizione, marca come bloccato manualmente
 	if err := db.Model(&models.Log{}).
-		Where("client_ip = ? AND description = ? AND (blocked_by = '' OR blocked_by IS NULL)", req.IP, req.Threat).
+		Where("client_ip = ? AND description = ?", req.IP, req.Threat).
 		Updates(map[string]interface{}{
-			"blocked": true,
+			"blocked":    true,
 			"blocked_by": "manual",
 		}).Error; err != nil {
 		// Log the error but don't fail the request
 		c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
 		return
 	}
-
-	c.JSON(201, gin.H{
-		"message": "IP blocked successfully",
-		"ip": req.IP,
-		"blocked": blockedIP,
-	})
 }
 
 // UnblockIPWithDB - Sblocca un IP per una specifica regola/descrizione
@@ -143,57 +121,51 @@ func UnblockIPWithDB(db *gorm.DB, c *gin.Context) {
 		return
 	}
 
-	blockedMu.Lock()
-	defer blockedMu.Unlock()
-
-	// Chiave composita: "ip::threat"
-	blockKey := ip + "::" + threat
-
-	if _, exists := blockedIPs[blockKey]; exists {
-		delete(blockedIPs, blockKey)
-
-		// Update logs for this IP AND regola/descrizione to remove "manual" BlockedBy status
-		// For default threats (XSS, SQLi, etc.), restore blocked_by="auto" since they're always blocked by rules
-		// For custom rules, set blocked_by="" and blocked=false
-		defaultThreats := []string{"XSS", "SQL_INJECTION", "LFI", "RFI", "COMMAND_INJECTION",
-			"XXE", "LDAP_INJECTION", "SSTI", "HTTP_RESPONSE_SPLITTING", "PROTOTYPE_POLLUTION",
-			"PATH_TRAVERSAL", "SSRF", "NOSQL_INJECTION"}
-
-		// Check if this is a default threat
-		isDefault := false
-		for _, dt := range defaultThreats {
-			if threat == dt {
-				isDefault = true
-				break
-			}
-		}
-
-		if isDefault {
-			// For default threats, restore blocked_by="auto"
-			if err := db.Model(&models.Log{}).
-				Where("client_ip = ? AND description = ? AND blocked_by = ?", ip, threat, "manual").
-				Update("blocked_by", "auto").Error; err != nil {
-				c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
-				return
-			}
-		} else {
-			// For custom rules, set blocked_by="" and blocked=false
-			if err := db.Model(&models.Log{}).
-				Where("client_ip = ? AND description = ? AND blocked_by = ?", ip, threat, "manual").
-				Updates(map[string]interface{}{
-					"blocked": false,
-					"blocked_by": "",
-				}).Error; err != nil {
-				c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
-				return
-			}
-		}
-
-		c.JSON(200, gin.H{"message": "IP unblocked successfully", "ip": ip, "threat": threat})
+	// Elimina il blocco dal database
+	if err := db.Where("ip_address = ? AND description = ?", ip, threat).
+		Delete(&models.BlockedIP{}).Error; err != nil {
+		c.JSON(500, gin.H{"error": "Failed to delete blocked IP", "details": err.Error()})
 		return
 	}
 
-	c.JSON(404, gin.H{"error": "IP not found in blocklist"})
+	// Update logs for this IP AND descrizione to remove "manual" BlockedBy status
+	// For default threats (XSS, SQLi, etc.), restore blocked_by="auto" since they're always blocked by rules
+	// For custom rules, set blocked_by="" and blocked=false
+	defaultThreats := []string{"XSS", "SQL_INJECTION", "LFI", "RFI", "COMMAND_INJECTION",
+		"XXE", "LDAP_INJECTION", "SSTI", "HTTP_RESPONSE_SPLITTING", "PROTOTYPE_POLLUTION",
+		"PATH_TRAVERSAL", "SSRF", "NOSQL_INJECTION"}
+
+	// Check if this is a default threat
+	isDefault := false
+	for _, dt := range defaultThreats {
+		if threat == dt {
+			isDefault = true
+			break
+		}
+	}
+
+	if isDefault {
+		// For default threats, restore blocked_by="auto"
+		if err := db.Model(&models.Log{}).
+			Where("client_ip = ? AND description = ? AND blocked_by = ?", ip, threat, "manual").
+			Update("blocked_by", "auto").Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
+			return
+		}
+	} else {
+		// For custom rules, set blocked_by="" and blocked=false
+		if err := db.Model(&models.Log{}).
+			Where("client_ip = ? AND description = ? AND blocked_by = ?", ip, threat, "manual").
+			Updates(map[string]interface{}{
+				"blocked":    false,
+				"blocked_by": "",
+			}).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
+			return
+		}
+	}
+
+	c.JSON(200, gin.H{"message": "IP unblocked successfully", "ip": ip, "threat": threat})
 }
 
 // UnblockIP - Deprecated: use NewUnblockIPHandler instead
@@ -201,26 +173,14 @@ func UnblockIP(c *gin.Context) {
 	c.JSON(400, gin.H{"error": "use NewUnblockIPHandler"})
 }
 
-// IsIPBlocked - Controlla se un IP è bloccato per una specifica regola/descrizione
-func IsIPBlocked(ip string, threat string) bool {
-	blockedMu.RLock()
-	defer blockedMu.RUnlock()
+// IsIPBlocked - Controlla se un IP è bloccato per una specifica regola/descrizione nel database
+func IsIPBlocked(db *gorm.DB, ip string, description string) bool {
+	var blockedIP models.BlockedIP
+	now := time.Now()
 
-	// Chiave composita: "ip::threat"
-	blockKey := ip + "::" + threat
+	// Controlla se esiste un blocco non scaduto per questo IP + descrizione
+	err := db.Where("ip_address = ? AND description = ? AND (permanent = ? OR expires_at > ?)",
+		ip, description, true, now).First(&blockedIP).Error
 
-	if blockedIP, exists := blockedIPs[blockKey]; exists {
-		// Se è permanente, sempre bloccato
-		if blockedIP.Permanent {
-			return true
-		}
-		// Se ha una scadenza, controlla se è ancora valida
-		if blockedIP.ExpiresAt != nil {
-			return blockedIP.ExpiresAt.After(time.Now())
-		}
-		// Se nessuna delle due condizioni, non è bloccato
-		return false
-	}
-
-	return false
+	return err == nil
 }
