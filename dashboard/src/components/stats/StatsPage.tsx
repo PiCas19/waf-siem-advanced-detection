@@ -1405,7 +1405,7 @@ const StatsPage: React.FC = () => {
                           ) : alert.blockedBy === 'manual' ? (
                             // Threat Manually Blocked by operator - mostra pulsante Unblock
                             <button
-                              onClick={() => handleUnblockThreat(alert.ip, alert.threat, alert.timestamp)}
+                              onClick={() => handleUnblockThreat(alert.ip, alert.threat)}
                               disabled={processingKey === getAlertKey(alert.ip, alert.threat) || !canUnblockThreats}
                               className={`px-2 py-1 rounded text-xs font-medium transition ${
                                 !canUnblockThreats
@@ -1421,7 +1421,7 @@ const StatsPage: React.FC = () => {
                           ) : (
                             // Threat Detected (non bloccata) - mostra pulsante Block
                             <button
-                              onClick={() => handleBlockThreat(alert.ip, alert.threat, alert.timestamp)}
+                              onClick={() => handleBlockThreat(alert.ip, alert.threat)}
                               disabled={processingKey === getAlertKey(alert.ip, alert.threat) || !canBlockThreats}
                               className={`px-2 py-1 rounded text-xs font-medium transition ${
                                 !canBlockThreats
