@@ -23,15 +23,16 @@ var (
 )
 
 type WAFEvent struct {
-	IP        string `json:"ip"`
-	Method    string `json:"method"`
-	Path      string `json:"path"`
-	Query     string `json:"query"`
-	UA        string `json:"user_agent"`
-	Timestamp string `json:"timestamp"`
-	Threat    string `json:"threat"`
-	Blocked   bool   `json:"blocked"`
-	BlockedBy string `json:"blocked_by"`
+	IP          string `json:"ip"`
+	Method      string `json:"method"`
+	Path        string `json:"path"`
+	Query       string `json:"query"`
+	UA          string `json:"user_agent"`
+	Timestamp   string `json:"timestamp"`
+	Threat      string `json:"threat"`
+	Description string `json:"description"` // Rule name/description for per-rule blocking
+	Blocked     bool   `json:"blocked"`
+	BlockedBy   string `json:"blocked_by"`
 }
 
 func init() {

@@ -249,15 +249,16 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 	}
 
 	eventPayload := map[string]interface{}{
-		"ip":         clientIP,
-		"threat":     threat.Type,
-		"method":     r.Method,
-		"path":       r.URL.Path,
-		"query":      r.URL.RawQuery,
-		"user_agent": r.UserAgent(),
-		"timestamp":  time.Now().Format(time.RFC3339),
-		"blocked":    blocked,
-		"blocked_by": blockedBy,
+		"ip":          clientIP,
+		"threat":      threat.Type,
+		"description": threat.Description, // Rule name/description for per-rule blocking
+		"method":      r.Method,
+		"path":        r.URL.Path,
+		"query":       r.URL.RawQuery,
+		"user_agent":  r.UserAgent(),
+		"timestamp":   time.Now().Format(time.RFC3339),
+		"blocked":     blocked,
+		"blocked_by":  blockedBy,
 	}
 
 	jsonData, err := json.Marshal(eventPayload)
