@@ -1435,34 +1435,34 @@ const StatsPage: React.FC = () => {
                           ) : alert.blockedBy === 'manual' ? (
                             // Custom threat manually blocked by operator - show Unblock button
                             <button
-                              onClick={() => handleUnblockThreat(alert.ip, alert.description)}
-                              disabled={processingKey === getAlertKey(alert.ip, alert.description) || !canUnblockThreats}
+                              onClick={() => handleUnblockThreat(alert.ip, alert.description || alert.threat)}
+                              disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canUnblockThreats}
                               className={`px-2 py-1 rounded text-xs font-medium transition ${
                                 !canUnblockThreats
                                   ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                  : processingKey === getAlertKey(alert.ip, alert.description)
+                                  : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
                                   ? 'bg-blue-600 text-white'
                                   : 'bg-orange-600 hover:bg-orange-700 text-white'
                               }`}
                               title={!canUnblockThreats ? 'You do not have permission to unblock threats' : ''}
                             >
-                              {processingKey === getAlertKey(alert.ip, alert.description) ? '...' : 'Unblock'}
+                              {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Unblock'}
                             </button>
                           ) : (
                             // Custom threat Detected (not blocked) - show Block button
                             <button
-                              onClick={() => handleBlockThreat(alert.ip, alert.description)}
-                              disabled={processingKey === getAlertKey(alert.ip, alert.description) || !canBlockThreats}
+                              onClick={() => handleBlockThreat(alert.ip, alert.description || alert.threat)}
+                              disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canBlockThreats}
                               className={`px-2 py-1 rounded text-xs font-medium transition ${
                                 !canBlockThreats
                                   ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                  : processingKey === getAlertKey(alert.ip, alert.description)
+                                  : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
                                   ? 'bg-blue-600 text-white'
                                   : 'bg-red-600 hover:bg-red-700 text-white'
                               }`}
                               title={!canBlockThreats ? 'You do not have permission to block threats' : ''}
                             >
-                              {processingKey === getAlertKey(alert.ip, alert.description) ? '...' : 'Block'}
+                              {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Block'}
                             </button>
                           )}
                         </td>
