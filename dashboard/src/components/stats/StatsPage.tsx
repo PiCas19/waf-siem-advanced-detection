@@ -757,7 +757,7 @@ const StatsPage: React.FC = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ip, reason: `Blocked threat: ${threat}`, permanent: false }),
+        body: JSON.stringify({ ip, threat, reason: `Blocked threat: ${threat}`, permanent: false }),
       });
 
       if (!resp.ok) {
@@ -786,7 +786,7 @@ const StatsPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('authToken');
-      const resp = await fetch(`/api/blocklist/${ip}`, {
+      const resp = await fetch(`/api/blocklist/${ip}?threat=${encodeURIComponent(threat)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
