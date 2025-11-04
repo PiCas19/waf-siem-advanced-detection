@@ -63,6 +63,7 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 		// Save event to database
 		log := models.Log{
 			ThreatType:  event.Threat,
+			Description: event.Description, // Rule name/description for per-rule blocking
 			ClientIP:    event.IP,
 			Method:      event.Method,
 			URL:         event.Path,
