@@ -106,11 +106,14 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 
 	blockedIPs[req.IP] = blockedIP
 
-	// Update all logs for this IP to set blocked=true and BlockedBy="manual"
-	if err := db.Model(&models.Log{}).Where("client_ip = ?", req.IP).Updates(map[string]interface{}{
-		"blocked": true,
-		"blocked_by": "manual",
-	}).Error; err != nil {
+	// Update logs for this IP, but only change blockedBy to "manual" if it wasn't already blocked by a rule
+	// If a log already has blockedBy="auto", it means it was blocked by a rule and should stay that way
+	if err := db.Model(&models.Log{}).
+		Where("client_ip = ? AND (blocked_by = '' OR blocked_by IS NULL)", req.IP).
+		Updates(map[string]interface{}{
+			"blocked": true,
+			"blocked_by": "manual",
+		}).Error; err != nil {
 		// Log the error but don't fail the request
 		c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
 		return
