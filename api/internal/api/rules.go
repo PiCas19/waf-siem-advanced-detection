@@ -80,6 +80,15 @@ func NewCreateRuleHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		rule.Enabled = true
+
+		// Se la regola è in modalità "detect" (action='log'), forza tutti gli *Enabled a false
+		if rule.Action == "log" {
+			rule.BlockEnabled = false
+			rule.DropEnabled = false
+			rule.RedirectEnabled = false
+			rule.ChallengeEnabled = false
+		}
+
 		if err := db.Create(&rule).Error; err != nil {
 			fmt.Printf("[ERROR] Failed to create rule: %v\n", err)
 			c.JSON(500, gin.H{"error": "failed to create rule"})
@@ -109,6 +118,14 @@ func NewUpdateRuleHandler(db *gorm.DB) gin.HandlerFunc {
 		if err := c.ShouldBindJSON(&updatedRule); err != nil {
 			c.JSON(400, gin.H{"error": "Invalid rule data"})
 			return
+		}
+
+		// Se la regola è in modalità "detect" (action='log'), forza tutti gli *Enabled a false
+		if updatedRule.Action == "log" {
+			updatedRule.BlockEnabled = false
+			updatedRule.DropEnabled = false
+			updatedRule.RedirectEnabled = false
+			updatedRule.ChallengeEnabled = false
 		}
 
 		// Update the rule
