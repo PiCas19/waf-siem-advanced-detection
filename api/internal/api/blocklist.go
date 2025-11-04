@@ -106,8 +106,11 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 
 	blockedIPs[req.IP] = blockedIP
 
-	// Update all logs for this IP to set BlockedBy = "manual"
-	if err := db.Model(&models.Log{}).Where("client_ip = ?", req.IP).Update("blocked_by", "manual").Error; err != nil {
+	// Update all logs for this IP to set blocked=true and BlockedBy="manual"
+	if err := db.Model(&models.Log{}).Where("client_ip = ?", req.IP).Updates(map[string]interface{}{
+		"blocked": true,
+		"blocked_by": "manual",
+	}).Error; err != nil {
 		// Log the error but don't fail the request
 		c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
 		return
@@ -131,10 +134,13 @@ func UnblockIPWithDB(db *gorm.DB, c *gin.Context) {
 		delete(blockedIPs, ip)
 
 		// Update all logs for this IP to remove "manual" BlockedBy status
-		// Set BlockedBy back to "auto" if they were originally blocked, else "" if not blocked
+		// Set blocked=false and blocked_by="" since we're removing the manual block
 		if err := db.Model(&models.Log{}).
 			Where("client_ip = ? AND blocked_by = ?", ip, "manual").
-			Update("blocked_by", "").Error; err != nil {
+			Updates(map[string]interface{}{
+				"blocked": false,
+				"blocked_by": "",
+			}).Error; err != nil {
 			c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
 			return
 		}
