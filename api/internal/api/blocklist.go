@@ -7,7 +7,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
-	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/websocket"
 )
 
 // GetBlocklist - Ritorna la lista degli IP bloccati da database
