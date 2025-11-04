@@ -6,6 +6,26 @@ import (
 	"gorm.io/gorm"
 )
 
+// isDefaultThreatType checks if a threat type is a default WAF rule
+func isDefaultThreatType(threatType string) bool {
+	defaultThreats := map[string]bool{
+		"XSS":                        true,
+		"SQL_INJECTION":              true,
+		"LFI":                        true,
+		"RFI":                        true,
+		"COMMAND_INJECTION":          true,
+		"XXE":                        true,
+		"LDAP_INJECTION":             true,
+		"SSTI":                       true,
+		"HTTP_RESPONSE_SPLITTING":    true,
+		"PROTOTYPE_POLLUTION":        true,
+		"PATH_TRAVERSAL":             true,
+		"SSRF":                       true,
+		"NOSQL_INJECTION":            true,
+	}
+	return defaultThreats[threatType]
+}
+
 func NewGetLogsHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var logs []models.Log
@@ -13,6 +33,15 @@ func NewGetLogsHandler(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": "failed to fetch logs"})
 			return
 		}
+
+		// Normalize blockedBy for default threats
+		// Default threats should always show blockedBy="auto" even if manually blocked
+		for i := range logs {
+			if isDefaultThreatType(logs[i].ThreatType) {
+				logs[i].BlockedBy = "auto"
+			}
+		}
+
 		c.JSON(200, gin.H{"logs": logs})
 	}
 }
