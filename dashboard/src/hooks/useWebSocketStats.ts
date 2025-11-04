@@ -16,6 +16,7 @@ interface WAFEvent {
   blocked: boolean;
   blockedBy?: string;
   user_agent?: string;
+  description?: string; // Rule name/description for per-rule blocking
 }
 
 // WebSocket globale - mantiene la connessione tra i re-render

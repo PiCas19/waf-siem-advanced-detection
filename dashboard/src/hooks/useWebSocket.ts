@@ -4,6 +4,7 @@ interface WAFEvent {
   ip: string;
   threat: string;
   timestamp: string;
+  description?: string; // Rule name/description for per-rule blocking
 }
 
 export function useWebSocket() {
