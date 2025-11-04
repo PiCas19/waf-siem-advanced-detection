@@ -50,7 +50,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		protected.GET("/audit-logs/stats", NewGetAuditLogStatsHandler(db))
 
 		// Blocklist endpoints
-		protected.GET("/blocklist", GetBlocklist)
+		protected.GET("/blocklist", GetBlocklist(db))
 		protected.POST("/blocklist", NewBlockIPHandler(db))
 		protected.DELETE("/blocklist/:ip", NewUnblockIPHandler(db))
 
