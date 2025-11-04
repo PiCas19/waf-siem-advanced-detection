@@ -134,9 +134,22 @@ func UnblockIPWithDB(db *gorm.DB, c *gin.Context) {
 		delete(blockedIPs, ip)
 
 		// Update all logs for this IP to remove "manual" BlockedBy status
-		// Set blocked=false and blocked_by="" since we're removing the manual block
+		// For default threats (XSS, SQLi, etc.), restore blocked_by="auto" since they're always blocked by rules
+		// For custom rules, set blocked_by="" and blocked=false
+		defaultThreats := []string{"XSS", "SQL_INJECTION", "LFI", "RFI", "COMMAND_INJECTION",
+			"XXE", "LDAP_INJECTION", "SSTI", "HTTP_RESPONSE_SPLITTING", "PROTOTYPE_POLLUTION",
+			"PATH_TRAVERSAL", "SSRF", "NOSQL_INJECTION"}
+
 		if err := db.Model(&models.Log{}).
 			Where("client_ip = ? AND blocked_by = ?", ip, "manual").
+			Update("blocked_by", gorm.Expr("CASE WHEN threat_type IN (?) THEN 'auto' ELSE '' END", defaultThreats)).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
+			return
+		}
+
+		// Also update blocked status for non-default threats
+		if err := db.Model(&models.Log{}).
+			Where("client_ip = ? AND blocked_by = ? AND threat_type NOT IN (?)", ip, "manual", defaultThreats).
 			Updates(map[string]interface{}{
 				"blocked": false,
 				"blocked_by": "",
