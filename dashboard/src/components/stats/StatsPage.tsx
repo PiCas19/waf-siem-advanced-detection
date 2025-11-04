@@ -722,7 +722,7 @@ const StatsPage: React.FC = () => {
   const getAlertKey = (ip?: string, threat?: string) => `${ip || ''}::${threat || ''}`;
 
   // Blocca tutte le threat dello stesso IP + tipo di attacco dell'alert selezionato
-  const handleBlockThreat = async (ip: string, threat: string, alertTimestamp?: string) => {
+  const handleBlockThreat = async (ip: string, threat: string) => {
     const key = getAlertKey(ip, threat);
     setProcessingKey(key);
 
@@ -757,7 +757,7 @@ const StatsPage: React.FC = () => {
   };
 
   // Sblocca tutte le threat dello stesso IP + tipo di attacco dell'alert selezionato
-  const handleUnblockThreat = async (ip: string, threat: string, alertTimestamp?: string) => {
+  const handleUnblockThreat = async (ip: string, threat: string) => {
     const key = getAlertKey(ip, threat);
     setProcessingKey(key);
 
