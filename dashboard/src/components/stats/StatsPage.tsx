@@ -731,19 +731,21 @@ const StatsPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('authToken');
-      const resp = await fetch('/api/alerts/block', {
+      const resp = await fetch('/api/blocklist', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ip, threat, timestamp: alertTimestamp }),
+        body: JSON.stringify({ ip, reason: `Blocked threat: ${threat}`, permanent: false }),
       });
 
       if (!resp.ok) {
         // rollback
         setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: false, blockedBy: '' } : a)));
         showToast('Error blocking threat', 'error');
+      } else {
+        showToast('Threat blocked successfully', 'success');
       }
     } catch (e) {
       // rollback
@@ -764,19 +766,20 @@ const StatsPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('authToken');
-      const resp = await fetch('/api/alerts/unblock', {
-        method: 'POST',
+      const resp = await fetch(`/api/blocklist/${ip}`, {
+        method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ip, threat, timestamp: alertTimestamp }),
       });
 
       if (!resp.ok) {
         // rollback
         setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.threat === threat ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
         showToast('Error unblocking threat', 'error');
+      } else {
+        showToast('Threat unblocked successfully', 'success');
       }
     } catch (e) {
       // rollback
