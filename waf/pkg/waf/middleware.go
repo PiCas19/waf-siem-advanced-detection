@@ -228,8 +228,14 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 	// 2. Custom rules block if action is "block"
 	// 3. Global block mode blocks everything
 	blocked := m.BlockMode || threat.IsDefault
-	if !threat.IsDefault && threat.Action == "block" {
-		blocked = true
+	if !threat.IsDefault {
+		// For custom rules, only block if action is "block"
+		if threat.Action == "block" {
+			blocked = true
+		} else {
+			// If custom rule action is "log" or other, don't block
+			blocked = false
+		}
 	}
 
 	// Determine blocked_by field for dashboard display
