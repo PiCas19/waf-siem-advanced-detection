@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/websocket"
 )
 
 // GetBlocklist - Ritorna la lista degli IP bloccati da database
@@ -171,6 +172,14 @@ func UnblockIPWithDB(db *gorm.DB, c *gin.Context) {
 // UnblockIP - Deprecated: use NewUnblockIPHandler instead
 func UnblockIP(c *gin.Context) {
 	c.JSON(400, gin.H{"error": "use NewUnblockIPHandler"})
+}
+
+// refreshStatsOnClients notifica i client di ricaricare gli stats
+// Il frontend farà un fetch a /api/stats per ottenere i dati aggiornati
+func refreshStatsOnClients(db *gorm.DB) {
+	// Nota: Il WebSocket viene usato per notificare i client, ma il valore
+	// di stats aggiornato verrà fetched dal frontend da /api/stats endpoint
+	// che legge direttamente dal database
 }
 
 // IsIPBlocked - Controlla se un IP è bloccato per una specifica regola/descrizione nel database

@@ -212,6 +212,7 @@ const StatsPage: React.FC = () => {
   const [threatTypeData, setThreatTypeData] = useState<any[]>([]);
   const [recentAlerts, setRecentAlerts] = useState<WAFEvent[]>([]);
   const [processingKey, setProcessingKey] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Trigger per refresh stats
 
   // Calcola i permessi dell'utente
   const canBlockThreats = user && hasPermission(user.role as any, 'threats_block');
@@ -295,7 +296,7 @@ const StatsPage: React.FC = () => {
   // Search states
   const [allAlertsSearchQuery, setAllAlertsSearchQuery] = useState<string>('');
 
-  // Carica i dati iniziali
+  // Carica i dati iniziali e quando refreshTrigger cambia
   useEffect(() => {
     const loadInitialData = async () => {
       try {
@@ -323,6 +324,7 @@ const StatsPage: React.FC = () => {
             blocked: log.blocked,
             blockedBy: log.blocked_by || '', // "auto", "manual", or ""
             user_agent: log.user_agent,
+            description: log.description || log.threat_type,
           }));
           setRecentAlerts(mappedLogs);
         } else {
@@ -334,7 +336,7 @@ const StatsPage: React.FC = () => {
       }
     };
     loadInitialData();
-  }, []);
+  }, [refreshTrigger]); // Ricarica quando refreshTrigger cambia
 
   // Inizializza timeline con dati dai logs storici
   const initializeTimeline = () => {
@@ -766,6 +768,8 @@ const StatsPage: React.FC = () => {
         showToast('Error blocking threat', 'error');
       } else {
         showToast('Threat blocked successfully', 'success');
+        // Trigger refresh degli stats dopo il blocco
+        setRefreshTrigger(prev => prev + 1);
       }
     } catch (e) {
       // rollback
@@ -800,6 +804,8 @@ const StatsPage: React.FC = () => {
         showToast('Error unblocking threat', 'error');
       } else {
         showToast('Threat unblocked successfully', 'success');
+        // Trigger refresh degli stats dopo lo sblocco
+        setRefreshTrigger(prev => prev + 1);
       }
     } catch (e) {
       // rollback
