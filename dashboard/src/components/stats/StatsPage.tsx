@@ -721,6 +721,26 @@ const StatsPage: React.FC = () => {
   // Util: chiave composta per azioni su alert specifico/gruppo
   const getAlertKey = (ip?: string, threat?: string) => `${ip || ''}::${threat || ''}`;
 
+  // Util: controlla se una threat è di tipo default (sempre bloccata automaticamente)
+  const isDefaultThreat = (threatType: string): boolean => {
+    const defaultThreats = [
+      'XSS',
+      'SQL_INJECTION',
+      'LFI',
+      'RFI',
+      'COMMAND_INJECTION',
+      'XXE',
+      'LDAP_INJECTION',
+      'SSTI',
+      'HTTP_RESPONSE_SPLITTING',
+      'PROTOTYPE_POLLUTION',
+      'PATH_TRAVERSAL',
+      'SSRF',
+      'NOSQL_INJECTION',
+    ];
+    return defaultThreats.includes(threatType);
+  };
+
   // Blocca tutte le threat dello stesso IP + tipo di attacco dell'alert selezionato
   const handleBlockThreat = async (ip: string, threat: string) => {
     const key = getAlertKey(ip, threat);
@@ -1399,11 +1419,14 @@ const StatsPage: React.FC = () => {
                           )}
                         </td>
                         <td className="py-3 px-4">
-                          {alert.blockedBy === 'auto' ? (
-                            // Threat Automatically Blocked by rule - nessun pulsante
+                          {isDefaultThreat(alert.threat) ? (
+                            // Default threats (XSS, SQLi, etc.) are ALWAYS auto-blocked - no action button
+                            <span className="text-gray-500 text-xs">—</span>
+                          ) : alert.blockedBy === 'auto' ? (
+                            // Custom threat automatically blocked by rule - no action button
                             <span className="text-gray-500 text-xs">—</span>
                           ) : alert.blockedBy === 'manual' ? (
-                            // Threat Manually Blocked by operator - mostra pulsante Unblock
+                            // Custom threat manually blocked by operator - show Unblock button
                             <button
                               onClick={() => handleUnblockThreat(alert.ip, alert.threat)}
                               disabled={processingKey === getAlertKey(alert.ip, alert.threat) || !canUnblockThreats}
@@ -1419,7 +1442,7 @@ const StatsPage: React.FC = () => {
                               {processingKey === getAlertKey(alert.ip, alert.threat) ? '...' : 'Unblock'}
                             </button>
                           ) : (
-                            // Threat Detected (non bloccata) - mostra pulsante Block
+                            // Custom threat Detected (not blocked) - show Block button
                             <button
                               onClick={() => handleBlockThreat(alert.ip, alert.threat)}
                               disabled={processingKey === getAlertKey(alert.ip, alert.threat) || !canBlockThreats}
