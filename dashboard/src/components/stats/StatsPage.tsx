@@ -782,28 +782,24 @@ const StatsPage: React.FC = () => {
       durationHours = selectedDuration as number;
     }
 
-    console.log('[TEMP DEBUG] selectedDuration:', selectedDuration, 'calculated durationHours:', durationHours);
-
     // Optimistic update: marca come blocked
     setRecentAlerts(prev => prev.map(a => (a.ip === pendingBlockIP && (a.description || a.threat) === pendingBlockDescription ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
 
     try {
       const token = localStorage.getItem('authToken');
-      const payload = {
-        ip: pendingBlockIP,
-        threat: pendingBlockDescription,
-        reason: `Blocked threat: ${pendingBlockDescription}`,
-        permanent: selectedDuration === 'permanent',
-        durationHours: durationHours,
-      };
-      console.log('[TEMP DEBUG] Sending payload:', payload);
       const resp = await fetch('/api/blocklist', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ip: pendingBlockIP,
+          threat: pendingBlockDescription,
+          reason: `Blocked threat: ${pendingBlockDescription}`,
+          permanent: selectedDuration === 'permanent',
+          duration_hours: durationHours,
+        }),
       });
 
       if (!resp.ok) {
@@ -1576,10 +1572,7 @@ const StatsPage: React.FC = () => {
                   type="radio"
                   name="blockDuration"
                   checked={selectedDuration === 24}
-                  onChange={() => {
-                    console.log('[TEMP DEBUG] Selected 24 hours');
-                    setSelectedDuration(24);
-                  }}
+                  onChange={() => setSelectedDuration(24)}
                   className="w-4 h-4"
                 />
                 <span className="text-gray-300">24 Hours</span>
@@ -1591,10 +1584,7 @@ const StatsPage: React.FC = () => {
                   type="radio"
                   name="blockDuration"
                   checked={selectedDuration === 168}
-                  onChange={() => {
-                    console.log('[TEMP DEBUG] Selected 7 days (168 hours)');
-                    setSelectedDuration(168);
-                  }}
+                  onChange={() => setSelectedDuration(168)}
                   className="w-4 h-4"
                 />
                 <span className="text-gray-300">7 Days</span>
@@ -1606,10 +1596,7 @@ const StatsPage: React.FC = () => {
                   type="radio"
                   name="blockDuration"
                   checked={selectedDuration === 720}
-                  onChange={() => {
-                    console.log('[TEMP DEBUG] Selected 30 days (720 hours)');
-                    setSelectedDuration(720);
-                  }}
+                  onChange={() => setSelectedDuration(720)}
                   className="w-4 h-4"
                 />
                 <span className="text-gray-300">30 Days</span>
@@ -1621,10 +1608,7 @@ const StatsPage: React.FC = () => {
                   type="radio"
                   name="blockDuration"
                   checked={selectedDuration === 'permanent'}
-                  onChange={() => {
-                    console.log('[TEMP DEBUG] Selected permanent');
-                    setSelectedDuration('permanent');
-                  }}
+                  onChange={() => setSelectedDuration('permanent')}
                   className="w-4 h-4"
                 />
                 <span className="text-gray-300">Permanent</span>
@@ -1636,10 +1620,7 @@ const StatsPage: React.FC = () => {
                   type="radio"
                   name="blockDuration"
                   checked={selectedDuration === 'custom'}
-                  onChange={() => {
-                    console.log('[TEMP DEBUG] Selected custom');
-                    setSelectedDuration('custom');
-                  }}
+                  onChange={() => setSelectedDuration('custom')}
                   className="w-4 h-4"
                 />
                 <span className="text-gray-300">Custom</span>
