@@ -40,13 +40,17 @@ const BlocklistPage: React.FC = () => {
 
   const [showAddBlockForm, setShowAddBlockForm] = useState(false);
   const [showAddWhiteForm, setShowAddWhiteForm] = useState(false);
+  const [showBlockDurationModal, setShowBlockDurationModal] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'permanent' | 'temporary'>('all');
 
   // Form states
-  const [blockForm, setBlockForm] = useState({ ip: '', reason: '', permanent: false });
+  const [blockForm, setBlockForm] = useState({ ip: '', reason: '', duration: '24h' });
+  const [blockDuration, setBlockDuration] = useState<number | 'permanent'>('24h' as any);
+  const [customBlockDuration, setCustomBlockDuration] = useState<number>(24);
+  const [customBlockDurationUnit, setCustomBlockDurationUnit] = useState<'hours' | 'days'>('hours');
   const [whiteForm, setWhiteForm] = useState({ ip: '', reason: '' });
 
   // Carica dati
@@ -98,6 +102,17 @@ const BlocklistPage: React.FC = () => {
       return;
     }
 
+    // Calcola la durata in ore
+    let durationHours = 24;
+    if (blockDuration === 'permanent') {
+      durationHours = -1;
+    } else if (blockDuration === 'custom') {
+      durationHours = customBlockDurationUnit === 'hours' ? customBlockDuration : customBlockDuration * 24;
+    } else {
+      // blockDuration è un numero che rappresenta le ore
+      durationHours = blockDuration as number;
+    }
+
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch('/api/blocklist', {
@@ -108,16 +123,23 @@ const BlocklistPage: React.FC = () => {
         },
         body: JSON.stringify({
           ip: blockForm.ip,
+          threat: blockForm.reason || 'Manually blocked',
           reason: blockForm.reason || 'Manually blocked',
-          permanent: blockForm.permanent,
+          permanent: blockDuration === 'permanent',
+          duration_hours: durationHours,
         }),
       });
 
       if (response.ok) {
         showToast('IP blocked successfully', 'success', 4000);
-        setBlockForm({ ip: '', reason: '', permanent: false });
+        setBlockForm({ ip: '', reason: '', duration: '24h' });
+        setBlockDuration('24h' as any);
+        setCustomBlockDuration(24);
+        setCustomBlockDurationUnit('hours');
         setShowAddBlockForm(false);
         loadData();
+      } else {
+        showToast('Failed to block IP', 'error', 4000);
       }
     } catch (error) {
       showToast('Failed to block IP', 'error', 4000);
@@ -159,6 +181,10 @@ const BlocklistPage: React.FC = () => {
   const handleDeleteBlock = async (ip: string, description: string) => {
     if (!confirm('Are you sure you want to remove this entry?')) return;
 
+    // Optimistic update: rimuovi dalla lista locale
+    const backupList = blocklist;
+    setBlocklist(blocklist.filter(entry => !(entry.ip_address === ip && entry.description === description)));
+
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`/api/blocklist/${ip}?threat=${encodeURIComponent(description)}`, {
@@ -168,17 +194,24 @@ const BlocklistPage: React.FC = () => {
 
       if (response.ok) {
         showToast('Entry removed successfully', 'success', 4000);
-        loadData();
       } else {
+        // Rollback on error
+        setBlocklist(backupList);
         showToast('Failed to delete entry', 'error', 4000);
       }
     } catch (error) {
+      // Rollback on error
+      setBlocklist(backupList);
       showToast('Failed to delete entry', 'error', 4000);
     }
   };
 
   const handleDeleteWhite = async (id: string | number) => {
     if (!confirm('Are you sure you want to remove this entry?')) return;
+
+    // Optimistic update: rimuovi dalla lista locale
+    const backupList = whitelist;
+    setWhitelist(whitelist.filter(entry => entry.id !== id));
 
     try {
       const token = localStorage.getItem('authToken');
@@ -189,9 +222,14 @@ const BlocklistPage: React.FC = () => {
 
       if (response.ok) {
         showToast('Entry removed successfully', 'success', 4000);
-        loadData();
+      } else {
+        // Rollback on error
+        setWhitelist(backupList);
+        showToast('Failed to delete entry', 'error', 4000);
       }
     } catch (error) {
+      // Rollback on error
+      setWhitelist(backupList);
       showToast('Failed to delete entry', 'error', 4000);
     }
   };
@@ -220,6 +258,10 @@ const BlocklistPage: React.FC = () => {
   const handleDeleteFalsePositive = async (id: string | number) => {
     if (!confirm('Are you sure you want to delete this false positive record?')) return;
 
+    // Optimistic update: rimuovi dalla lista locale
+    const backupList = falsePositives;
+    setFalsePositives(falsePositives.filter(entry => entry.id !== id));
+
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`/api/false-positives/${id}`, {
@@ -229,11 +271,14 @@ const BlocklistPage: React.FC = () => {
 
       if (response.ok) {
         showToast('False positive deleted successfully', 'success', 4000);
-        loadData();
       } else {
+        // Rollback on error
+        setFalsePositives(backupList);
         showToast('Failed to delete false positive', 'error', 4000);
       }
     } catch (error) {
+      // Rollback on error
+      setFalsePositives(backupList);
       showToast('Failed to delete false positive', 'error', 4000);
     }
   };
@@ -356,15 +401,52 @@ const BlocklistPage: React.FC = () => {
                     className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-red-500 focus:outline-none"
                   />
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={blockForm.permanent}
-                    onChange={(e) => setBlockForm({ ...blockForm, permanent: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-gray-300">Permanent block (otherwise 24 hours)</span>
-                </label>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Block Duration</label>
+                  <div className="space-y-2">
+                    {[
+                      { label: '24 Hours', value: 24 },
+                      { label: '7 Days', value: 7 * 24 },
+                      { label: '30 Days', value: 30 * 24 },
+                      { label: 'Permanent', value: 'permanent' as any },
+                      { label: 'Custom', value: 'custom' as any },
+                    ].map((option) => (
+                      <label key={option.value} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="blockDuration"
+                          checked={blockDuration === option.value}
+                          onChange={() => setBlockDuration(option.value)}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-gray-300">{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {blockDuration === 'custom' && (
+                  <div className="bg-gray-700/50 border border-gray-600 rounded p-3 space-y-2">
+                    <label className="block text-sm font-medium text-gray-300">Custom Duration</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        value={customBlockDuration}
+                        onChange={(e) => setCustomBlockDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="flex-1 px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-red-500 focus:outline-none"
+                      />
+                      <select
+                        value={customBlockDurationUnit}
+                        onChange={(e) => setCustomBlockDurationUnit(e.target.value as 'hours' | 'days')}
+                        className="px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-red-500 focus:outline-none"
+                      >
+                        <option value="hours">Hours</option>
+                        <option value="days">Days</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <button
                     type="submit"
