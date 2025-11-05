@@ -39,11 +39,7 @@ export function useWebSocketStats() {
   useEffect(() => {
     const loadInitialStats = async () => {
       try {
-        const token = localStorage.getItem('authToken');
-        console.log('[Stats Hook] Loading initial stats - Token exists:', !!token);
-
         const data = await fetchStats();
-        console.log('[Stats Hook] Stats loaded successfully:', data);
 
         const newStats = {
           threats_detected: data.threats_detected || 0,
@@ -57,12 +53,6 @@ export function useWebSocketStats() {
           blocked: newStats.requests_blocked,
         };
       } catch (error) {
-        console.error('[Stats Hook] Failed to load initial stats:', error);
-        console.error('[Stats Hook] Error details:', {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          status: (error as any)?.response?.status,
-          statusText: (error as any)?.response?.statusText,
-        });
         // Fallback: se l'API fallisce, gli stats rimangono a 0
       }
     };
