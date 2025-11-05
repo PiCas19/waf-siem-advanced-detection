@@ -764,13 +764,33 @@ const StatsPage: React.FC = () => {
     return defaultThreats.includes(threatType);
   };
 
-  // Blocca tutte le threat dello stesso IP + descrizione regola dell'alert selezionato
-  const handleBlockThreat = async (ip: string, description: string) => {
-    const key = getAlertKey(ip, description);
+  // Apri modal per selezionare duration del blocco
+  const handleBlockThreat = (ip: string, description: string) => {
+    setPendingBlockIP(ip);
+    setPendingBlockDescription(description);
+    setSelectedDuration(24 * 60); // Default 24 hours
+    setBlockModalOpen(true);
+  };
+
+  // Conferma blocco con duration selezionato
+  const confirmBlockThreat = async () => {
+    if (!pendingBlockIP || !pendingBlockDescription) return;
+
+    const key = getAlertKey(pendingBlockIP, pendingBlockDescription);
     setProcessingKey(key);
 
-    // Optimistic update: marca come blocked tutti gli alert con stesso ip+description
-    setRecentAlerts(prev => prev.map(a => (a.ip === ip && (a.description || a.threat) === description ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
+    // Calcola la duration in ore
+    let durationHours = 24;
+    if (selectedDuration === 'permanent') {
+      durationHours = -1; // -1 per indicare permanente
+    } else if (selectedDuration === 'custom') {
+      durationHours = customDurationUnit === 'hours' ? customDuration : customDuration * 24;
+    } else {
+      durationHours = (selectedDuration as number) / 60; // Converti da minuti a ore
+    }
+
+    // Optimistic update: marca come blocked
+    setRecentAlerts(prev => prev.map(a => (a.ip === pendingBlockIP && (a.description || a.threat) === pendingBlockDescription ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
 
     try {
       const token = localStorage.getItem('authToken');
@@ -780,12 +800,18 @@ const StatsPage: React.FC = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ip, threat: description, reason: `Blocked threat: ${description}`, permanent: false }),
+        body: JSON.stringify({
+          ip: pendingBlockIP,
+          threat: pendingBlockDescription,
+          reason: `Blocked threat: ${pendingBlockDescription}`,
+          permanent: selectedDuration === 'permanent',
+          durationHours: durationHours,
+        }),
       });
 
       if (!resp.ok) {
         // rollback
-        setRecentAlerts(prev => prev.map(a => (a.ip === ip && (a.description || a.threat) === description ? { ...a, blocked: false, blockedBy: '' } : a)));
+        setRecentAlerts(prev => prev.map(a => (a.ip === pendingBlockIP && (a.description || a.threat) === pendingBlockDescription ? { ...a, blocked: false, blockedBy: '' } : a)));
         showToast('Error blocking threat', 'error');
       } else {
         showToast('Threat blocked successfully', 'success');
@@ -794,10 +820,13 @@ const StatsPage: React.FC = () => {
       }
     } catch (e) {
       // rollback
-      setRecentAlerts(prev => prev.map(a => (a.ip === ip && (a.description || a.threat) === description ? { ...a, blocked: false, blockedBy: '' } : a)));
+      setRecentAlerts(prev => prev.map(a => (a.ip === pendingBlockIP && (a.description || a.threat) === pendingBlockDescription ? { ...a, blocked: false, blockedBy: '' } : a)));
       showToast('Network error blocking threat', 'error');
     } finally {
       setProcessingKey(null);
+      setBlockModalOpen(false);
+      setPendingBlockIP(null);
+      setPendingBlockDescription(null);
     }
   };
 
@@ -1536,6 +1565,71 @@ const StatsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Block Duration Selection Modal */}
+      {blockModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-sm w-full mx-4">
+            <h2 className="text-xl font-bold text-white mb-4">Select Block Duration</h2>
+
+            <div className="space-y-3 mb-6">
+              {BLOCK_DURATION_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setSelectedDuration(option.value);
+                  }}
+                  className={`w-full px-4 py-3 rounded-lg font-medium transition ${
+                    selectedDuration === option.value
+                      ? 'bg-blue-600 text-white border border-blue-500'
+                      : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Duration Input */}
+            <div className="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-700">
+              <label className="text-gray-300 text-sm font-medium mb-2 block">Custom Duration</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  value={customDuration}
+                  onChange={(e) => setCustomDuration(parseInt(e.target.value) || 1)}
+                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                />
+                <select
+                  value={customDurationUnit}
+                  onChange={(e) => setCustomDurationUnit(e.target.value as 'hours' | 'days')}
+                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500"
+                >
+                  <option value="hours">Hours</option>
+                  <option value="days">Days</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setBlockModalOpen(false)}
+                className="flex-1 px-4 py-2 rounded-lg font-medium bg-gray-800 text-gray-300 hover:bg-gray-700 transition border border-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmBlockThreat}
+                className="flex-1 px-4 py-2 rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 transition"
+              >
+                Block IP
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -46,10 +46,11 @@ func NewUnblockIPHandler(db *gorm.DB) gin.HandlerFunc {
 // BlockIPWithDB - Blocca un IP per una specifica regola/descrizione
 func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 	var req struct {
-		IP        string `json:"ip" binding:"required"`
-		Threat    string `json:"threat" binding:"required"` // Nome della regola/descrizione (es: "Detect API Enumeration", "XSS")
-		Reason    string `json:"reason"`
-		Permanent bool   `json:"permanent"`
+		IP            string `json:"ip" binding:"required"`
+		Threat        string `json:"threat" binding:"required"` // Nome della regola/descrizione (es: "Detect API Enumeration", "XSS")
+		Reason        string `json:"reason"`
+		Permanent     bool   `json:"permanent"`
+		DurationHours int    `json:"duration_hours"` // Custom duration in hours (-1 for permanent)
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -66,11 +67,15 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		IPAddress:   req.IP,
 		Description: req.Threat,
 		Reason:      req.Reason,
-		Permanent:   req.Permanent,
+		Permanent:   req.Permanent || req.DurationHours == -1,
 	}
 
-	// Se non è permanente, imposta la scadenza a 24 ore
-	if !req.Permanent {
+	// Calcola la scadenza in base alla duration
+	if !blockedIP.Permanent && req.DurationHours > 0 {
+		expiresAt := time.Now().Add(time.Duration(req.DurationHours) * time.Hour)
+		blockedIP.ExpiresAt = &expiresAt
+	} else if !blockedIP.Permanent {
+		// Fallback: default 24 ore
 		expiresAt := time.Now().Add(24 * time.Hour)
 		blockedIP.ExpiresAt = &expiresAt
 	}
