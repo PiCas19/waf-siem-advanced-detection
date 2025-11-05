@@ -48,11 +48,8 @@ func DownloadDatabase(config *DownloadConfig) error {
 
 	// Check if database already exists and is recent
 	if fileExists(dbFilePath) && isFileRecent(dbFilePath, 7*24*time.Hour) {
-		fmt.Printf("[INFO] GeoLite2 database already exists and is recent (%s)\n", dbFilePath)
 		return nil
 	}
-
-	fmt.Printf("[INFO] Downloading MaxMind GeoLite2-Country database...\n")
 
 	// Download the database
 	client := &http.Client{
@@ -86,8 +83,6 @@ func DownloadDatabase(config *DownloadConfig) error {
 		return fmt.Errorf("failed to write tar.gz file: %w", err)
 	}
 
-	fmt.Printf("[INFO] Downloaded to %s\n", tarPath)
-
 	// Extract tar.gz
 	if err := extractTarGz(tarPath, dbPath); err != nil {
 		return fmt.Errorf("failed to extract database: %w", err)
@@ -109,7 +104,6 @@ func DownloadDatabase(config *DownloadConfig) error {
 	os.Remove(tarPath)
 	cleanupExtractedDirs(dbPath)
 
-	fmt.Printf("[INFO] GeoLite2 database downloaded and extracted successfully to %s\n", dbFilePath)
 	return nil
 }
 

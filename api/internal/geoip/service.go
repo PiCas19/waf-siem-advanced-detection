@@ -62,7 +62,6 @@ func GetPublicIP() string {
 
 		ip := strings.TrimSpace(string(body))
 		if net.ParseIP(ip) != nil {
-			fmt.Printf("[INFO] Server public IP detected: %s (from %s)\n", ip, service)
 			return ip
 		}
 	}
@@ -97,7 +96,6 @@ func NewService() (*Service, error) {
 	for _, dbPath := range dbPaths {
 		if reader, err := geoip2.Open(dbPath); err == nil {
 			s.reader = reader
-			fmt.Printf("[INFO] MaxMind GeoLite2 database loaded successfully from %s\n", dbPath)
 			return s, nil
 		}
 	}
@@ -172,11 +170,9 @@ func (s *Service) LookupCountry(ipStr string) string {
 	// Handle private/local IPs - map to server's public IP location
 	if IsPrivateIP(ipStr) {
 		if publicIP != "" {
-			fmt.Printf("[INFO] Private IP detected: %s -> Using server public IP: %s\n", ipStr, publicIP)
 			// Recursively lookup using the public IP
 			return s.LookupCountry(publicIP)
 		}
-		fmt.Printf("[INFO] Private IP detected: %s -> No public IP available\n", ipStr)
 		return "Unknown"
 	}
 
@@ -276,35 +272,29 @@ func (s *Service) EnrichIPFromService(ipStr string) string {
 
 	resp, err := client.Get(url)
 	if err != nil {
-		fmt.Printf("[WARN] Failed to enrich IP %s from ipapi.co: %v\n", ipStr, err)
 		return "Unknown"
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("[WARN] ipapi.co returned status %d for IP %s\n", resp.StatusCode, ipStr)
 		return "Unknown"
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("[WARN] Failed to read ipapi.co response for IP %s: %v\n", ipStr, err)
 		return "Unknown"
 	}
 
 	var apiResp map[string]interface{}
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		fmt.Printf("[WARN] Failed to parse ipapi.co response for IP %s: %v\n", ipStr, err)
 		return "Unknown"
 	}
 
 	// Extract country name from response
 	if country, ok := apiResp["country_name"].(string); ok && country != "" {
-		fmt.Printf("[INFO] IP %s enriched from ipapi.co: %s\n", ipStr, country)
 		return country
 	}
 
-	fmt.Printf("[WARN] Country name not found in ipapi.co response for IP %s\n", ipStr)
 	return "Unknown"
 }
 
@@ -318,7 +308,6 @@ func (s *Service) LookupCountryWithEnrichment(ipStr string) string {
 
 	// If not found and it's a public IP, try enrichment from ipify service
 	if !IsPrivateIP(ipStr) {
-		fmt.Printf("[INFO] Attempting IP enrichment for: %s\n", ipStr)
 		return s.EnrichIPFromService(ipStr)
 	}
 

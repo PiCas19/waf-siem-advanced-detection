@@ -9,18 +9,21 @@ export const connectWebSocket = () => {
   socket = new WebSocket(url);
 
   socket.onopen = () => {
-    console.log('WebSocket connected');
+    // Connected
   };
 
   socket.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    if (msg.type === 'waf_event') {
-      listeners.forEach(fn => fn(msg.data));
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'waf_event') {
+        listeners.forEach(fn => fn(msg.data));
+      }
+    } catch (error) {
+      // Silently ignore parse errors
     }
   };
 
   socket.onclose = () => {
-    console.log('WebSocket disconnected. Reconnecting...');
     setTimeout(connectWebSocket, 2000);
   };
 };
