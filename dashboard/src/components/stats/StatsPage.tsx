@@ -207,14 +207,15 @@ const getSeverityColor = (count: number): string => {
 
 interface BlockDurationOption {
   label: string;
-  value: number | 'permanent'; // minutes or 'permanent'
+  value: number | 'permanent' | 'custom'; // hours or 'permanent' or 'custom'
 }
 
 const BLOCK_DURATION_OPTIONS: BlockDurationOption[] = [
-  { label: '24 Hours', value: 24 * 60 },
-  { label: '7 Days', value: 7 * 24 * 60 },
-  { label: '30 Days', value: 30 * 24 * 60 },
+  { label: '24 Hours', value: 24 },
+  { label: '7 Days', value: 168 },
+  { label: '30 Days', value: 720 },
   { label: 'Permanent', value: 'permanent' },
+  { label: 'Custom', value: 'custom' },
 ];
 
 const StatsPage: React.FC = () => {
@@ -231,7 +232,9 @@ const StatsPage: React.FC = () => {
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [pendingBlockIP, setPendingBlockIP] = useState<string | null>(null);
   const [pendingBlockDescription, setPendingBlockDescription] = useState<string | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<number | 'permanent'>(24 * 60);
+  const [selectedDuration, setSelectedDuration] = useState<number | 'permanent' | 'custom'>(24);
+  const [customBlockDuration, setCustomBlockDuration] = useState<number>(24);
+  const [customBlockDurationUnit, setCustomBlockDurationUnit] = useState<'hours' | 'days'>('hours');
 
   // Calcola i permessi dell'utente
   const canBlockThreats = user && hasPermission(user.role as any, 'threats_block');
@@ -772,8 +775,10 @@ const StatsPage: React.FC = () => {
     console.log('[DEBUG StatsPage] handleBlockThreat called for IP:', ip, 'description:', description);
     setPendingBlockIP(ip);
     setPendingBlockDescription(description);
-    setSelectedDuration(24 * 60); // Default 24 hours
-    console.log('[DEBUG StatsPage] Modal opening with selectedDuration reset to:', 24 * 60);
+    setSelectedDuration(24); // Default 24 hours
+    setCustomBlockDuration(24);
+    setCustomBlockDurationUnit('hours');
+    console.log('[DEBUG StatsPage] Modal opening with selectedDuration reset to: 24');
     setBlockModalOpen(true);
   };
 
@@ -784,15 +789,17 @@ const StatsPage: React.FC = () => {
     const key = getAlertKey(pendingBlockIP, pendingBlockDescription);
     setProcessingKey(key);
 
-    // Calcola la duration in ore
+    // Calcola la duration in ore (stesso logic della BlocklistPage)
     let durationHours = 24;
     console.log('[DEBUG StatsPage] selectedDuration:', selectedDuration, 'type:', typeof selectedDuration);
 
     if (selectedDuration === 'permanent') {
       durationHours = -1; // -1 per indicare permanente
+    } else if (selectedDuration === 'custom') {
+      durationHours = customBlockDurationUnit === 'hours' ? customBlockDuration : customBlockDuration * 24;
     } else {
-      // selectedDuration è sempre in minuti per le opzioni preset
-      durationHours = (selectedDuration as number) / 60; // Converti da minuti a ore
+      // selectedDuration è un numero che rappresenta le ore
+      durationHours = selectedDuration as number;
     }
 
     console.log('[DEBUG StatsPage] Calculated durationHours:', durationHours);
@@ -1580,25 +1587,50 @@ const StatsPage: React.FC = () => {
           <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-sm w-full mx-4">
             <h2 className="text-xl font-bold text-white mb-4">Select Block Duration</h2>
 
-            <div className="space-y-3 mb-6">
-              {BLOCK_DURATION_OPTIONS.map((option) => (
-                <button
-                  key={option.label}
-                  onClick={() => {
-                    console.log('[DEBUG StatsPage] Duration button clicked, option.value:', option.value);
-                    setSelectedDuration(option.value);
-                    console.log('[DEBUG StatsPage] selectedDuration state set to:', option.value);
-                  }}
-                  className={`w-full px-4 py-3 rounded-lg font-medium transition ${
-                    selectedDuration === option.value
-                      ? 'bg-blue-600 text-white border border-blue-500'
-                      : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
+            <div className="space-y-2 mb-6">
+              {(([
+                { label: '24 Hours', value: 24 },
+                { label: '7 Days', value: 168 },
+                { label: '30 Days', value: 720 },
+                { label: 'Permanent', value: 'permanent' },
+                { label: 'Custom', value: 'custom' },
+              ] as const).map((option) => (
+                <label key={`${option.value}`} className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
+                  <input
+                    type="radio"
+                    name="blockDuration"
+                    checked={selectedDuration === option.value}
+                    onChange={() => setSelectedDuration(option.value)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-gray-300">{option.label}</span>
+                </label>
+              )))}
             </div>
+
+            {/* Custom Duration Input */}
+            {selectedDuration === 'custom' && (
+              <div className="bg-gray-700/50 border border-gray-600 rounded p-3 space-y-2 mb-6">
+                <label className="block text-sm font-medium text-gray-300">Custom Duration</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    value={customBlockDuration}
+                    onChange={(e) => setCustomBlockDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="flex-1 px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-red-500 focus:outline-none"
+                  />
+                  <select
+                    value={customBlockDurationUnit}
+                    onChange={(e) => setCustomBlockDurationUnit(e.target.value as 'hours' | 'days')}
+                    className="px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-red-500 focus:outline-none"
+                  >
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
+              </div>
+            )}
 
             {/* Action Buttons */}
             <div className="flex gap-3">
