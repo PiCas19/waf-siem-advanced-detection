@@ -750,7 +750,7 @@ const StatsPage: React.FC = () => {
     setProcessingKey(key);
 
     // Optimistic update: marca come blocked tutti gli alert con stesso ip+description
-    setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.description === description ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
+    setRecentAlerts(prev => prev.map(a => (a.ip === ip && (a.description || a.threat) === description ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
 
     try {
       const token = localStorage.getItem('authToken');
@@ -765,7 +765,7 @@ const StatsPage: React.FC = () => {
 
       if (!resp.ok) {
         // rollback
-        setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.description === description ? { ...a, blocked: false, blockedBy: '' } : a)));
+        setRecentAlerts(prev => prev.map(a => (a.ip === ip && (a.description || a.threat) === description ? { ...a, blocked: false, blockedBy: '' } : a)));
         showToast('Error blocking threat', 'error');
       } else {
         showToast('Threat blocked successfully', 'success');
@@ -774,7 +774,7 @@ const StatsPage: React.FC = () => {
       }
     } catch (e) {
       // rollback
-      setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.description === description ? { ...a, blocked: false, blockedBy: '' } : a)));
+      setRecentAlerts(prev => prev.map(a => (a.ip === ip && (a.description || a.threat) === description ? { ...a, blocked: false, blockedBy: '' } : a)));
       showToast('Network error blocking threat', 'error');
     } finally {
       setProcessingKey(null);
@@ -787,7 +787,7 @@ const StatsPage: React.FC = () => {
     setProcessingKey(key);
 
     // Optimistic update: marca come unblocked tutti gli alert con stesso ip+description
-    setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.description === description ? { ...a, blocked: false, blockedBy: '' } : a)));
+    setRecentAlerts(prev => prev.map(a => (a.ip === ip && (a.description || a.threat) === description ? { ...a, blocked: false, blockedBy: '' } : a)));
 
     try {
       const token = localStorage.getItem('authToken');
@@ -801,7 +801,7 @@ const StatsPage: React.FC = () => {
 
       if (!resp.ok) {
         // rollback
-        setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.description === description ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
+        setRecentAlerts(prev => prev.map(a => (a.ip === ip && (a.description || a.threat) === description ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
         showToast('Error unblocking threat', 'error');
       } else {
         showToast('Threat unblocked successfully', 'success');
@@ -810,7 +810,7 @@ const StatsPage: React.FC = () => {
       }
     } catch (e) {
       // rollback
-      setRecentAlerts(prev => prev.map(a => (a.ip === ip && a.description === description ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
+      setRecentAlerts(prev => prev.map(a => (a.ip === ip && (a.description || a.threat) === description ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
       showToast('Network error unblocking threat', 'error');
     } finally {
       setProcessingKey(null);
