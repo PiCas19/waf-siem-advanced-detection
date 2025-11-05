@@ -54,13 +54,17 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		DurationHours int    `json:"duration_hours"` // Custom duration in hours (-1 for permanent)
 	}
 
+	// Note: The JSON tag "duration_hours" is already correct above!
+	// This maps snake_case JSON field to Go field automatically
+
 	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Printf("[ERROR] Failed to bind JSON: %v\n", err)
 		c.JSON(400, gin.H{"error": "Invalid request"})
 		return
 	}
 
-	fmt.Printf("[DEBUG] BlockIP Request: IP=%s, Threat=%s, Permanent=%v, DurationHours=%d\n",
-		req.IP, req.Threat, req.Permanent, req.DurationHours)
+	fmt.Printf("[DEBUG] BlockIP Request RECEIVED: IP=%s, Threat=%s, Reason=%s, Permanent=%v, DurationHours=%d\n",
+		req.IP, req.Threat, req.Reason, req.Permanent, req.DurationHours)
 
 	// Controlla se esiste già un blocco per questo IP + descrizione
 	var existingBlock models.BlockedIP
