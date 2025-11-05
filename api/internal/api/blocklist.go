@@ -58,18 +58,9 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 	// This maps snake_case JSON field to Go field automatically
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		fmt.Printf("[ERROR] Failed to bind JSON: %v\n", err)
 		c.JSON(400, gin.H{"error": "Invalid request"})
 		return
 	}
-
-	fmt.Printf("[DEBUG] BlockIP Request RECEIVED:\n")
-	fmt.Printf("  IP=%s\n", req.IP)
-	fmt.Printf("  Threat=%s\n", req.Threat)
-	fmt.Printf("  Reason=%s\n", req.Reason)
-	fmt.Printf("  Permanent=%v\n", req.Permanent)
-	fmt.Printf("  DurationHours=%d (received as int)\n", req.DurationHours)
-	fmt.Printf("  blockedIP.Permanent will be=%v\n", req.Permanent || req.DurationHours == -1)
 
 	// Controlla se esiste già un blocco per questo IP + descrizione
 	var existingBlock models.BlockedIP
@@ -87,14 +78,10 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 	if !blockedIP.Permanent && req.DurationHours > 0 {
 		expiresAt := time.Now().Add(time.Duration(int64(req.DurationHours)) * time.Hour)
 		blockedIP.ExpiresAt = &expiresAt
-		fmt.Printf("[DEBUG] Setting ExpiresAt: %v (in %d hours from now: %v)\n", expiresAt, req.DurationHours, time.Now())
 	} else if !blockedIP.Permanent {
 		// Fallback: default 24 ore
 		expiresAt := time.Now().Add(24 * time.Hour)
 		blockedIP.ExpiresAt = &expiresAt
-		fmt.Printf("[DEBUG] Using default 24h expires: %v\n", expiresAt)
-	} else {
-		fmt.Printf("[DEBUG] Permanent block, no expiration\n")
 	}
 
 	// Se esiste, aggiorna; altrimenti crea

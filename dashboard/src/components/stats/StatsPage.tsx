@@ -236,10 +236,6 @@ const StatsPage: React.FC = () => {
     return unsubscribe;
   }, [onAlertReceived]);
 
-  // Debug: Log selectedDuration changes
-  useEffect(() => {
-    console.log('[DEBUG StatsPage] selectedDuration changed to:', selectedDuration);
-  }, [selectedDuration]);
 
   // Type per i filtri di tempo
   type TimeFilter = 'today' | '15m' | '30m' | '1h' | '24h' | 'week' | '7d' | '30d' | '90d' | '1y';
@@ -759,13 +755,11 @@ const StatsPage: React.FC = () => {
 
   // Apri modal per selezionare duration del blocco
   const handleBlockThreat = (ip: string, description: string) => {
-    console.log('[DEBUG StatsPage] handleBlockThreat called for IP:', ip, 'description:', description);
     setPendingBlockIP(ip);
     setPendingBlockDescription(description);
     setSelectedDuration(24); // Default 24 hours
     setCustomBlockDuration(24);
     setCustomBlockDurationUnit('hours');
-    console.log('[DEBUG StatsPage] Modal opening with selectedDuration reset to: 24');
     setBlockModalOpen(true);
   };
 
@@ -778,7 +772,6 @@ const StatsPage: React.FC = () => {
 
     // Calcola la duration in ore (stesso logic della BlocklistPage)
     let durationHours = 24;
-    console.log('[DEBUG StatsPage] selectedDuration:', selectedDuration, 'type:', typeof selectedDuration);
 
     if (selectedDuration === 'permanent') {
       durationHours = -1; // -1 per indicare permanente
@@ -788,8 +781,6 @@ const StatsPage: React.FC = () => {
       // selectedDuration è un numero che rappresenta le ore
       durationHours = selectedDuration as number;
     }
-
-    console.log('[DEBUG StatsPage] Calculated durationHours:', durationHours);
 
     // Optimistic update: marca come blocked
     setRecentAlerts(prev => prev.map(a => (a.ip === pendingBlockIP && (a.description || a.threat) === pendingBlockDescription ? { ...a, blocked: true, blockedBy: 'manual' } : a)));

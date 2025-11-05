@@ -68,7 +68,6 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          console.log('[DEBUG] Blocklist data from API:', data.blocked_ips);
           setBlocklist(data.blocked_ips || []);
         }
       } else if (activeTab === 'whitelist') {
@@ -104,7 +103,6 @@ const BlocklistPage: React.FC = () => {
 
     // Calcola la durata in ore
     let durationHours = 24;
-    console.log('[DEBUG] blockDuration state value:', blockDuration, 'type:', typeof blockDuration);
 
     if (blockDuration === 'permanent') {
       durationHours = -1;
@@ -115,8 +113,6 @@ const BlocklistPage: React.FC = () => {
       durationHours = blockDuration as number;
     }
 
-    console.log('[DEBUG] Calculated durationHours:', durationHours);
-
     try {
       const token = localStorage.getItem('authToken');
       const payloadToSend = {
@@ -126,7 +122,6 @@ const BlocklistPage: React.FC = () => {
         permanent: blockDuration === 'permanent',
         duration_hours: durationHours,
       };
-      console.log('[DEBUG] Sending block request:', payloadToSend);
 
       const response = await fetch('/api/blocklist', {
         method: 'POST',
@@ -137,10 +132,8 @@ const BlocklistPage: React.FC = () => {
         body: JSON.stringify(payloadToSend),
       });
 
-      const responseData = await response.json();
-      console.log('[DEBUG] Block response:', responseData);
-
       if (response.ok) {
+        await response.json(); // Parse but don't use
         showToast('IP blocked successfully', 'success', 4000);
         // Reset form after successful block
         setBlockForm({ ip: '', reason: '', duration: '24h' });
