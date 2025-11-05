@@ -63,8 +63,13 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("[DEBUG] BlockIP Request RECEIVED: IP=%s, Threat=%s, Reason=%s, Permanent=%v, DurationHours=%d\n",
-		req.IP, req.Threat, req.Reason, req.Permanent, req.DurationHours)
+	fmt.Printf("[DEBUG] BlockIP Request RECEIVED:\n")
+	fmt.Printf("  IP=%s\n", req.IP)
+	fmt.Printf("  Threat=%s\n", req.Threat)
+	fmt.Printf("  Reason=%s\n", req.Reason)
+	fmt.Printf("  Permanent=%v\n", req.Permanent)
+	fmt.Printf("  DurationHours=%d (received as int)\n", req.DurationHours)
+	fmt.Printf("  blockedIP.Permanent will be=%v\n", req.Permanent || req.DurationHours == -1)
 
 	// Controlla se esiste già un blocco per questo IP + descrizione
 	var existingBlock models.BlockedIP
