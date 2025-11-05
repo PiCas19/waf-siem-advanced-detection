@@ -68,6 +68,7 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
+          console.log('[DEBUG] Blocklist data from API:', data.blocked_ips);
           setBlocklist(data.blocked_ips || []);
         }
       } else if (activeTab === 'whitelist') {
@@ -114,20 +115,26 @@ const BlocklistPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('authToken');
+      const payloadToSend = {
+        ip: blockForm.ip,
+        threat: blockForm.reason || 'Manually blocked',
+        reason: blockForm.reason || 'Manually blocked',
+        permanent: blockDuration === 'permanent',
+        duration_hours: durationHours,
+      };
+      console.log('[DEBUG] Sending block request:', payloadToSend);
+
       const response = await fetch('/api/blocklist', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ip: blockForm.ip,
-          threat: blockForm.reason || 'Manually blocked',
-          reason: blockForm.reason || 'Manually blocked',
-          permanent: blockDuration === 'permanent',
-          duration_hours: durationHours,
-        }),
+        body: JSON.stringify(payloadToSend),
       });
+
+      const responseData = await response.json();
+      console.log('[DEBUG] Block response:', responseData);
 
       if (response.ok) {
         showToast('IP blocked successfully', 'success', 4000);
