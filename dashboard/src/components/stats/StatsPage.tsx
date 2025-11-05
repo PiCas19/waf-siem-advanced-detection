@@ -205,19 +205,6 @@ const getSeverityColor = (count: number): string => {
   return '#3b82f6'; // Blue for low
 };
 
-interface BlockDurationOption {
-  label: string;
-  value: number | 'permanent' | 'custom'; // hours or 'permanent' or 'custom'
-}
-
-const BLOCK_DURATION_OPTIONS: BlockDurationOption[] = [
-  { label: '24 Hours', value: 24 },
-  { label: '7 Days', value: 168 },
-  { label: '30 Days', value: 720 },
-  { label: 'Permanent', value: 'permanent' },
-  { label: 'Custom', value: 'custom' },
-];
-
 const StatsPage: React.FC = () => {
   const { stats, isConnected, onAlertReceived } = useWebSocketStats();
   const { user } = useAuth();
