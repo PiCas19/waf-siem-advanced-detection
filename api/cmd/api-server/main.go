@@ -37,6 +37,11 @@ func main() {
 		log.Fatal("Failed to initialize database:", err)
 	}
 
+	// Seed default users (creates root admin if it doesn't exist)
+	if err := database.SeedDefaultUsers(db); err != nil {
+		log.Printf("[WARN] Failed to seed default users: %v\n", err)
+	}
+
 	// Initialize MaxMind GeoIP database
 	licenseKey := os.Getenv("MAXMIND_LICENSE_KEY")
 	if licenseKey != "" {

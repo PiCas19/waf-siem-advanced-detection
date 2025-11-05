@@ -44,9 +44,15 @@ func NewGetLogsHandler(db *gorm.DB) gin.HandlerFunc {
 
 		// Normalize blockedBy for default threats
 		// Default threats should always show blockedBy="auto" even if manually blocked
+		// Also ensure Severity is always set
 		for i := range logs {
 			if isDefaultThreatType(logs[i].ThreatType) {
 				logs[i].BlockedBy = "auto"
+			}
+
+			// Ensure severity is always set (for backwards compatibility with old logs)
+			if logs[i].Severity == "" || logs[i].Severity == "N/A" {
+				logs[i].Severity = GetSeverityFromThreatType(logs[i].ThreatType)
 			}
 		}
 
