@@ -404,12 +404,12 @@ const BlocklistPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-300 mb-2">Block Duration</label>
                   <div className="space-y-2">
                     {[
-                      { label: '24 Hours', value: 24 as const },
-                      { label: '7 Days', value: (7 * 24) as const },
-                      { label: '30 Days', value: (30 * 24) as const },
-                      { label: 'Permanent', value: 'permanent' as const },
-                      { label: 'Custom', value: 'custom' as const },
-                    ].map((option) => (
+                      { label: '24 Hours', value: 24 },
+                      { label: '7 Days', value: 168 },
+                      { label: '30 Days', value: 720 },
+                      { label: 'Permanent', value: 'permanent' },
+                      { label: 'Custom', value: 'custom' },
+                    ] as const satisfies ReadonlyArray<{ label: string; value: number | 'permanent' | 'custom' }>[]).map((option) => (
                       <label key={`${option.value}`} className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
