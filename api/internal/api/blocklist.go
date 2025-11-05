@@ -94,10 +94,11 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 			c.JSON(500, gin.H{"error": "Failed to update blocked IP", "details": err.Error()})
 			return
 		}
+		// Ricarica l'entry aggiornata dal database
+		db.First(&existingBlock)
 		c.JSON(200, gin.H{
 			"message": "IP block updated successfully",
-			"ip":      req.IP,
-			"threat":  req.Threat,
+			"entry":   existingBlock,
 		})
 	} else {
 		if err := db.Create(&blockedIP).Error; err != nil {
@@ -106,8 +107,7 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		}
 		c.JSON(201, gin.H{
 			"message": "IP blocked successfully",
-			"ip":      req.IP,
-			"threat":  req.Threat,
+			"entry":   blockedIP,
 		})
 	}
 
