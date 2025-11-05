@@ -781,6 +781,8 @@ const StatsPage: React.FC = () => {
 
     // Calcola la duration in ore
     let durationHours = 24;
+    console.log('[DEBUG StatsPage] selectedDuration:', selectedDuration, 'type:', typeof selectedDuration);
+
     if (selectedDuration === 'permanent') {
       durationHours = -1; // -1 per indicare permanente
     } else if (selectedDuration === 'custom') {
@@ -788,6 +790,8 @@ const StatsPage: React.FC = () => {
     } else {
       durationHours = (selectedDuration as number) / 60; // Converti da minuti a ore
     }
+
+    console.log('[DEBUG StatsPage] Calculated durationHours:', durationHours);
 
     // Optimistic update: marca come blocked
     setRecentAlerts(prev => prev.map(a => (a.ip === pendingBlockIP && (a.description || a.threat) === pendingBlockDescription ? { ...a, blocked: true, blockedBy: 'manual' } : a)));

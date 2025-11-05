@@ -104,6 +104,8 @@ const BlocklistPage: React.FC = () => {
 
     // Calcola la durata in ore
     let durationHours = 24;
+    console.log('[DEBUG] blockDuration state value:', blockDuration, 'type:', typeof blockDuration);
+
     if (blockDuration === 'permanent') {
       durationHours = -1;
     } else if (blockDuration === 'custom') {
@@ -112,6 +114,8 @@ const BlocklistPage: React.FC = () => {
       // blockDuration è un numero che rappresenta le ore
       durationHours = blockDuration as number;
     }
+
+    console.log('[DEBUG] Calculated durationHours:', durationHours);
 
     try {
       const token = localStorage.getItem('authToken');
@@ -138,6 +142,7 @@ const BlocklistPage: React.FC = () => {
 
       if (response.ok) {
         showToast('IP blocked successfully', 'success', 4000);
+        // Reset form after successful block
         setBlockForm({ ip: '', reason: '', duration: '24h' });
         setBlockDuration(24);
         setCustomBlockDuration(24);
