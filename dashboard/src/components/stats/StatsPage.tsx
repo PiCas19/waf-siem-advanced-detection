@@ -785,9 +785,8 @@ const StatsPage: React.FC = () => {
 
     if (selectedDuration === 'permanent') {
       durationHours = -1; // -1 per indicare permanente
-    } else if (selectedDuration === 'custom') {
-      durationHours = customDurationUnit === 'hours' ? customDuration : customDuration * 24;
     } else {
+      // selectedDuration è sempre in minuti per le opzioni preset
       durationHours = (selectedDuration as number) / 60; // Converti da minuti a ore
     }
 
@@ -1592,28 +1591,6 @@ const StatsPage: React.FC = () => {
                   {option.label}
                 </button>
               ))}
-            </div>
-
-            {/* Custom Duration Input */}
-            <div className="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-700">
-              <label className="text-gray-300 text-sm font-medium mb-2 block">Custom Duration</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  value={customDuration}
-                  onChange={(e) => setCustomDuration(parseInt(e.target.value) || 1)}
-                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                />
-                <select
-                  value={customDurationUnit}
-                  onChange={(e) => setCustomDurationUnit(e.target.value as 'hours' | 'days')}
-                  className="px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500"
-                >
-                  <option value="hours">Hours</option>
-                  <option value="days">Days</option>
-                </select>
-              </div>
             </div>
 
             {/* Action Buttons */}
