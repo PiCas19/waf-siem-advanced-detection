@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -100,6 +101,26 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 			c.JSON(500, gin.H{"error": "Failed to create blocked IP", "details": err.Error()})
 			return
 		}
+
+		// Log this action
+		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+		durationStr := "temporary"
+		if blockedIP.Permanent {
+			durationStr = "permanent"
+		} else if req.DurationHours > 0 {
+			durationStr = fmt.Sprintf("%d hours", req.DurationHours)
+		}
+		details := map[string]interface{}{
+			"ip":          req.IP,
+			"threat_type": req.Threat,
+			"reason":      req.Reason,
+			"duration":    durationStr,
+		}
+		LogAuditAction(db, userID.(uint), userEmail.(string), "BLOCK_IP", "BLOCKLIST",
+			"ip", req.IP, fmt.Sprintf("Blocked IP %s for threat: %s", req.IP, req.Threat),
+			details, c.ClientIP())
+
 		c.JSON(201, gin.H{
 			"message": "IP blocked successfully",
 			"entry":   blockedIP,
@@ -135,6 +156,17 @@ func UnblockIPWithDB(db *gorm.DB, c *gin.Context) {
 		c.JSON(500, gin.H{"error": "Failed to delete blocked IP", "details": err.Error()})
 		return
 	}
+
+	// Log this unblock action
+	userID, _ := c.Get("user_id")
+	userEmail, _ := c.Get("user_email")
+	details := map[string]interface{}{
+		"ip":          ip,
+		"threat_type": threat,
+	}
+	LogAuditAction(db, userID.(uint), userEmail.(string), "UNBLOCK_IP", "BLOCKLIST",
+		"ip", ip, fmt.Sprintf("Unblocked IP %s for threat: %s", ip, threat),
+		details, c.ClientIP())
 
 	// Update logs for this IP AND descrizione to remove "manual" BlockedBy status
 	// For default threats (XSS, SQLi, etc.), restore blocked_by="auto" since they're always blocked by rules

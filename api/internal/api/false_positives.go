@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -15,7 +14,6 @@ func NewGetFalsePositivesHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var falsePositives []models.FalsePositive
 		if err := db.Order("created_at DESC").Find(&falsePositives).Error; err != nil {
-			fmt.Printf("[ERROR] Failed to fetch false positives: %v\n", err)
 			c.JSON(500, gin.H{"error": "failed to fetch false positives"})
 			return
 		}
@@ -54,13 +52,11 @@ func NewReportFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		if err := db.Create(&falsePositive).Error; err != nil {
-			fmt.Printf("[ERROR] Failed to report false positive: %v\n", err)
-			c.JSON(500, gin.H{"error": "failed to report false positive"})
+				c.JSON(500, gin.H{"error": "failed to report false positive"})
 			return
 		}
 
-		fmt.Printf("[INFO] False positive reported: IP=%s, Threat=%s\n", req.ClientIP, req.ThreatType)
-
+	
 		c.JSON(201, gin.H{
 			"message": "False positive reported successfully",
 			"entry":   falsePositive,
@@ -105,8 +101,7 @@ func NewUpdateFalsePositiveStatusHandler(db *gorm.DB) gin.HandlerFunc {
 			if err == gorm.ErrRecordNotFound {
 				c.JSON(404, gin.H{"error": "Entry not found"})
 			} else {
-				fmt.Printf("[ERROR] Failed to update false positive: %v\n", err)
-				c.JSON(500, gin.H{"error": "failed to update false positive"})
+					c.JSON(500, gin.H{"error": "failed to update false positive"})
 			}
 			return
 		}
@@ -123,8 +118,7 @@ func NewUpdateFalsePositiveStatusHandler(db *gorm.DB) gin.HandlerFunc {
 			db.Create(&whitelist)
 		}
 
-		fmt.Printf("[INFO] False positive updated: ID=%s, Status=%s\n", id, req.Status)
-
+	
 		c.JSON(200, gin.H{"message": "Status updated successfully"})
 	}
 }
@@ -143,13 +137,11 @@ func NewDeleteFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
 			if err == gorm.ErrRecordNotFound {
 				c.JSON(404, gin.H{"error": "Entry not found"})
 			} else {
-				fmt.Printf("[ERROR] Failed to delete false positive: %v\n", err)
-				c.JSON(500, gin.H{"error": "failed to delete false positive"})
+					c.JSON(500, gin.H{"error": "failed to delete false positive"})
 			}
 			return
 		}
 
-		fmt.Printf("[INFO] False positive deleted: ID=%s\n", id)
 
 		c.JSON(200, gin.H{"message": "Entry deleted successfully"})
 	}
