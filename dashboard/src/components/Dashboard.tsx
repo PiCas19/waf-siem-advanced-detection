@@ -71,7 +71,7 @@ const Dashboard: React.FC = () => {
               </button>
             </PermissionGate>
 
-            {/* IP Quarantine Management - needs blocklist_view permission */}
+            {/* Quarantine - needs blocklist_view permission */}
             <PermissionGate permission="blocklist_view">
               <button
                 onClick={() => setActiveTab('blocklist')}
@@ -81,7 +81,7 @@ const Dashboard: React.FC = () => {
                     : 'border-transparent text-gray-400 hover:text-white'
                 }`}
               >
-                IP Quarantine Management
+                Quarantine
               </button>
             </PermissionGate>
 
