@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Lock, CheckCircle, AlertTriangle, Trash2, Clock, Zap } from 'lucide-react';
 import { useToast } from '@/contexts/SnackbarContext';
 
 interface BlockedEntry {
   id: string | number;
   ip_address: string;
+  description: string;
   reason: string;
   created_at: string;
   expires_at: string | null;
@@ -155,12 +156,12 @@ const BlocklistPage: React.FC = () => {
     }
   };
 
-  const handleDeleteBlock = async (id: string | number) => {
+  const handleDeleteBlock = async (ip: string, description: string) => {
     if (!confirm('Are you sure you want to remove this entry?')) return;
 
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/blocklist/${id}`, {
+      const response = await fetch(`/api/blocklist/${ip}?threat=${encodeURIComponent(description)}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -168,6 +169,8 @@ const BlocklistPage: React.FC = () => {
       if (response.ok) {
         showToast('Entry removed successfully', 'success', 4000);
         loadData();
+      } else {
+        showToast('Failed to delete entry', 'error', 4000);
       }
     } catch (error) {
       showToast('Failed to delete entry', 'error', 4000);
@@ -211,6 +214,27 @@ const BlocklistPage: React.FC = () => {
       }
     } catch (error) {
       showToast('Failed to update status', 'error', 4000);
+    }
+  };
+
+  const handleDeleteFalsePositive = async (id: string | number) => {
+    if (!confirm('Are you sure you want to delete this false positive record?')) return;
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`/api/false-positives/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        showToast('False positive deleted successfully', 'success', 4000);
+        loadData();
+      } else {
+        showToast('Failed to delete false positive', 'error', 4000);
+      }
+    } catch (error) {
+      showToast('Failed to delete false positive', 'error', 4000);
     }
   };
 
@@ -381,6 +405,7 @@ const BlocklistPage: React.FC = () => {
                   <thead className="bg-gray-700">
                     <tr>
                       <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>
+                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat/Rule</th>
                       <th className="text-left py-3 px-4 text-gray-300 font-medium">Reason</th>
                       <th className="text-left py-3 px-4 text-gray-300 font-medium">Type</th>
                       <th className="text-left py-3 px-4 text-gray-300 font-medium">Blocked Date</th>
@@ -392,14 +417,25 @@ const BlocklistPage: React.FC = () => {
                     {filteredBlocklist.map((entry) => (
                       <tr key={entry.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
                         <td className="py-3 px-4 text-white font-mono">{entry.ip_address}</td>
+                        <td className="py-3 px-4 text-gray-300 font-medium">{entry.description}</td>
                         <td className="py-3 px-4 text-gray-300">{entry.reason}</td>
                         <td className="py-3 px-4">
-                          <span className={`px-3 py-1 rounded text-xs font-medium ${
+                          <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
                             entry.permanent
                               ? 'bg-red-500/20 text-red-300'
                               : 'bg-yellow-500/20 text-yellow-300'
                           }`}>
-                            {entry.permanent ? '⏳ Permanent' : '⏱️ 24 Hours'}
+                            {entry.permanent ? (
+                              <>
+                                <Zap size={12} />
+                                Permanent
+                              </>
+                            ) : (
+                              <>
+                                <Clock size={12} />
+                                Temporary
+                              </>
+                            )}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-gray-400 text-sm">
@@ -410,9 +446,10 @@ const BlocklistPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 text-center">
                           <button
-                            onClick={() => handleDeleteBlock(entry.id)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                            onClick={() => handleDeleteBlock(entry.ip_address, entry.description)}
+                            className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
                           >
+                            <Trash2 size={14} />
                             Remove
                           </button>
                         </td>
@@ -512,8 +549,9 @@ const BlocklistPage: React.FC = () => {
                         <td className="py-3 px-4 text-center">
                           <button
                             onClick={() => handleDeleteWhite(entry.id)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                            className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
                           >
+                            <Trash2 size={14} />
                             Remove
                           </button>
                         </td>
@@ -549,33 +587,57 @@ const BlocklistPage: React.FC = () => {
                       <p className="text-gray-400 text-sm">{fp.method} {fp.url}</p>
                       <p className="text-gray-500 text-xs mt-1">IP: {fp.client_ip}</p>
                     </div>
-                    <span className={`px-3 py-1 rounded text-xs font-medium ${
+                    <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
                       fp.status === 'pending' ? 'bg-blue-500/20 text-blue-300' :
                       fp.status === 'whitelisted' ? 'bg-green-500/20 text-green-300' :
                       'bg-gray-500/20 text-gray-300'
                     }`}>
-                      {fp.status === 'pending' ? '⏳ Pending' :
-                       fp.status === 'whitelisted' ? '✅ Whitelisted' :
-                       '👁️ Reviewed'}
+                      {fp.status === 'pending' ? (
+                        <>
+                          <Clock size={12} />
+                          Pending
+                        </>
+                      ) : fp.status === 'whitelisted' ? (
+                        <>
+                          <CheckCircle size={12} />
+                          Whitelisted
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle size={12} />
+                          Reviewed
+                        </>
+                      )}
                     </span>
                   </div>
 
-                  {fp.status === 'pending' && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleMarkFalsePositive(fp.id, 'reviewed')}
-                        className="px-4 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
-                      >
-                        Mark as Reviewed
-                      </button>
-                      <button
-                        onClick={() => handleMarkFalsePositive(fp.id, 'whitelisted')}
-                        className="px-4 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
-                      >
-                        Whitelist IP
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex gap-2 pt-3 border-t border-gray-700">
+                    {fp.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => handleMarkFalsePositive(fp.id, 'reviewed')}
+                          className="inline-flex items-center gap-2 px-4 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
+                        >
+                          <AlertTriangle size={14} />
+                          Mark as Reviewed
+                        </button>
+                        <button
+                          onClick={() => handleMarkFalsePositive(fp.id, 'whitelisted')}
+                          className="inline-flex items-center gap-2 px-4 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
+                        >
+                          <CheckCircle size={14} />
+                          Whitelist IP
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleDeleteFalsePositive(fp.id)}
+                      className="ml-auto inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
