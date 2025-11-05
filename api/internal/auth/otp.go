@@ -77,10 +77,8 @@ func verifyTOTP(secret, code string, counter int64) bool {
 	decoder := base32.StdEncoding.WithPadding(base32.NoPadding)
 	decodedSecret, err := decoder.DecodeString(secret)
 	if err != nil {
-		fmt.Printf("[TOTP DEBUG] Failed to decode secret: %v\n", err)
 		return false
 	}
-	fmt.Printf("[DECODE DEBUG] Secret: %s, Decoded length: %d, Decoded hex: %x\n", secret, len(decodedSecret), decodedSecret)
 
 	// Calculate HMAC-SHA1
 	hash := calculateHMAC(decodedSecret, counter)
@@ -91,7 +89,6 @@ func verifyTOTP(secret, code string, counter int64) bool {
 
 	// Extract 4 bytes starting at offset (with bounds checking)
 	if int(offset) > len(hash)-4 {
-		fmt.Printf("[TOTP DEBUG] Offset out of bounds: %d, hash length: %d\n", offset, len(hash))
 		return false
 	}
 
@@ -105,10 +102,6 @@ func verifyTOTP(secret, code string, counter int64) bool {
 	codeValue := int(code32 % 1000000)
 
 	generatedCode := fmt.Sprintf("%06d", codeValue)
-	fmt.Printf("[TOTP DEBUG] Counter: %d, Offset: %d, Generated: %s, Expected: %s, Match: %v\n", counter, offset, generatedCode, code, generatedCode == code)
-	fmt.Printf("[TOTP DEBUG] HMAC hex: %x\n", hash)
-	fmt.Printf("[TOTP DEBUG] code32 calculation: %x (offset+0)=%x (offset+1)=%x (offset+2)=%x (offset+3)=%x\n",
-		code32, hash[offset], hash[offset+1], hash[offset+2], hash[offset+3])
 
 	// Verify the code
 	return generatedCode == code

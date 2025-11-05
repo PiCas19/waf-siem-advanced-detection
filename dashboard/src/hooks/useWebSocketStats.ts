@@ -73,13 +73,11 @@ export function useWebSocketStats() {
     const connectWebSocket = () => {
       // Se già connesso o connettando, non fare nulla
       if (globalWs && (globalWs.readyState === WebSocket.OPEN || globalWs.readyState === WebSocket.CONNECTING)) {
-        console.log('[WebSocket] Already connected or connecting, skipping new connection');
         setIsConnected(globalWs.readyState === WebSocket.OPEN);
         return;
       }
 
       if (isConnecting) {
-        console.log('[WebSocket] Already attempting to connect, skipping duplicate attempt');
         return;
       }
 
@@ -87,12 +85,10 @@ export function useWebSocketStats() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       // Usa la stessa host e porta del frontend (Caddy fa da proxy per /ws)
       const wsUrl = `${protocol}//${window.location.host}/ws`;
-      console.log('[WebSocket] Attempting to connect to:', wsUrl);
 
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        console.log('[WebSocket] ✅ Connected to stats stream');
         globalWs = ws;
         isConnecting = false;
         setIsConnected(true);
@@ -101,16 +97,10 @@ export function useWebSocketStats() {
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('[WebSocket] Received message:', message);
 
           // Se ricevi un evento WAF, aggiorna gli stats e invia agli alert
           if (message.type === 'waf_event' && message.data) {
             const wafEvent = message.data;
-            console.log('[WebSocket] Processing WAF event:', {
-              threat: wafEvent.threat,
-              blocked: wafEvent.blocked,
-              ip: wafEvent.ip,
-            });
 
             // Aggiorna stats
             setStats((prevStats) => ({
@@ -134,29 +124,24 @@ export function useWebSocketStats() {
             // Chiama tutti i callback registrati
             alertCallbacksRef.current.forEach(callback => callback(alert));
             setNewAlert(alert);
-          } else {
-            console.log('[WebSocket] Ignoring message - type:', message.type, 'has data:', !!message.data);
           }
         } catch (error) {
-          console.error('[WebSocket] Failed to parse message:', error);
+          // Silently ignore parse errors
         }
       };
 
-      ws.onerror = (error) => {
-        console.error('[WebSocket] ❌ Error:', error);
+      ws.onerror = () => {
         isConnecting = false;
         setIsConnected(false);
       };
 
       ws.onclose = () => {
-        console.log('[WebSocket] 🔴 Disconnected from stats stream. Reconnecting in 3 seconds...');
         globalWs = null;
         isConnecting = false;
         setIsConnected(false);
 
         // Reconnect automaticamente dopo 3 secondi
         setTimeout(() => {
-          console.log('[WebSocket] Attempting automatic reconnect...');
           connectWebSocket();
         }, 3000);
       };
@@ -168,7 +153,7 @@ export function useWebSocketStats() {
 
     // Non chiudere il WebSocket - mantieni la connessione attiva
     return () => {
-      console.log('[WebSocket] Component unmounted, keeping WebSocket alive');
+      // Component unmounted, keeping WebSocket alive
     };
   }, []);
 

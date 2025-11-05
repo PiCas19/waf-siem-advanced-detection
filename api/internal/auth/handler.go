@@ -245,10 +245,8 @@ func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
 	if h.mailer != nil {
 		if err := h.mailer.SendInvite(req.Email, req.Name, resetLink, tempPassword); err == nil {
 			emailSent = true
-		} else {
-			// log and continue
-			fmt.Printf("failed to send invite email: %v\n", err)
 		}
+		// log and continue
 	}
 
 	// Return created response. In production avoid returning tokens; for now include reset_link for convenience if email not sent.
