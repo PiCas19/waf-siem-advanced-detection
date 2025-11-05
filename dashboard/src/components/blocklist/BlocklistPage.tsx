@@ -40,7 +40,6 @@ const BlocklistPage: React.FC = () => {
 
   const [showAddBlockForm, setShowAddBlockForm] = useState(false);
   const [showAddWhiteForm, setShowAddWhiteForm] = useState(false);
-  const [showBlockDurationModal, setShowBlockDurationModal] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,7 +47,7 @@ const BlocklistPage: React.FC = () => {
 
   // Form states
   const [blockForm, setBlockForm] = useState({ ip: '', reason: '', duration: '24h' });
-  const [blockDuration, setBlockDuration] = useState<number | 'permanent'>('24h' as any);
+  const [blockDuration, setBlockDuration] = useState<number | 'permanent' | 'custom'>(24);
   const [customBlockDuration, setCustomBlockDuration] = useState<number>(24);
   const [customBlockDurationUnit, setCustomBlockDurationUnit] = useState<'hours' | 'days'>('hours');
   const [whiteForm, setWhiteForm] = useState({ ip: '', reason: '' });
@@ -133,7 +132,7 @@ const BlocklistPage: React.FC = () => {
       if (response.ok) {
         showToast('IP blocked successfully', 'success', 4000);
         setBlockForm({ ip: '', reason: '', duration: '24h' });
-        setBlockDuration('24h' as any);
+        setBlockDuration(24);
         setCustomBlockDuration(24);
         setCustomBlockDurationUnit('hours');
         setShowAddBlockForm(false);
@@ -405,13 +404,13 @@ const BlocklistPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-300 mb-2">Block Duration</label>
                   <div className="space-y-2">
                     {[
-                      { label: '24 Hours', value: 24 },
-                      { label: '7 Days', value: 7 * 24 },
-                      { label: '30 Days', value: 30 * 24 },
-                      { label: 'Permanent', value: 'permanent' as any },
-                      { label: 'Custom', value: 'custom' as any },
+                      { label: '24 Hours', value: 24 as const },
+                      { label: '7 Days', value: (7 * 24) as const },
+                      { label: '30 Days', value: (30 * 24) as const },
+                      { label: 'Permanent', value: 'permanent' as const },
+                      { label: 'Custom', value: 'custom' as const },
                     ].map((option) => (
-                      <label key={option.value} className="flex items-center gap-2 cursor-pointer">
+                      <label key={`${option.value}`} className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
                           name="blockDuration"
