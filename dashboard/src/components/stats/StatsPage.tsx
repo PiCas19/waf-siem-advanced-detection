@@ -246,6 +246,11 @@ const StatsPage: React.FC = () => {
     return unsubscribe;
   }, [onAlertReceived]);
 
+  // Debug: Log selectedDuration changes
+  useEffect(() => {
+    console.log('[DEBUG StatsPage] selectedDuration changed to:', selectedDuration);
+  }, [selectedDuration]);
+
   // Type per i filtri di tempo
   type TimeFilter = 'today' | '15m' | '30m' | '1h' | '24h' | 'week' | '7d' | '30d' | '90d' | '1y';
 
@@ -764,9 +769,11 @@ const StatsPage: React.FC = () => {
 
   // Apri modal per selezionare duration del blocco
   const handleBlockThreat = (ip: string, description: string) => {
+    console.log('[DEBUG StatsPage] handleBlockThreat called for IP:', ip, 'description:', description);
     setPendingBlockIP(ip);
     setPendingBlockDescription(description);
     setSelectedDuration(24 * 60); // Default 24 hours
+    console.log('[DEBUG StatsPage] Modal opening with selectedDuration reset to:', 24 * 60);
     setBlockModalOpen(true);
   };
 
@@ -1576,9 +1583,11 @@ const StatsPage: React.FC = () => {
             <div className="space-y-3 mb-6">
               {BLOCK_DURATION_OPTIONS.map((option) => (
                 <button
-                  key={option.value}
+                  key={option.label}
                   onClick={() => {
+                    console.log('[DEBUG StatsPage] Duration button clicked, option.value:', option.value);
                     setSelectedDuration(option.value);
+                    console.log('[DEBUG StatsPage] selectedDuration state set to:', option.value);
                   }}
                   className={`w-full px-4 py-3 rounded-lg font-medium transition ${
                     selectedDuration === option.value
