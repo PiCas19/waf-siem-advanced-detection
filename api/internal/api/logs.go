@@ -29,9 +29,17 @@ func isDefaultThreatType(threatType string) bool {
 func NewGetLogsHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var logs []models.Log
+		var auditLogs []models.AuditLog
+
+		// Fetch security logs
 		if err := db.Order("created_at DESC").Find(&logs).Error; err != nil {
 			c.JSON(500, gin.H{"error": "failed to fetch logs"})
 			return
+		}
+
+		// Fetch audit logs
+		if err := db.Order("created_at DESC").Find(&auditLogs).Error; err != nil {
+			// If audit logs fail, continue with just security logs
 		}
 
 		// Normalize blockedBy for default threats
@@ -42,6 +50,10 @@ func NewGetLogsHandler(db *gorm.DB) gin.HandlerFunc {
 			}
 		}
 
-		c.JSON(200, gin.H{"logs": logs})
+		c.JSON(200, gin.H{
+			"security_logs": logs,
+			"audit_logs":    auditLogs,
+			"logs":          logs, // Keep for backward compatibility
+		})
 	}
 }

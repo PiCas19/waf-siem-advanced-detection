@@ -27,6 +27,35 @@ var (
 	}
 )
 
+// GetSeverityFromThreatType determines severity level based on threat type
+func GetSeverityFromThreatType(threatType string) string {
+	severityMap := map[string]string{
+		// Critical threats - can lead to complete system compromise
+		"SQL_INJECTION":           "Critical",
+		"COMMAND_INJECTION":       "Critical",
+		"XXE":                     "Critical",
+		"LDAP_INJECTION":          "Critical",
+		"RFI":                     "Critical",
+		"SSTI":                    "Critical",
+
+		// High threats - can lead to significant data exposure or unauthorized access
+		"XSS":                     "High",
+		"LFI":                     "High",
+		"PATH_TRAVERSAL":          "High",
+		"SSRF":                    "High",
+		"NOSQL_INJECTION":         "High",
+		"HTTP_RESPONSE_SPLITTING": "High",
+
+		// Medium threats - restricted access or partial compromise
+		"PROTOTYPE_POLLUTION": "Medium",
+	}
+
+	if severity, exists := severityMap[threatType]; exists {
+		return severity
+	}
+	return "Medium" // Default severity for unknown threats
+}
+
 func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var event websocket.WAFEvent
@@ -71,6 +100,7 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 			CreatedAt:   time.Now(),
 			Blocked:     event.Blocked,
 			BlockedBy:   event.BlockedBy,
+			Severity:    GetSeverityFromThreatType(event.Threat),
 		}
 		if err := db.Create(&log).Error; err != nil {
 			fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)

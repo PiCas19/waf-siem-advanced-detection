@@ -14,7 +14,6 @@ func NewGetWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var whitelisted []models.WhitelistedIP
 		if err := db.Order("created_at DESC").Find(&whitelisted).Error; err != nil {
-			fmt.Printf("[ERROR] Failed to fetch whitelist: %v\n", err)
 			c.JSON(500, gin.H{"error": "failed to fetch whitelist"})
 			return
 		}
@@ -44,12 +43,20 @@ func NewAddToWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		if err := db.Create(&whitelist).Error; err != nil {
-			fmt.Printf("[ERROR] Failed to add to whitelist: %v\n", err)
 			c.JSON(500, gin.H{"error": "failed to add to whitelist"})
 			return
 		}
 
-		fmt.Printf("[INFO] IP whitelisted: %s\n", req.IPAddress)
+		// Log this action
+		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+		details := map[string]interface{}{
+			"ip":     req.IPAddress,
+			"reason": req.Reason,
+		}
+		LogAuditAction(db, userID.(uint), userEmail.(string), "ADD_WHITELIST", "WHITELIST",
+			"ip", req.IPAddress, fmt.Sprintf("Added IP %s to whitelist", req.IPAddress),
+			details, c.ClientIP())
 
 		c.JSON(201, gin.H{
 			"message": "IP whitelisted successfully",
@@ -68,17 +75,26 @@ func NewRemoveFromWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Fetch IP address before deleting for logging
+		var whitelistEntry models.WhitelistedIP
+		db.First(&whitelistEntry, uint(idUint))
+		ipAddr := whitelistEntry.IPAddress
+
 		if err := db.Delete(&models.WhitelistedIP{}, uint(idUint)).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				c.JSON(404, gin.H{"error": "Entry not found"})
 			} else {
-				fmt.Printf("[ERROR] Failed to remove from whitelist: %v\n", err)
-				c.JSON(500, gin.H{"error": "failed to remove from whitelist"})
+						c.JSON(500, gin.H{"error": "failed to remove from whitelist"})
 			}
 			return
 		}
 
-		fmt.Printf("[INFO] IP removed from whitelist: ID=%s\n", id)
+		// Log this action
+		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+		LogAuditAction(db, userID.(uint), userEmail.(string), "REMOVE_WHITELIST", "WHITELIST",
+			"ip", ipAddr, fmt.Sprintf("Removed IP %s from whitelist", ipAddr),
+			map[string]interface{}{"ip": ipAddr}, c.ClientIP())
 
 		c.JSON(200, gin.H{"message": "IP removed from whitelist successfully"})
 	}

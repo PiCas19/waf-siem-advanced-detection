@@ -9,12 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/mailer"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
-
-	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 )
 
 type AuthHandler struct {
@@ -92,6 +91,22 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// Log successful login (using direct DB create since we're in auth package)
+	ipAddress := c.ClientIP()
+	auditLog := models.AuditLog{
+		UserID:       user.ID,
+		UserEmail:    user.Email,
+		Action:       "LOGIN",
+		Category:     "AUTH",
+		ResourceType: "user",
+		ResourceID:   fmt.Sprintf("%d", user.ID),
+		Description:  fmt.Sprintf("User logged in successfully"),
+		Status:       "success",
+		IPAddress:    ipAddress,
+		CreatedAt:    time.Now(),
+	}
+	h.db.Create(&auditLog)
+
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
 		"user": gin.H{
@@ -153,6 +168,22 @@ func (h *AuthHandler) VerifyOTPLogin(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
+
+	// Log successful 2FA login
+	ipAddress := c.ClientIP()
+	auditLog := models.AuditLog{
+		UserID:       user.ID,
+		UserEmail:    user.Email,
+		Action:       "LOGIN_2FA",
+		Category:     "AUTH",
+		ResourceType: "user",
+		ResourceID:   fmt.Sprintf("%d", user.ID),
+		Description:  fmt.Sprintf("User logged in successfully with 2FA"),
+		Status:       "success",
+		IPAddress:    ipAddress,
+		CreatedAt:    time.Now(),
+	}
+	h.db.Create(&auditLog)
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
