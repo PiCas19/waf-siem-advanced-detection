@@ -782,24 +782,28 @@ const StatsPage: React.FC = () => {
       durationHours = selectedDuration as number;
     }
 
+    console.log('[TEMP DEBUG] selectedDuration:', selectedDuration, 'calculated durationHours:', durationHours);
+
     // Optimistic update: marca come blocked
     setRecentAlerts(prev => prev.map(a => (a.ip === pendingBlockIP && (a.description || a.threat) === pendingBlockDescription ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
 
     try {
       const token = localStorage.getItem('authToken');
+      const payload = {
+        ip: pendingBlockIP,
+        threat: pendingBlockDescription,
+        reason: `Blocked threat: ${pendingBlockDescription}`,
+        permanent: selectedDuration === 'permanent',
+        durationHours: durationHours,
+      };
+      console.log('[TEMP DEBUG] Sending payload:', payload);
       const resp = await fetch('/api/blocklist', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ip: pendingBlockIP,
-          threat: pendingBlockDescription,
-          reason: `Blocked threat: ${pendingBlockDescription}`,
-          permanent: selectedDuration === 'permanent',
-          durationHours: durationHours,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!resp.ok) {
@@ -1566,24 +1570,80 @@ const StatsPage: React.FC = () => {
             <h2 className="text-xl font-bold text-white mb-4">Select Block Duration</h2>
 
             <div className="space-y-2 mb-6">
-              {(([
-                { label: '24 Hours', value: 24 },
-                { label: '7 Days', value: 168 },
-                { label: '30 Days', value: 720 },
-                { label: 'Permanent', value: 'permanent' },
-                { label: 'Custom', value: 'custom' },
-              ] as const).map((option) => (
-                <label key={`${option.value}`} className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
-                  <input
-                    type="radio"
-                    name="blockDuration"
-                    checked={selectedDuration === option.value}
-                    onChange={() => setSelectedDuration(option.value)}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-gray-300">{option.label}</span>
-                </label>
-              )))}
+              {/* 24 Hours */}
+              <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
+                <input
+                  type="radio"
+                  name="blockDuration"
+                  checked={selectedDuration === 24}
+                  onChange={() => {
+                    console.log('[TEMP DEBUG] Selected 24 hours');
+                    setSelectedDuration(24);
+                  }}
+                  className="w-4 h-4"
+                />
+                <span className="text-gray-300">24 Hours</span>
+              </label>
+
+              {/* 7 Days */}
+              <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
+                <input
+                  type="radio"
+                  name="blockDuration"
+                  checked={selectedDuration === 168}
+                  onChange={() => {
+                    console.log('[TEMP DEBUG] Selected 7 days (168 hours)');
+                    setSelectedDuration(168);
+                  }}
+                  className="w-4 h-4"
+                />
+                <span className="text-gray-300">7 Days</span>
+              </label>
+
+              {/* 30 Days */}
+              <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
+                <input
+                  type="radio"
+                  name="blockDuration"
+                  checked={selectedDuration === 720}
+                  onChange={() => {
+                    console.log('[TEMP DEBUG] Selected 30 days (720 hours)');
+                    setSelectedDuration(720);
+                  }}
+                  className="w-4 h-4"
+                />
+                <span className="text-gray-300">30 Days</span>
+              </label>
+
+              {/* Permanent */}
+              <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
+                <input
+                  type="radio"
+                  name="blockDuration"
+                  checked={selectedDuration === 'permanent'}
+                  onChange={() => {
+                    console.log('[TEMP DEBUG] Selected permanent');
+                    setSelectedDuration('permanent');
+                  }}
+                  className="w-4 h-4"
+                />
+                <span className="text-gray-300">Permanent</span>
+              </label>
+
+              {/* Custom */}
+              <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
+                <input
+                  type="radio"
+                  name="blockDuration"
+                  checked={selectedDuration === 'custom'}
+                  onChange={() => {
+                    console.log('[TEMP DEBUG] Selected custom');
+                    setSelectedDuration('custom');
+                  }}
+                  className="w-4 h-4"
+                />
+                <span className="text-gray-300">Custom</span>
+              </label>
             </div>
 
             {/* Custom Duration Input */}

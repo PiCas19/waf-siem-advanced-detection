@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -61,6 +62,8 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		return
 	}
 
+	fmt.Printf("[TEMP DEBUG BlockIP] req.DurationHours=%d, req.Permanent=%v\n", req.DurationHours, req.Permanent)
+
 	// Controlla se esiste già un blocco per questo IP + descrizione
 	var existingBlock models.BlockedIP
 	blockExists := db.Where("ip_address = ? AND description = ?", req.IP, req.Threat).
@@ -77,10 +80,12 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 	if !blockedIP.Permanent && req.DurationHours > 0 {
 		expiresAt := time.Now().Add(time.Duration(int64(req.DurationHours)) * time.Hour)
 		blockedIP.ExpiresAt = &expiresAt
+		fmt.Printf("[TEMP DEBUG BlockIP] Using req.DurationHours=%d, ExpiresAt=%v\n", req.DurationHours, expiresAt)
 	} else if !blockedIP.Permanent {
 		// Fallback: default 24 ore
 		expiresAt := time.Now().Add(24 * time.Hour)
 		blockedIP.ExpiresAt = &expiresAt
+		fmt.Printf("[TEMP DEBUG BlockIP] Using fallback 24h, ExpiresAt=%v\n", expiresAt)
 	}
 
 	// Se esiste, aggiorna; altrimenti crea
