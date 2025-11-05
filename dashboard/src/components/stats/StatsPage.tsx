@@ -205,6 +205,18 @@ const getSeverityColor = (count: number): string => {
   return '#3b82f6'; // Blue for low
 };
 
+interface BlockDurationOption {
+  label: string;
+  value: number | 'permanent'; // minutes or 'permanent'
+}
+
+const BLOCK_DURATION_OPTIONS: BlockDurationOption[] = [
+  { label: '24 Hours', value: 24 * 60 },
+  { label: '7 Days', value: 7 * 24 * 60 },
+  { label: '30 Days', value: 30 * 24 * 60 },
+  { label: 'Permanent', value: 'permanent' },
+];
+
 const StatsPage: React.FC = () => {
   const { stats, isConnected, onAlertReceived } = useWebSocketStats();
   const { user } = useAuth();
@@ -214,6 +226,14 @@ const StatsPage: React.FC = () => {
   const [recentAlerts, setRecentAlerts] = useState<WAFEvent[]>([]);
   const [processingKey, setProcessingKey] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0); // Trigger per refresh stats
+
+  // Block duration modal state
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [pendingBlockIP, setPendingBlockIP] = useState<string | null>(null);
+  const [pendingBlockDescription, setPendingBlockDescription] = useState<string | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<number | 'permanent'>(24 * 60);
+  const [customDuration, setCustomDuration] = useState<number>(24);
+  const [customDurationUnit, setCustomDurationUnit] = useState<'hours' | 'days'>('hours');
 
   // Calcola i permessi dell'utente
   const canBlockThreats = user && hasPermission(user.role as any, 'threats_block');
@@ -1442,7 +1462,7 @@ const StatsPage: React.FC = () => {
                                   ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
                                   : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
                                   ? 'bg-blue-600 text-white'
-                                  : 'bg-orange-600 hover:bg-orange-700 text-white'
+                                  : 'bg-green-600 hover:bg-green-700 text-white'
                               }`}
                               title={!canUnblockThreats ? 'You do not have permission to unblock threats' : ''}
                             >
