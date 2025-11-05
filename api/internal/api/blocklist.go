@@ -80,9 +80,9 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 
 	// Calcola la scadenza in base alla duration
 	if !blockedIP.Permanent && req.DurationHours > 0 {
-		expiresAt := time.Now().Add(time.Duration(req.DurationHours) * time.Hour)
+		expiresAt := time.Now().Add(time.Duration(int64(req.DurationHours)) * time.Hour)
 		blockedIP.ExpiresAt = &expiresAt
-		fmt.Printf("[DEBUG] Setting ExpiresAt: %v (in %d hours)\n", expiresAt, req.DurationHours)
+		fmt.Printf("[DEBUG] Setting ExpiresAt: %v (in %d hours from now: %v)\n", expiresAt, req.DurationHours, time.Now())
 	} else if !blockedIP.Permanent {
 		// Fallback: default 24 ore
 		expiresAt := time.Now().Add(24 * time.Hour)
