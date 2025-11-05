@@ -231,9 +231,7 @@ const StatsPage: React.FC = () => {
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [pendingBlockIP, setPendingBlockIP] = useState<string | null>(null);
   const [pendingBlockDescription, setPendingBlockDescription] = useState<string | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<number | 'permanent' | 'custom'>(24 * 60);
-  const [customDuration, setCustomDuration] = useState<number>(24);
-  const [customDurationUnit, setCustomDurationUnit] = useState<'hours' | 'days'>('hours');
+  const [selectedDuration, setSelectedDuration] = useState<number | 'permanent'>(24 * 60);
 
   // Calcola i permessi dell'utente
   const canBlockThreats = user && hasPermission(user.role as any, 'threats_block');
