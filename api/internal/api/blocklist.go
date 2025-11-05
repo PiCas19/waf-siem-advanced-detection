@@ -58,6 +58,9 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		return
 	}
 
+	fmt.Printf("[DEBUG] BlockIP Request: IP=%s, Threat=%s, Permanent=%v, DurationHours=%d\n",
+		req.IP, req.Threat, req.Permanent, req.DurationHours)
+
 	// Controlla se esiste già un blocco per questo IP + descrizione
 	var existingBlock models.BlockedIP
 	blockExists := db.Where("ip_address = ? AND description = ?", req.IP, req.Threat).
@@ -74,10 +77,14 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 	if !blockedIP.Permanent && req.DurationHours > 0 {
 		expiresAt := time.Now().Add(time.Duration(req.DurationHours) * time.Hour)
 		blockedIP.ExpiresAt = &expiresAt
+		fmt.Printf("[DEBUG] Setting ExpiresAt: %v (in %d hours)\n", expiresAt, req.DurationHours)
 	} else if !blockedIP.Permanent {
 		// Fallback: default 24 ore
 		expiresAt := time.Now().Add(24 * time.Hour)
 		blockedIP.ExpiresAt = &expiresAt
+		fmt.Printf("[DEBUG] Using default 24h expires: %v\n", expiresAt)
+	} else {
+		fmt.Printf("[DEBUG] Permanent block, no expiration\n")
 	}
 
 	// Se esiste, aggiorna; altrimenti crea
