@@ -1561,88 +1561,144 @@ const StatsPage: React.FC = () => {
 
       {/* Block Duration Selection Modal */}
       {blockModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-sm w-full mx-4">
-            <h2 className="text-xl font-bold text-white mb-4">Select Block Duration</h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-2xl p-8 max-w-sm w-full shadow-2xl">
+            {/* Header */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-white mb-2">Block Duration</h2>
+              <p className="text-gray-400 text-sm">Select how long to block this threat</p>
+            </div>
 
-            <div className="space-y-2 mb-6">
+            {/* Duration Options */}
+            <div className="space-y-3 mb-8">
               {/* 24 Hours */}
-              <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
-                <input
-                  type="radio"
-                  name="blockDuration"
-                  checked={selectedDuration === 24}
-                  onChange={() => setSelectedDuration(24)}
-                  className="w-4 h-4"
-                />
-                <span className="text-gray-300">24 Hours</span>
-              </label>
+              <button
+                onClick={() => setSelectedDuration(24)}
+                className={`w-full p-4 rounded-xl border-2 transition-all ${
+                  selectedDuration === 24
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800/70'
+                } text-left`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-white">24 Hours</p>
+                    <p className="text-xs text-gray-400 mt-1">One day block</p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    selectedDuration === 24 ? 'border-blue-500 bg-blue-500' : 'border-gray-600'
+                  }`}>
+                    {selectedDuration === 24 && <div className="w-2 h-2 bg-white rounded-full" />}
+                  </div>
+                </div>
+              </button>
 
               {/* 7 Days */}
-              <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
-                <input
-                  type="radio"
-                  name="blockDuration"
-                  checked={selectedDuration === 168}
-                  onChange={() => setSelectedDuration(168)}
-                  className="w-4 h-4"
-                />
-                <span className="text-gray-300">7 Days</span>
-              </label>
+              <button
+                onClick={() => setSelectedDuration(168)}
+                className={`w-full p-4 rounded-xl border-2 transition-all ${
+                  selectedDuration === 168
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800/70'
+                } text-left`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-white">7 Days</p>
+                    <p className="text-xs text-gray-400 mt-1">One week block</p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    selectedDuration === 168 ? 'border-blue-500 bg-blue-500' : 'border-gray-600'
+                  }`}>
+                    {selectedDuration === 168 && <div className="w-2 h-2 bg-white rounded-full" />}
+                  </div>
+                </div>
+              </button>
 
               {/* 30 Days */}
-              <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
-                <input
-                  type="radio"
-                  name="blockDuration"
-                  checked={selectedDuration === 720}
-                  onChange={() => setSelectedDuration(720)}
-                  className="w-4 h-4"
-                />
-                <span className="text-gray-300">30 Days</span>
-              </label>
+              <button
+                onClick={() => setSelectedDuration(720)}
+                className={`w-full p-4 rounded-xl border-2 transition-all ${
+                  selectedDuration === 720
+                    ? 'border-blue-500 bg-blue-500/10'
+                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800/70'
+                } text-left`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-white">30 Days</p>
+                    <p className="text-xs text-gray-400 mt-1">One month block</p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    selectedDuration === 720 ? 'border-blue-500 bg-blue-500' : 'border-gray-600'
+                  }`}>
+                    {selectedDuration === 720 && <div className="w-2 h-2 bg-white rounded-full" />}
+                  </div>
+                </div>
+              </button>
 
               {/* Permanent */}
-              <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
-                <input
-                  type="radio"
-                  name="blockDuration"
-                  checked={selectedDuration === 'permanent'}
-                  onChange={() => setSelectedDuration('permanent')}
-                  className="w-4 h-4"
-                />
-                <span className="text-gray-300">Permanent</span>
-              </label>
+              <button
+                onClick={() => setSelectedDuration('permanent')}
+                className={`w-full p-4 rounded-xl border-2 transition-all ${
+                  selectedDuration === 'permanent'
+                    ? 'border-red-500 bg-red-500/10'
+                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800/70'
+                } text-left`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-white">Permanent</p>
+                    <p className="text-xs text-gray-400 mt-1">Block indefinitely</p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    selectedDuration === 'permanent' ? 'border-red-500 bg-red-500' : 'border-gray-600'
+                  }`}>
+                    {selectedDuration === 'permanent' && <div className="w-2 h-2 bg-white rounded-full" />}
+                  </div>
+                </div>
+              </button>
 
               {/* Custom */}
-              <label className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-800">
-                <input
-                  type="radio"
-                  name="blockDuration"
-                  checked={selectedDuration === 'custom'}
-                  onChange={() => setSelectedDuration('custom')}
-                  className="w-4 h-4"
-                />
-                <span className="text-gray-300">Custom</span>
-              </label>
+              <button
+                onClick={() => setSelectedDuration('custom')}
+                className={`w-full p-4 rounded-xl border-2 transition-all ${
+                  selectedDuration === 'custom'
+                    ? 'border-yellow-500 bg-yellow-500/10'
+                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-600 hover:bg-gray-800/70'
+                } text-left`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-white">Custom</p>
+                    <p className="text-xs text-gray-400 mt-1">Set your own duration</p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    selectedDuration === 'custom' ? 'border-yellow-500 bg-yellow-500' : 'border-gray-600'
+                  }`}>
+                    {selectedDuration === 'custom' && <div className="w-2 h-2 bg-white rounded-full" />}
+                  </div>
+                </div>
+              </button>
             </div>
 
             {/* Custom Duration Input */}
             {selectedDuration === 'custom' && (
-              <div className="bg-gray-700/50 border border-gray-600 rounded p-3 space-y-2 mb-6">
-                <label className="block text-sm font-medium text-gray-300">Custom Duration</label>
+              <div className="bg-gradient-to-r from-gray-800 to-gray-800/50 border border-gray-700 rounded-xl p-4 space-y-3 mb-8">
+                <label className="block text-sm font-semibold text-white">Custom Duration</label>
                 <div className="flex gap-2">
                   <input
                     type="number"
                     min="1"
                     value={customBlockDuration}
                     onChange={(e) => setCustomBlockDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="flex-1 px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-red-500 focus:outline-none"
+                    className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-yellow-500 focus:outline-none transition"
+                    placeholder="Enter duration"
                   />
                   <select
                     value={customBlockDurationUnit}
                     onChange={(e) => setCustomBlockDurationUnit(e.target.value as 'hours' | 'days')}
-                    className="px-3 py-2 bg-gray-600 text-white rounded border border-gray-500 focus:border-red-500 focus:outline-none"
+                    className="px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-yellow-500 focus:outline-none transition"
                   >
                     <option value="hours">Hours</option>
                     <option value="days">Days</option>
@@ -1655,13 +1711,13 @@ const StatsPage: React.FC = () => {
             <div className="flex gap-3">
               <button
                 onClick={() => setBlockModalOpen(false)}
-                className="flex-1 px-4 py-2 rounded-lg font-medium bg-gray-800 text-gray-300 hover:bg-gray-700 transition border border-gray-700"
+                className="flex-1 px-4 py-3 rounded-lg font-medium bg-gray-800 text-gray-300 hover:bg-gray-700 transition border border-gray-700"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmBlockThreat}
-                className="flex-1 px-4 py-2 rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 transition"
+                className="flex-1 px-4 py-3 rounded-lg font-medium bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800 transition shadow-lg hover:shadow-red-500/50"
               >
                 Block IP
               </button>
