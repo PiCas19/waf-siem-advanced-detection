@@ -1562,15 +1562,15 @@ const StatsPage: React.FC = () => {
       {/* Block Duration Selection Modal */}
       {blockModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
+          <div className="rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-gray-300">
             {/* Header */}
-            <div className="px-6 py-5 border-b border-gray-200 bg-gray-50">
+            <div className="px-6 py-5 border-b border-gray-300">
               <h2 className="text-xl font-bold text-gray-900">Block Duration</h2>
               <p className="text-gray-600 text-sm mt-1">Select how long to block this threat</p>
             </div>
 
             {/* Content */}
-            <div className="px-6 py-5 space-y-5">
+            <div className="px-6 py-5 space-y-5 bg-transparent">
               {/* Preset Duration Options */}
               <div className="grid grid-cols-2 gap-3">
                 {/* 24 Hours */}
@@ -1663,7 +1663,7 @@ const StatsPage: React.FC = () => {
             </div>
 
             {/* Action Buttons */}
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3">
+            <div className="px-6 py-4 border-t border-gray-300 flex gap-3">
               <button
                 onClick={() => setBlockModalOpen(false)}
                 className="flex-1 px-4 py-2.5 rounded-lg font-medium text-sm bg-white text-gray-700 hover:bg-gray-100 transition border border-gray-300"
