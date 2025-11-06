@@ -68,13 +68,24 @@ func NewGetCustomRulesHandler(db *gorm.DB) gin.HandlerFunc {
 func NewCreateRuleHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rule models.Rule
+		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+
 		if err := c.ShouldBindJSON(&rule); err != nil {
+			// Log failed rule creation - invalid request
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULES",
+				"rule", "unknown", "Failed to create rule - invalid request format",
+				err.Error(), c.ClientIP())
 			fmt.Printf("[ERROR] Failed to parse rule: %v\n", err)
 			c.JSON(400, gin.H{"error": "Invalid rule data"})
 			return
 		}
 
 		if rule.Name == "" || rule.Pattern == "" {
+			// Log failed rule creation - missing required fields
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULES",
+				"rule", "unknown", "Failed to create rule - missing required fields",
+				"Name and Pattern are required", c.ClientIP())
 			c.JSON(400, gin.H{"error": "Name and Pattern are required"})
 			return
 		}
@@ -90,10 +101,25 @@ func NewCreateRuleHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		if err := db.Create(&rule).Error; err != nil {
+			// Log failed rule creation - database error
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULES",
+				"rule", rule.Name, "Failed to create rule in database",
+				err.Error(), c.ClientIP())
 			fmt.Printf("[ERROR] Failed to create rule: %v\n", err)
 			c.JSON(500, gin.H{"error": "failed to create rule"})
 			return
 		}
+
+		// Log successful rule creation
+		details := map[string]interface{}{
+			"rule_name": rule.Name,
+			"rule_type": rule.Type,
+			"action":    rule.Action,
+			"pattern":   rule.Pattern,
+		}
+		LogAuditAction(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULES",
+			"rule", fmt.Sprintf("%d", rule.ID), fmt.Sprintf("Created rule '%s' with type '%s' and action '%s'", rule.Name, rule.Type, rule.Action),
+			details, c.ClientIP())
 
 		fmt.Printf("[INFO] Rule created: ID=%d, Name=%s, Type=%s, Action=%s\n", rule.ID, rule.Name, rule.Type, rule.Action)
 
