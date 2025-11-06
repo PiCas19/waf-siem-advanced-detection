@@ -56,19 +56,64 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	// Find user
 	var user models.User
+	ipAddress := c.ClientIP()
 	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		// Log failed login attempt - user not found
+		auditLog := models.AuditLog{
+			UserEmail:    req.Email,
+			Action:       "LOGIN",
+			Category:     "AUTH",
+			ResourceType: "user",
+			ResourceID:   req.Email,
+			Description:  "Login attempt failed - user not found",
+			Status:       "failure",
+			Error:        "User not found",
+			IPAddress:    ipAddress,
+			CreatedAt:    time.Now(),
+		}
+		h.db.Create(&auditLog)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		// Log failed login attempt - invalid password
+		auditLog := models.AuditLog{
+			UserID:       user.ID,
+			UserEmail:    user.Email,
+			Action:       "LOGIN",
+			Category:     "AUTH",
+			ResourceType: "user",
+			ResourceID:   fmt.Sprintf("%d", user.ID),
+			Description:  "Login attempt failed - invalid password",
+			Status:       "failure",
+			Error:        "Invalid password",
+			IPAddress:    ipAddress,
+			CreatedAt:    time.Now(),
+		}
+		h.db.Create(&auditLog)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
 	// Check if active
 	if !user.Active {
+		// Log failed login attempt - account disabled
+		auditLog := models.AuditLog{
+			UserID:       user.ID,
+			UserEmail:    user.Email,
+			Action:       "LOGIN",
+			Category:     "AUTH",
+			ResourceType: "user",
+			ResourceID:   fmt.Sprintf("%d", user.ID),
+			Description:  "Login attempt failed - account disabled",
+			Status:       "failure",
+			Error:        "Account disabled",
+			IPAddress:    ipAddress,
+			CreatedAt:    time.Now(),
+		}
+		h.db.Create(&auditLog)
 		c.JSON(http.StatusForbidden, gin.H{"error": "Account disabled"})
 		return
 	}
@@ -102,7 +147,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Log successful login (using direct DB create since we're in auth package)
-	ipAddress := c.ClientIP()
 	auditLog := models.AuditLog{
 		UserID:       user.ID,
 		UserEmail:    user.Email,
@@ -150,17 +194,35 @@ func (h *AuthHandler) VerifyOTPLogin(c *gin.Context) {
 
 	// Find user
 	var user models.User
+	ipAddress := c.ClientIP()
 	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		// Log failed 2FA attempt - user not found
+		auditLog := models.AuditLog{
+			UserEmail:    req.Email,
+			Action:       "LOGIN_2FA",
+			Category:     "AUTH",
+			ResourceType: "user",
+			ResourceID:   req.Email,
+			Description:  "2FA verification failed - user not found",
+			Status:       "failure",
+			Error:        "User not found",
+			IPAddress:    ipAddress,
+			CreatedAt:    time.Now(),
+		}
+		h.db.Create(&auditLog)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
 	// Verify OTP code or backup code
 	var verified bool
+	var codeType string
 	if req.OTPCode != "" {
 		verified = VerifyOTP(user.OTPSecret, req.OTPCode)
+		codeType = "OTP"
 	} else if req.BackupCode != "" {
 		verified = VerifyBackupCode(&user, req.BackupCode)
+		codeType = "BACKUP"
 		if verified {
 			// Save the updated backup codes
 			h.db.Save(&user)
@@ -168,6 +230,21 @@ func (h *AuthHandler) VerifyOTPLogin(c *gin.Context) {
 	}
 
 	if !verified {
+		// Log failed 2FA attempt - invalid code
+		auditLog := models.AuditLog{
+			UserID:       user.ID,
+			UserEmail:    user.Email,
+			Action:       "LOGIN_2FA",
+			Category:     "AUTH",
+			ResourceType: "user",
+			ResourceID:   fmt.Sprintf("%d", user.ID),
+			Description:  fmt.Sprintf("2FA verification failed - invalid %s code", codeType),
+			Status:       "failure",
+			Error:        "Invalid 2FA code",
+			IPAddress:    ipAddress,
+			CreatedAt:    time.Now(),
+		}
+		h.db.Create(&auditLog)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid 2FA code"})
 		return
 	}
@@ -180,7 +257,6 @@ func (h *AuthHandler) VerifyOTPLogin(c *gin.Context) {
 	}
 
 	// Log successful 2FA login
-	ipAddress := c.ClientIP()
 	auditLog := models.AuditLog{
 		UserID:       user.ID,
 		UserEmail:    user.Email,
@@ -226,8 +302,28 @@ func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
 		return
 	}
 
+	// Get admin user ID from context
+	adminUserID, _ := c.Get("user_id")
+	adminUserEmail, _ := c.Get("user_email")
+	ipAddress := c.ClientIP()
+
 	// validate role against supported roles
 	if _, ok := RolePermissions[req.Role]; !ok {
+		// Log failed user creation - invalid role
+		auditLog := models.AuditLog{
+			UserID:       adminUserID.(uint),
+			UserEmail:    adminUserEmail.(string),
+			Action:       "CREATE_USER",
+			Category:     "USER_MANAGEMENT",
+			ResourceType: "user",
+			ResourceID:   req.Email,
+			Description:  fmt.Sprintf("Failed to create user - invalid role '%s'", req.Role),
+			Status:       "failure",
+			Error:        "Invalid role",
+			IPAddress:    ipAddress,
+			CreatedAt:    time.Now(),
+		}
+		h.db.Create(&auditLog)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role"})
 		return
 	}
@@ -235,6 +331,21 @@ func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
 	// check existing
 	var existing models.User
 	if err := h.db.Where("email = ?", req.Email).First(&existing).Error; err == nil {
+		// Log failed user creation - email already exists
+		auditLog := models.AuditLog{
+			UserID:       adminUserID.(uint),
+			UserEmail:    adminUserEmail.(string),
+			Action:       "CREATE_USER",
+			Category:     "USER_MANAGEMENT",
+			ResourceType: "user",
+			ResourceID:   req.Email,
+			Description:  fmt.Sprintf("Failed to create user - email already exists"),
+			Status:       "failure",
+			Error:        "Email already exists",
+			IPAddress:    ipAddress,
+			CreatedAt:    time.Now(),
+		}
+		h.db.Create(&auditLog)
 		c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
 		return
 	}
@@ -272,6 +383,21 @@ func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&user).Error; err != nil {
+		// Log failed user creation - database error
+		auditLog := models.AuditLog{
+			UserID:       adminUserID.(uint),
+			UserEmail:    adminUserEmail.(string),
+			Action:       "CREATE_USER",
+			Category:     "USER_MANAGEMENT",
+			ResourceType: "user",
+			ResourceID:   req.Email,
+			Description:  fmt.Sprintf("Failed to create user"),
+			Status:       "failure",
+			Error:        "Database error",
+			IPAddress:    ipAddress,
+			CreatedAt:    time.Now(),
+		}
+		h.db.Create(&auditLog)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}
@@ -289,6 +415,21 @@ func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
 		}
 		// log and continue
 	}
+
+	// Log successful user creation
+	auditLog := models.AuditLog{
+		UserID:       adminUserID.(uint),
+		UserEmail:    adminUserEmail.(string),
+		Action:       "CREATE_USER",
+		Category:     "USER_MANAGEMENT",
+		ResourceType: "user",
+		ResourceID:   fmt.Sprintf("%d", user.ID),
+		Description:  fmt.Sprintf("Created user '%s' with role '%s' (email_sent: %v)", req.Name, req.Role, emailSent),
+		Status:       "success",
+		IPAddress:    ipAddress,
+		CreatedAt:    time.Now(),
+	}
+	h.db.Create(&auditLog)
 
 	// Return created response. In production avoid returning tokens; for now include reset_link for convenience if email not sent.
 	resp := gin.H{"message": "User created", "email_sent": emailSent}
