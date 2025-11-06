@@ -73,6 +73,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// Check if 2FA setup is mandatory
+	if user.MustSetup2FA {
+		c.JSON(http.StatusOK, gin.H{
+			"requires_2fa_setup": true,
+			"email":              user.Email,
+			"message":            "Please set up 2FA before continuing",
+		})
+		return
+	}
+
 	// Check if 2FA is enabled
 	if user.TwoFAEnabled {
 		// Return 2FA required response
@@ -411,6 +421,7 @@ func (h *AuthHandler) CompleteTwoFASetup(c *gin.Context) {
 	user.OTPSecret = req.Secret
 	user.BackupCodes = string(backupCodesJSON)
 	user.Active = true
+	user.MustSetup2FA = false  // Disable mandatory 2FA setup flag
 
 	if err := h.db.Save(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save 2FA setup"})
