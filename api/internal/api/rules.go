@@ -74,8 +74,7 @@ func NewCreateRuleHandler(db *gorm.DB) gin.HandlerFunc {
 		if err := c.ShouldBindJSON(&rule); err != nil {
 			// Log failed rule creation - invalid request
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULES",
-				"rule", "unknown", "Failed to create rule - invalid request format",
-				err.Error(), c.ClientIP())
+				"rule", "unknown", "Failed to create rule - invalid request format", nil, c.ClientIP(), err.Error())
 			fmt.Printf("[ERROR] Failed to parse rule: %v\n", err)
 			c.JSON(400, gin.H{"error": "Invalid rule data"})
 			return
@@ -84,8 +83,7 @@ func NewCreateRuleHandler(db *gorm.DB) gin.HandlerFunc {
 		if rule.Name == "" || rule.Pattern == "" {
 			// Log failed rule creation - missing required fields
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULES",
-				"rule", "unknown", "Failed to create rule - missing required fields",
-				"Name and Pattern are required", c.ClientIP())
+				"rule", "unknown", "Failed to create rule - missing required fields", nil, c.ClientIP(), "Name and Pattern are required")
 			c.JSON(400, gin.H{"error": "Name and Pattern are required"})
 			return
 		}
@@ -103,8 +101,7 @@ func NewCreateRuleHandler(db *gorm.DB) gin.HandlerFunc {
 		if err := db.Create(&rule).Error; err != nil {
 			// Log failed rule creation - database error
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULES",
-				"rule", rule.Name, "Failed to create rule in database",
-				err.Error(), c.ClientIP())
+				"rule", rule.Name, "Failed to create rule in database", nil, c.ClientIP(), err.Error())
 			fmt.Printf("[ERROR] Failed to create rule: %v\n", err)
 			c.JSON(500, gin.H{"error": "failed to create rule"})
 			return
@@ -140,8 +137,7 @@ func NewUpdateRuleHandler(db *gorm.DB) gin.HandlerFunc {
 
 		if err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULES",
-				"rule", ruleID, "Failed to update rule - invalid rule ID format",
-				"Invalid rule ID", c.ClientIP())
+				"rule", ruleID, "Failed to update rule - invalid rule ID format", nil, c.ClientIP(), "Invalid rule ID")
 			c.JSON(400, gin.H{"error": "Invalid rule ID"})
 			return
 		}
@@ -149,8 +145,7 @@ func NewUpdateRuleHandler(db *gorm.DB) gin.HandlerFunc {
 		var updatedRule models.Rule
 		if err := c.ShouldBindJSON(&updatedRule); err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULES",
-				"rule", ruleID, "Failed to update rule - invalid request format",
-				err.Error(), c.ClientIP())
+				"rule", ruleID, "Failed to update rule - invalid request format", nil, c.ClientIP(), err.Error())
 			c.JSON(400, gin.H{"error": "Invalid rule data"})
 			return
 		}
@@ -167,13 +162,11 @@ func NewUpdateRuleHandler(db *gorm.DB) gin.HandlerFunc {
 		if err := db.Model(&models.Rule{}).Where("id = ?", uint(id)).Updates(updatedRule).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULES",
-					"rule", ruleID, "Failed to update rule - rule not found",
-					"Rule not found", c.ClientIP())
+					"rule", ruleID, "Failed to update rule - rule not found", nil, c.ClientIP(), "Rule not found")
 				c.JSON(404, gin.H{"error": "Rule not found"})
 			} else {
 				LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULES",
-					"rule", ruleID, "Failed to update rule in database",
-					err.Error(), c.ClientIP())
+					"rule", ruleID, "Failed to update rule in database", nil, c.ClientIP(), err.Error())
 				fmt.Printf("[ERROR] Failed to update rule: %v\n", err)
 				c.JSON(500, gin.H{"error": "failed to update rule"})
 			}
@@ -213,8 +206,7 @@ func NewDeleteRuleHandler(db *gorm.DB) gin.HandlerFunc {
 
 		if err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "DELETE_RULE", "RULES",
-				"rule", ruleID, "Failed to delete rule - invalid rule ID format",
-				"Invalid rule ID", c.ClientIP())
+				"rule", ruleID, "Failed to delete rule - invalid rule ID format", nil, c.ClientIP(), "Invalid rule ID")
 			c.JSON(400, gin.H{"error": "Invalid rule ID"})
 			return
 		}
@@ -230,13 +222,11 @@ func NewDeleteRuleHandler(db *gorm.DB) gin.HandlerFunc {
 		if err := db.Delete(&models.Rule{}, uint(id)).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				LogAuditActionWithError(db, userID.(uint), userEmail.(string), "DELETE_RULE", "RULES",
-					"rule", ruleID, "Failed to delete rule - rule not found",
-					"Rule not found", c.ClientIP())
+					"rule", ruleID, "Failed to delete rule - rule not found", nil, c.ClientIP(), "Rule not found")
 				c.JSON(404, gin.H{"error": "Rule not found"})
 			} else {
 				LogAuditActionWithError(db, userID.(uint), userEmail.(string), "DELETE_RULE", "RULES",
-					"rule", ruleID, "Failed to delete rule from database",
-					err.Error(), c.ClientIP())
+					"rule", ruleID, "Failed to delete rule from database", nil, c.ClientIP(), err.Error())
 				fmt.Printf("[ERROR] Failed to delete rule: %v\n", err)
 				c.JSON(500, gin.H{"error": "failed to delete rule"})
 			}
