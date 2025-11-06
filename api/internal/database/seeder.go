@@ -39,6 +39,7 @@ func SeedDefaultUsers(db *gorm.DB) error {
 		Active:       true,
 		PasswordHash: string(passwordHash),
 		TwoFAEnabled: false,
+		MustSetup2FA: true,  // Force 2FA setup on first login
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}

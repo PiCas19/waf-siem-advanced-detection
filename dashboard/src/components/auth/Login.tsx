@@ -11,7 +11,7 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login, verifyOTP, requiresTwoFA, currentUserEmail } = useAuth()
+  const { login, verifyOTP, requiresTwoFA, requiresTwoFASetup, currentUserEmail } = useAuth()
   const navigate = useNavigate()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -51,6 +51,33 @@ const Login: React.FC = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  // If 2FA setup is required (first login), redirect to setup page
+  if (requiresTwoFASetup) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="bg-gray-800 p-8 rounded-lg shadow-lg w-full max-w-md">
+          <h1 className="text-3xl font-bold text-white mb-4 text-center">2FA Setup Required</h1>
+          <p className="text-gray-400 text-center mb-6">
+            You must set up Two-Factor Authentication before continuing.
+          </p>
+
+          {error && (
+            <div className="bg-red-500 bg-opacity-20 border border-red-500 text-red-300 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
+
+          <button
+            onClick={() => navigate('/setup-2fa')}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition"
+          >
+            Set Up 2FA
+          </button>
+        </div>
+      </div>
+    )
   }
 
   // If 2FA is required, show OTP input
