@@ -406,148 +406,104 @@ const BlocklistPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Block Duration</label>
-                  <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3">Block Duration</label>
+
+                  {/* Quick Duration Options */}
+                  <div className="grid grid-cols-2 gap-2 mb-4">
                     {/* 24 Hours */}
                     <button
                       type="button"
                       onClick={() => setBlockDuration(24)}
-                      className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                      className={`px-3 py-2.5 rounded-lg font-medium transition-all border text-sm ${
                         blockDuration === 24
-                          ? 'border-blue-500 bg-blue-500/10'
-                          : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                          ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/30'
+                          : 'bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-700 hover:border-gray-500'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-white text-sm">24 Hours</p>
-                          <p className="text-xs text-gray-400">One day block</p>
-                        </div>
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          blockDuration === 24 ? 'border-blue-500 bg-blue-500' : 'border-gray-600'
-                        }`}>
-                          {blockDuration === 24 && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                        </div>
-                      </div>
+                      <p className="font-semibold text-xs">24 Hours</p>
+                      <p className="text-xs opacity-75">1 day</p>
                     </button>
 
                     {/* 7 Days */}
                     <button
                       type="button"
                       onClick={() => setBlockDuration(168)}
-                      className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                      className={`px-3 py-2.5 rounded-lg font-medium transition-all border text-sm ${
                         blockDuration === 168
-                          ? 'border-blue-500 bg-blue-500/10'
-                          : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                          ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/30'
+                          : 'bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-700 hover:border-gray-500'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-white text-sm">7 Days</p>
-                          <p className="text-xs text-gray-400">One week block</p>
-                        </div>
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          blockDuration === 168 ? 'border-blue-500 bg-blue-500' : 'border-gray-600'
-                        }`}>
-                          {blockDuration === 168 && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                        </div>
-                      </div>
+                      <p className="font-semibold text-xs">7 Days</p>
+                      <p className="text-xs opacity-75">1 week</p>
                     </button>
 
                     {/* 30 Days */}
                     <button
                       type="button"
                       onClick={() => setBlockDuration(720)}
-                      className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                      className={`px-3 py-2.5 rounded-lg font-medium transition-all border text-sm ${
                         blockDuration === 720
-                          ? 'border-blue-500 bg-blue-500/10'
-                          : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                          ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/30'
+                          : 'bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-700 hover:border-gray-500'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-white text-sm">30 Days</p>
-                          <p className="text-xs text-gray-400">One month block</p>
-                        </div>
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          blockDuration === 720 ? 'border-blue-500 bg-blue-500' : 'border-gray-600'
-                        }`}>
-                          {blockDuration === 720 && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                        </div>
-                      </div>
+                      <p className="font-semibold text-xs">30 Days</p>
+                      <p className="text-xs opacity-75">1 month</p>
                     </button>
 
                     {/* Permanent */}
                     <button
                       type="button"
                       onClick={() => setBlockDuration('permanent')}
-                      className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                      className={`px-3 py-2.5 rounded-lg font-medium transition-all border text-sm ${
                         blockDuration === 'permanent'
-                          ? 'border-red-500 bg-red-500/10'
-                          : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                          ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-500/30'
+                          : 'bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-700 hover:border-gray-500'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-white text-sm">Permanent</p>
-                          <p className="text-xs text-gray-400">Block indefinitely</p>
-                        </div>
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          blockDuration === 'permanent' ? 'border-red-500 bg-red-500' : 'border-gray-600'
-                        }`}>
-                          {blockDuration === 'permanent' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                        </div>
-                      </div>
-                    </button>
-
-                    {/* Custom */}
-                    <button
-                      type="button"
-                      onClick={() => setBlockDuration('custom')}
-                      className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
-                        blockDuration === 'custom'
-                          ? 'border-yellow-500 bg-yellow-500/10'
-                          : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-white text-sm">Custom</p>
-                          <p className="text-xs text-gray-400">Set your own duration</p>
-                        </div>
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                          blockDuration === 'custom' ? 'border-yellow-500 bg-yellow-500' : 'border-gray-600'
-                        }`}>
-                          {blockDuration === 'custom' && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                        </div>
-                      </div>
+                      <p className="font-semibold text-xs">Permanent</p>
+                      <p className="text-xs opacity-75">Forever</p>
                     </button>
                   </div>
-                </div>
 
-                {blockDuration === 'custom' && (
-                  <div className="bg-gradient-to-r from-gray-800 to-gray-800/50 border border-gray-700 rounded-lg p-4 space-y-3">
-                    <label className="block text-sm font-semibold text-white">Custom Duration</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        value={customBlockDuration}
-                        onChange={(e) => setCustomBlockDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="flex-1 px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-yellow-500 focus:outline-none transition"
-                        placeholder="Enter duration"
-                      />
-                      <select
-                        value={customBlockDurationUnit}
-                        onChange={(e) => setCustomBlockDurationUnit(e.target.value as 'hours' | 'days')}
-                        className="px-4 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-yellow-500 focus:outline-none transition"
-                      >
-                        <option value="hours">Hours</option>
-                        <option value="days">Days</option>
-                      </select>
+                  {/* Custom Duration Option */}
+                  <button
+                    type="button"
+                    onClick={() => setBlockDuration('custom')}
+                    className={`w-full px-3 py-2.5 rounded-lg font-medium transition-all border mb-3 text-sm ${
+                      blockDuration === 'custom'
+                        ? 'bg-amber-600 text-white border-amber-500 shadow-lg shadow-amber-500/30'
+                        : 'bg-gray-700/50 text-gray-300 border-gray-600 hover:bg-gray-700 hover:border-gray-500'
+                    }`}
+                  >
+                    <p className="font-semibold text-xs">Custom Duration</p>
+                  </button>
+
+                  {/* Custom Duration Input */}
+                  {blockDuration === 'custom' && (
+                    <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-3 space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={customBlockDuration}
+                          onChange={(e) => setCustomBlockDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="flex-1 px-3 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-amber-500 focus:outline-none transition text-sm"
+                          placeholder="Duration"
+                        />
+                        <select
+                          value={customBlockDurationUnit}
+                          onChange={(e) => setCustomBlockDurationUnit(e.target.value as 'hours' | 'days')}
+                          className="px-3 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-amber-500 focus:outline-none transition text-sm"
+                        >
+                          <option value="hours">Hours</option>
+                          <option value="days">Days</option>
+                        </select>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
                 <div className="flex gap-3">
                   <button
                     type="submit"
