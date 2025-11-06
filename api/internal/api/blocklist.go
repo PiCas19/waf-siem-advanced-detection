@@ -62,8 +62,7 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		userID, _ := c.Get("user_id")
 		userEmail, _ := c.Get("user_email")
 		LogAuditActionWithError(db, userID.(uint), userEmail.(string), "BLOCK_IP", "BLOCKLIST",
-			"ip", "unknown", "Failed to block IP - invalid request format",
-			err.Error(), c.ClientIP())
+			"ip", "unknown", "Failed to block IP - invalid request format", nil, c.ClientIP(), err.Error())
 		c.JSON(400, gin.H{"error": "Invalid request"})
 		return
 	}
@@ -98,8 +97,7 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		if err := db.Model(&existingBlock).Updates(blockedIP).Error; err != nil {
 			// Log failed block update - database error
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "BLOCK_IP", "BLOCKLIST",
-				"ip", req.IP, "Failed to update IP block in database",
-				err.Error(), c.ClientIP())
+				"ip", req.IP, "Failed to update IP block in database", nil, c.ClientIP(), err.Error())
 			c.JSON(500, gin.H{"error": "Failed to update blocked IP", "details": err.Error()})
 			return
 		}
@@ -131,8 +129,7 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		if err := db.Create(&blockedIP).Error; err != nil {
 			// Log failed block creation - database error
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "BLOCK_IP", "BLOCKLIST",
-				"ip", req.IP, "Failed to create IP block in database",
-				err.Error(), c.ClientIP())
+				"ip", req.IP, "Failed to create IP block in database", nil, c.ClientIP(), err.Error())
 			c.JSON(500, gin.H{"error": "Failed to create blocked IP", "details": err.Error()})
 			return
 		}
@@ -184,8 +181,7 @@ func UnblockIPWithDB(db *gorm.DB, c *gin.Context) {
 	if threat == "" {
 		// Log failed unblock attempt - missing threat parameter
 		LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UNBLOCK_IP", "BLOCKLIST",
-			"ip", ip, "Failed to unblock IP - threat parameter missing",
-			"threat parameter required", c.ClientIP())
+			"ip", ip, "Failed to unblock IP - threat parameter missing", nil, c.ClientIP(), "threat parameter required")
 		c.JSON(400, gin.H{"error": "threat parameter required"})
 		return
 	}
@@ -195,8 +191,7 @@ func UnblockIPWithDB(db *gorm.DB, c *gin.Context) {
 		Delete(&models.BlockedIP{}).Error; err != nil {
 		// Log failed unblock attempt - database error
 		LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UNBLOCK_IP", "BLOCKLIST",
-			"ip", ip, fmt.Sprintf("Failed to unblock IP %s for threat %s", ip, threat),
-			err.Error(), c.ClientIP())
+			"ip", ip, fmt.Sprintf("Failed to unblock IP %s for threat %s", ip, threat), nil, c.ClientIP(), err.Error())
 		c.JSON(500, gin.H{"error": "Failed to delete blocked IP", "details": err.Error()})
 		return
 	}
