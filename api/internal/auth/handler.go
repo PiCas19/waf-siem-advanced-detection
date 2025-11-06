@@ -120,10 +120,23 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	// Check if 2FA setup is mandatory
 	if user.MustSetup2FA {
+		// Generate temporary token to allow access to 2FA setup page
+		token, err := GenerateToken(user.ID, user.Email, user.Role)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"requires_2fa_setup": true,
+			"token":              token,
 			"email":              user.Email,
 			"message":            "Please set up 2FA before continuing",
+			"user": gin.H{
+				"id":    user.ID,
+				"email": user.Email,
+				"name":  user.Name,
+				"role":  user.Role,
+			},
 		})
 		return
 	}
