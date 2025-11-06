@@ -19,6 +19,7 @@ interface AuthContextType {
   setupTwoFA: () => Promise<TwoFASetup>
   completeTwoFASetup: (secret: string, otpCode: string) => Promise<void>
   disableTwoFA: (password: string) => Promise<void>
+  resetTwoFASetupFlag: () => void
   requiresTwoFA: boolean
   requiresTwoFASetup: boolean
   currentUserEmail: string | null
@@ -66,6 +67,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // User must set up 2FA before proceeding
         setRequiresTwoFASetup(true)
         setCurrentUserEmail(email)
+        // Save temporary token and user for 2FA setup
+        if (response.data.token) {
+          setToken(response.data.token)
+          setUser(response.data.user)
+          localStorage.setItem('authToken', response.data.token)
+          localStorage.setItem('authUser', JSON.stringify(response.data.user))
+          axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`
+        }
         return
       }
 
@@ -142,10 +151,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser({ ...user, two_fa_enabled: true })
         localStorage.setItem('authUser', JSON.stringify({ ...user, two_fa_enabled: true }))
       }
+      // Reset 2FA setup flag
+      setRequiresTwoFASetup(false)
     } catch (error) {
       console.error('2FA confirmation failed:', error)
       throw error
     }
+  }
+
+  const resetTwoFASetupFlag = () => {
+    setRequiresTwoFASetup(false)
   }
 
   const disableTwoFA = async (password: string) => {
@@ -177,6 +192,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setupTwoFA,
         completeTwoFASetup,
         disableTwoFA,
+        resetTwoFASetupFlag,
         requiresTwoFA,
         requiresTwoFASetup,
         currentUserEmail,
