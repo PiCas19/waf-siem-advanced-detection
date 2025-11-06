@@ -58,6 +58,12 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 	// This maps snake_case JSON field to Go field automatically
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		// Log failed block attempt - invalid request
+		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+		LogAuditActionWithError(db, userID.(uint), userEmail.(string), "BLOCK_IP", "BLOCKLIST",
+			"ip", "unknown", "Failed to block IP - invalid request format",
+			err.Error(), c.ClientIP())
 		c.JSON(400, gin.H{"error": "Invalid request"})
 		return
 	}
@@ -85,26 +91,53 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 	}
 
 	// Se esiste, aggiorna; altrimenti crea
+	userID, _ := c.Get("user_id")
+	userEmail, _ := c.Get("user_email")
+
 	if blockExists {
 		if err := db.Model(&existingBlock).Updates(blockedIP).Error; err != nil {
+			// Log failed block update - database error
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "BLOCK_IP", "BLOCKLIST",
+				"ip", req.IP, "Failed to update IP block in database",
+				err.Error(), c.ClientIP())
 			c.JSON(500, gin.H{"error": "Failed to update blocked IP", "details": err.Error()})
 			return
 		}
 		// Ricarica l'entry aggiornata dal database
 		db.First(&existingBlock)
+
+		// Log successful block update
+		durationStr := "temporary"
+		if blockedIP.Permanent {
+			durationStr = "permanent"
+		} else if req.DurationHours > 0 {
+			durationStr = fmt.Sprintf("%d hours", req.DurationHours)
+		}
+		details := map[string]interface{}{
+			"ip":          req.IP,
+			"threat_type": req.Threat,
+			"reason":      req.Reason,
+			"duration":    durationStr,
+		}
+		LogAuditAction(db, userID.(uint), userEmail.(string), "BLOCK_IP_UPDATE", "BLOCKLIST",
+			"ip", req.IP, fmt.Sprintf("Updated IP block for %s (threat: %s)", req.IP, req.Threat),
+			details, c.ClientIP())
+
 		c.JSON(200, gin.H{
 			"message": "IP block updated successfully",
 			"entry":   existingBlock,
 		})
 	} else {
 		if err := db.Create(&blockedIP).Error; err != nil {
+			// Log failed block creation - database error
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "BLOCK_IP", "BLOCKLIST",
+				"ip", req.IP, "Failed to create IP block in database",
+				err.Error(), c.ClientIP())
 			c.JSON(500, gin.H{"error": "Failed to create blocked IP", "details": err.Error()})
 			return
 		}
 
 		// Log this action
-		userID, _ := c.Get("user_id")
-		userEmail, _ := c.Get("user_email")
 		durationStr := "temporary"
 		if blockedIP.Permanent {
 			durationStr = "permanent"
@@ -145,7 +178,14 @@ func UnblockIPWithDB(db *gorm.DB, c *gin.Context) {
 	ip := c.Param("ip")
 	threat := c.Query("threat") // Ottieni il nome della regola dalla query string
 
+	userID, _ := c.Get("user_id")
+	userEmail, _ := c.Get("user_email")
+
 	if threat == "" {
+		// Log failed unblock attempt - missing threat parameter
+		LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UNBLOCK_IP", "BLOCKLIST",
+			"ip", ip, "Failed to unblock IP - threat parameter missing",
+			"threat parameter required", c.ClientIP())
 		c.JSON(400, gin.H{"error": "threat parameter required"})
 		return
 	}
@@ -153,13 +193,15 @@ func UnblockIPWithDB(db *gorm.DB, c *gin.Context) {
 	// Elimina il blocco dal database
 	if err := db.Where("ip_address = ? AND description = ?", ip, threat).
 		Delete(&models.BlockedIP{}).Error; err != nil {
+		// Log failed unblock attempt - database error
+		LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UNBLOCK_IP", "BLOCKLIST",
+			"ip", ip, fmt.Sprintf("Failed to unblock IP %s for threat %s", ip, threat),
+			err.Error(), c.ClientIP())
 		c.JSON(500, gin.H{"error": "Failed to delete blocked IP", "details": err.Error()})
 		return
 	}
 
 	// Log this unblock action
-	userID, _ := c.Get("user_id")
-	userEmail, _ := c.Get("user_email")
 	details := map[string]interface{}{
 		"ip":          ip,
 		"threat_type": threat,
