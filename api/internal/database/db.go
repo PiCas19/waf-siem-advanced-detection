@@ -39,6 +39,11 @@ func Initialize(dbPath string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
+	// Run custom migrations
+	if err := RunMigrations(db); err != nil {
+		return nil, err
+	}
+
 	return db, nil
 }
