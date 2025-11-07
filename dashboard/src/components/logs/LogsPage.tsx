@@ -170,12 +170,16 @@ export default function LogsPage(): React.ReactElement {
 
     // Threat type filter
     if (filter.threatType !== 'all') {
-      filtered = filtered.filter((log) => log.threat_type === filter.threatType);
+      filtered = filtered.filter((log) =>
+        log.threat_type?.toLowerCase() === filter.threatType.toLowerCase()
+      );
     }
 
-    // Severity filter
+    // Severity filter (case-insensitive)
     if (filter.severity !== 'all') {
-      filtered = filtered.filter((log) => log.severity === filter.severity);
+      filtered = filtered.filter((log) =>
+        log.severity?.toUpperCase() === filter.severity.toUpperCase()
+      );
     }
 
     // Blocked filter
@@ -226,14 +230,18 @@ export default function LogsPage(): React.ReactElement {
       );
     }
 
-    // Category filter for audit logs
+    // Category filter for audit logs (case-insensitive)
     if (filter.category !== 'all') {
-      filteredAudit = filteredAudit.filter((log) => log.category === filter.category);
+      filteredAudit = filteredAudit.filter((log) =>
+        log.category?.toLowerCase() === filter.category.toLowerCase()
+      );
     }
 
-    // Status filter for audit logs
+    // Status filter for audit logs (case-insensitive)
     if (filter.status !== 'all') {
-      filteredAudit = filteredAudit.filter((log) => log.status === filter.status);
+      filteredAudit = filteredAudit.filter((log) =>
+        log.status?.toLowerCase() === filter.status.toLowerCase()
+      );
     }
 
     // Sort by date descending
