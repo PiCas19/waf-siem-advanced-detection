@@ -97,13 +97,18 @@ func (m *Middleware) loadCustomRulesFromAPI() error {
 
 	// Define Rule struct inline to avoid circular imports
 	type Rule struct {
-		ID          uint   `json:"id"`
-		Name        string `json:"name"`
-		Pattern     string `json:"pattern"`
-		Type        string `json:"type"`
-		Severity    string `json:"severity"`
-		Enabled     bool   `json:"enabled"`
-		Action      string `json:"action"`
+		ID               uint   `json:"id"`
+		Name             string `json:"name"`
+		Pattern          string `json:"pattern"`
+		Type             string `json:"type"`
+		Severity         string `json:"severity"`
+		Enabled          bool   `json:"enabled"`
+		Action           string `json:"action"`
+		BlockEnabled     bool   `json:"block_enabled"`
+		DropEnabled      bool   `json:"drop_enabled"`
+		RedirectEnabled  bool   `json:"redirect_enabled"`
+		ChallengeEnabled bool   `json:"challenge_enabled"`
+		RedirectURL      string `json:"redirect_url"`
 	}
 
 	type APIResponse struct {
@@ -120,13 +125,18 @@ func (m *Middleware) loadCustomRulesFromAPI() error {
 	customRules := make([]*detector.CustomRule, 0)
 	for _, rule := range apiResponse.Rules {
 		customRules = append(customRules, &detector.CustomRule{
-			ID:       rule.ID,
-			Name:     rule.Name,
-			Pattern:  rule.Pattern,
-			Type:     rule.Type,
-			Severity: rule.Severity,
-			Enabled:  rule.Enabled,
-			Action:   rule.Action,
+			ID:               rule.ID,
+			Name:             rule.Name,
+			Pattern:          rule.Pattern,
+			Type:             rule.Type,
+			Severity:         rule.Severity,
+			Enabled:          rule.Enabled,
+			Action:           rule.Action,
+			BlockEnabled:     rule.BlockEnabled,
+			DropEnabled:      rule.DropEnabled,
+			RedirectEnabled:  rule.RedirectEnabled,
+			ChallengeEnabled: rule.ChallengeEnabled,
+			RedirectURL:      rule.RedirectURL,
 		})
 	}
 
