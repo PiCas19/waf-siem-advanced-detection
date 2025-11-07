@@ -7,14 +7,19 @@ import (
 
 // CustomRule represents a rule loaded from the database
 type CustomRule struct {
-	ID       uint
-	Name     string
-	Pattern  string
-	Type     string
-	Severity string
-	Enabled  bool
-	Action   string // "log" or "block"
-	regex    *regexp.Regexp
+	ID                uint
+	Name              string
+	Pattern           string
+	Type              string
+	Severity          string
+	Enabled           bool
+	Action            string // "log" or "block"
+	BlockEnabled      bool   // True if block action is selected
+	DropEnabled       bool   // True if drop action is selected
+	RedirectEnabled   bool   // True if redirect action is selected
+	ChallengeEnabled  bool   // True if challenge action is selected
+	RedirectURL       string // URL to redirect to (if RedirectEnabled is true)
+	regex             *regexp.Regexp
 }
 
 // CustomRuleDetector manages detection using custom rules from database
