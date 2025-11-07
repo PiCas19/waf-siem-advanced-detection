@@ -34,11 +34,21 @@ function AppContent() {
           <Route path="/login" element={<Login />} />
           <Route path="/set-password" element={<SetPassword />} />
 
+          {/* Redirect dashboard/other pages to /setup-2fa if 2FA setup required */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Protected routes - 2FA Setup (required after first login) */}
           <Route
             path="/setup-2fa"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowTwoFASetup={true}>
                 <ForcedTwoFASetup />
               </ProtectedRoute>
             }

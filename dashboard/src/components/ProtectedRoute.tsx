@@ -1,20 +1,23 @@
 import React from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { hasPermission, UserRole, RolePermissions } from '@/types/rbac'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
   requiredPermission?: keyof RolePermissions
+  allowTwoFASetup?: boolean
 }
 
 /**
  * ProtectedRoute component that checks:
  * 1. User is authenticated
- * 2. User has the required permission (if specified)
+ * 2. User must complete 2FA setup if required
+ * 3. User has the required permission (if specified)
  */
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredPermission }) => {
-  const { user, isLoading } = useAuth()
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredPermission, allowTwoFASetup = false }) => {
+  const { user, isLoading, requiresTwoFASetup } = useAuth()
+  const location = useLocation()
 
   // Still loading auth state
   if (isLoading) {
@@ -28,6 +31,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredPermi
   // Not authenticated
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  // If 2FA setup is required, redirect to setup page (unless already on setup page or page allows it)
+  if (requiresTwoFASetup && !allowTwoFASetup && location.pathname !== '/setup-2fa') {
+    return <Navigate to="/setup-2fa" replace />
   }
 
   // Check permission if required
