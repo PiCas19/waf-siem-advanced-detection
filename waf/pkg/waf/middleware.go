@@ -2,10 +2,13 @@ package waf
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
@@ -22,6 +25,12 @@ func init() {
 	httpcaddyfile.RegisterHandlerDirective("waf", parseCaddyfile)
 }
 
+// RequestFingerprint represents a unique request to deduplicate retries
+type RequestFingerprint struct {
+	Fingerprint string    // MD5 hash of IP + method + path + threat type + payload
+	Timestamp   time.Time // When this request was first seen
+}
+
 // Middleware implements WAF functionality for Caddy
 type Middleware struct {
 	RulesFile     string `json:"rules_file,omitempty"`
@@ -34,6 +43,13 @@ type Middleware struct {
 	logger         *logger.Logger
 	httpClient     *http.Client
 	stopRuleReload chan bool // Channel to stop rule reloading goroutine
+
+	// Cache for recently processed requests to prevent duplicate logging of retries
+	// Key: MD5 fingerprint of (IP + method + path + threat + payload)
+	// Value: timestamp when this request was first processed
+	// Deduplicates within 3 seconds window (typical browser retry timeout)
+	processedRequests     map[string]time.Time
+	processedRequestsLock sync.RWMutex
 }
 
 // CaddyModule returns the Caddy module information
@@ -62,6 +78,9 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	m.httpClient = &http.Client{
 		Timeout: 5 * time.Second,
 	}
+
+	// Initialize processed requests cache
+	m.processedRequests = make(map[string]time.Time)
 
 	// Load initial custom rules from API endpoint
 	if m.RulesEndpoint != "" {
@@ -169,6 +188,47 @@ func (m *Middleware) reloadRulesBackground() {
 	}
 }
 
+// computeRequestFingerprint creates a unique fingerprint for a request
+// to detect retries of the same malicious request
+// Fingerprint = MD5(IP + method + path + threat_type + payload)
+func (m *Middleware) computeRequestFingerprint(clientIP string, method string, path string, threatType string, payload string) string {
+	// Create a unique identifier for this request
+	uniqueStr := fmt.Sprintf("%s|%s|%s|%s|%s", clientIP, method, path, threatType, payload)
+	hash := md5.Sum([]byte(uniqueStr))
+	return fmt.Sprintf("%x", hash)
+}
+
+// isAlreadyProcessed checks if a request (by fingerprint) was already processed recently
+// Returns true if same request was seen within last 3 seconds (typical retry window)
+func (m *Middleware) isAlreadyProcessed(fingerprint string) bool {
+	m.processedRequestsLock.RLock()
+	defer m.processedRequestsLock.RUnlock()
+
+	if timestamp, exists := m.processedRequests[fingerprint]; exists {
+		// Check if it was seen within last 3 seconds
+		if time.Since(timestamp) < 3*time.Second {
+			return true
+		}
+	}
+	return false
+}
+
+// markAsProcessed marks a request as processed and cleans up old entries
+func (m *Middleware) markAsProcessed(fingerprint string) {
+	m.processedRequestsLock.Lock()
+	defer m.processedRequestsLock.Unlock()
+
+	m.processedRequests[fingerprint] = time.Now()
+
+	// Clean up old entries (older than 5 seconds) to prevent memory bloat
+	now := time.Now()
+	for fp, timestamp := range m.processedRequests {
+		if now.Sub(timestamp) > 5*time.Second {
+			delete(m.processedRequests, fp)
+		}
+	}
+}
+
 // ServeHTTP implements the middleware handler
 func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	// Inspect the request for threats
@@ -177,25 +237,36 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	if threat != nil {
 		clientIP := getClientIP(r)
 
-		// Log the threat - always log, even if browser retries
-		// Dashboard should handle deduplication/grouping of threats
-		if m.logger != nil {
-			entry := logger.LogEntry{
-				ThreatType:  threat.Type,
-				Severity:    threat.Severity,
-				Description: threat.Description,
-				ClientIP:    clientIP,
-				Method:      r.Method,
-				URL:         r.URL.String(),
-				UserAgent:   r.UserAgent(),
-				Payload:     threat.Payload,
-			}
-			m.logger.Log(entry)
-		}
+		// Create a fingerprint of this request to detect retries
+		// Fingerprint = MD5(IP + method + path + threat_type + payload)
+		// This allows us to detect when browser retries the same malicious request
+		fingerprint := m.computeRequestFingerprint(clientIP, r.Method, r.URL.Path, threat.Type, threat.Payload)
 
-		// Send event to API backend
-		if m.APIEndpoint != "" {
-			go m.sendEventToAPI(r, clientIP, threat)
+		// Check if we've already processed this exact request recently (within 3 seconds)
+		// This prevents logging the same attack multiple times when browser retries
+		if !m.isAlreadyProcessed(fingerprint) {
+			// Mark this request as processed
+			m.markAsProcessed(fingerprint)
+
+			// Log the threat
+			if m.logger != nil {
+				entry := logger.LogEntry{
+					ThreatType:  threat.Type,
+					Severity:    threat.Severity,
+					Description: threat.Description,
+					ClientIP:    clientIP,
+					Method:      r.Method,
+					URL:         r.URL.String(),
+					UserAgent:   r.UserAgent(),
+					Payload:     threat.Payload,
+				}
+				m.logger.Log(entry)
+			}
+
+			// Send event to API backend
+			if m.APIEndpoint != "" {
+				go m.sendEventToAPI(r, clientIP, threat)
+			}
 		}
 
 		// Determine if we should block/handle the request based on threat and configuration
