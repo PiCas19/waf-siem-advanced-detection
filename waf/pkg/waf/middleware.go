@@ -513,7 +513,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
                 <input type="hidden" id="recaptcha-token" name="captcha_token">
 
                 <div class="recaptcha-container">
-                    <div class="g-recaptcha" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" data-callback="onRecaptchaSuccess" data-size="normal"></div>
+                    <div class="g-recaptcha" data-sitekey="6LfMqwUsAAAAAM2C3rZxYdGbFGyxDovAZ2aI8BDO" data-callback="onRecaptchaSuccess" data-size="normal"></div>
                 </div>
 
                 <button type="submit" id="submitBtn">Verify and Continue</button>
