@@ -45,6 +45,8 @@ interface FilterState {
   severity: string;
   blocked: string;
   timeRange: TimeRangeFilter;
+  category: string;
+  status: string;
 }
 
 export default function LogsPage(): React.ReactElement {
@@ -62,6 +64,8 @@ export default function LogsPage(): React.ReactElement {
     severity: 'all',
     blocked: 'all',
     timeRange: '24h',
+    category: 'all',
+    status: 'all',
   });
 
   // Funzione utility per calcolare il timeMs
@@ -222,6 +226,16 @@ export default function LogsPage(): React.ReactElement {
       );
     }
 
+    // Category filter for audit logs
+    if (filter.category !== 'all') {
+      filteredAudit = filteredAudit.filter((log) => log.category === filter.category);
+    }
+
+    // Status filter for audit logs
+    if (filter.status !== 'all') {
+      filteredAudit = filteredAudit.filter((log) => log.status === filter.status);
+    }
+
     // Sort by date descending
     filteredAudit.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
@@ -229,6 +243,8 @@ export default function LogsPage(): React.ReactElement {
   }, [logs, auditLogs, filter]);
 
   const uniqueThreatTypes = Array.from(new Set(logs.map((log) => log.threat_type)));
+  const uniqueCategories = Array.from(new Set(auditLogs.map((log) => log.category)));
+  const uniqueStatuses = Array.from(new Set(auditLogs.map((log) => log.status)));
 
   const currentLogs = logType === 'security' ? filteredLogs : filteredAuditLogs;
   const totalPages = Math.ceil(currentLogs.length / itemsPerPage);
@@ -237,7 +253,52 @@ export default function LogsPage(): React.ReactElement {
     currentPage * itemsPerPage
   );
 
-  const handleDownloadLogs = () => {
+  const handleDownloadCSV = () => {
+    const headers = logType === 'security'
+      ? ['Time', 'Threat Type', 'Severity', 'Client IP', 'Method', 'URL', 'Blocked', 'Description']
+      : ['Time', 'User Email', 'Action', 'Category', 'IP Address', 'Status', 'Description', 'Error'];
+
+    const rows = currentLogs.map((log: any) => {
+      if (logType === 'security') {
+        return [
+          new Date(log.created_at).toLocaleString('it-IT'),
+          log.threat_type || '',
+          log.severity || '',
+          log.client_ip || '',
+          log.method || '',
+          log.url || '',
+          log.blocked ? 'Blocked' : 'Detected',
+          log.description || '',
+        ];
+      } else {
+        return [
+          new Date(log.created_at).toLocaleString('it-IT'),
+          log.user_email || '',
+          log.action || '',
+          log.category || '',
+          log.ip_address || '',
+          log.status || '',
+          log.description || '',
+          log.error || '',
+        ];
+      }
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+    ].join('\n');
+
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent));
+    element.setAttribute('download', `logs_${logType}_${new Date().toISOString().split('T')[0]}.csv`);
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const handleDownloadJSON = () => {
     const jsonString = JSON.stringify(currentLogs, null, 2);
     const element = document.createElement('a');
     element.setAttribute('href', 'data:text/json;charset=utf-8,' + encodeURIComponent(jsonString));
@@ -248,6 +309,85 @@ export default function LogsPage(): React.ReactElement {
     document.body.removeChild(element);
   };
 
+  const handleDownloadPDF = () => {
+    // Simple PDF generation using basic HTML to PDF conversion
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Logs Export</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+          h1 { color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background-color: #f3f4f6; padding: 12px; text-align: left; border: 1px solid #d1d5db; font-weight: bold; }
+          td { padding: 10px 12px; border: 1px solid #d1d5db; word-wrap: break-word; }
+          tr:nth-child(even) { background-color: #f9fafb; }
+          .header-info { color: #6b7280; margin-bottom: 10px; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <h1>${logType === 'security' ? 'Security Logs' : 'Audit Logs'} Export</h1>
+        <div class="header-info">
+          <p><strong>Exported:</strong> ${new Date().toLocaleString('it-IT')}</p>
+          <p><strong>Total Records:</strong> ${currentLogs.length}</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              ${logType === 'security'
+                ? '<th>Time</th><th>Threat Type</th><th>Severity</th><th>Client IP</th><th>Method</th><th>URL</th><th>Status</th><th>Description</th>'
+                : '<th>Time</th><th>User Email</th><th>Action</th><th>Category</th><th>IP Address</th><th>Status</th><th>Description</th>'
+              }
+            </tr>
+          </thead>
+          <tbody>
+            ${currentLogs.map((log: any) => {
+              if (logType === 'security') {
+                return `
+                  <tr>
+                    <td>${new Date(log.created_at).toLocaleString('it-IT')}</td>
+                    <td>${log.threat_type || ''}</td>
+                    <td>${log.severity || ''}</td>
+                    <td>${log.client_ip || ''}</td>
+                    <td>${log.method || ''}</td>
+                    <td style="font-size: 11px;">${log.url || ''}</td>
+                    <td>${log.blocked ? 'Blocked' : 'Detected'}</td>
+                    <td>${log.description || ''}</td>
+                  </tr>
+                `;
+              } else {
+                return `
+                  <tr>
+                    <td>${new Date(log.created_at).toLocaleString('it-IT')}</td>
+                    <td>${log.user_email || ''}</td>
+                    <td>${log.action || ''}</td>
+                    <td>${log.category || ''}</td>
+                    <td>${log.ip_address || ''}</td>
+                    <td>${log.status || ''}</td>
+                    <td>${log.description || ''}</td>
+                  </tr>
+                `;
+              }
+            }).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '', 'width=1000,height=600');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -256,13 +396,29 @@ export default function LogsPage(): React.ReactElement {
           <h1 className="text-3xl font-bold text-white mb-2">Logs</h1>
           <p className="text-gray-400">View all security events, threat detections, and system actions</p>
         </div>
-        <button
-          onClick={handleDownloadLogs}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium text-white transition"
-        >
-          <Download size={18} />
-          Export JSON
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleDownloadCSV}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg font-medium text-white transition"
+          >
+            <Download size={18} />
+            Export CSV
+          </button>
+          <button
+            onClick={handleDownloadJSON}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium text-white transition"
+          >
+            <Download size={18} />
+            Export JSON
+          </button>
+          <button
+            onClick={handleDownloadPDF}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-medium text-white transition"
+          >
+            <Download size={18} />
+            Export PDF
+          </button>
+        </div>
       </div>
 
       {/* Tab Buttons */}
@@ -380,12 +536,48 @@ export default function LogsPage(): React.ReactElement {
               <option value="detected">Detected</option>
             </select>
           )}
+
+          {/* Category - Only for Audit Logs */}
+          {logType === 'audit' && (
+            <select
+              value={filter.category}
+              onChange={(e) => setFilter({ ...filter, category: e.target.value })}
+              className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+            >
+              <option value="all">All Categories</option>
+              {uniqueCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Status - Only for Audit Logs */}
+          {logType === 'audit' && (
+            <select
+              value={filter.status}
+              onChange={(e) => setFilter({ ...filter, status: e.target.value })}
+              className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+            >
+              <option value="all">All Status</option>
+              {uniqueStatuses.map((status) => (
+                <option key={status} value={status}>
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Results Info */}
         <div className="mt-4 text-sm text-gray-400">
-          Found <span className="text-blue-400 font-semibold">{filteredLogs.length}</span> logs
-          {logs.length > filteredLogs.length && ` (filtered from ${logs.length} total)`}
+          Found <span className="text-blue-400 font-semibold">{logType === 'security' ? filteredLogs.length : filteredAuditLogs.length}</span> logs
+          {logType === 'security' ? (
+            logs.length > filteredLogs.length && ` (filtered from ${logs.length} total)`
+          ) : (
+            auditLogs.length > filteredAuditLogs.length && ` (filtered from ${auditLogs.length} total)`
+          )}
         </div>
       </div>
 
