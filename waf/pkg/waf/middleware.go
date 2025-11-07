@@ -380,7 +380,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 	// Generate a challenge ID
 	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
 
-	// Return CAPTCHA challenge HTML (matching dashboard theme)
+	// Return CAPTCHA challenge HTML (matching dashboard theme) with hCaptcha
 	challengeHTML := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
@@ -388,6 +388,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -456,6 +457,11 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
             word-break: break-all;
             margin: 10px 0;
         }
+        .h-captcha {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
         button {
             background: #3b82f6;
             color: white;
@@ -474,6 +480,11 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
         }
         button:active {
             transform: scale(0.98);
+        }
+        button:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+            box-shadow: none;
         }
         .info {
             font-size: 12px;
@@ -499,13 +510,18 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
         </div>
 
         <div class="challenge-box">
-            <p style="color: #d1d5db; margin-bottom: 10px;">Complete the verification to proceed:</p>
-            <p style="font-size: 14px; color: #9ca3af;">Challenge ID:</p>
-            <div class="challenge-id">%s</div>
-            <form method="POST" action="/api/waf/challenge/verify">
+            <p style="color: #d1d5db; margin-bottom: 15px;">Complete the CAPTCHA verification to proceed:</p>
+
+            <form id="challengeForm" method="POST" action="/api/waf/challenge/verify">
                 <input type="hidden" name="challenge_id" value="%s">
                 <input type="hidden" name="original_request" value="%s">
-                <button type="submit">Verify and Continue</button>
+                <input type="hidden" id="h-captcha-token" name="captcha_token">
+
+                <div class="h-captcha">
+                    <div class="h-captcha" data-sitekey="10000000-ffff-ffff-ffff-000000000001" data-callback="onCaptchaSuccess"></div>
+                </div>
+
+                <button type="submit" id="submitBtn" disabled>Verify and Continue</button>
             </form>
         </div>
 
@@ -514,8 +530,26 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
             <p>Your IP: <code style="color: #60a5fa;">%s</code></p>
         </div>
     </div>
+
+    <script>
+        function onCaptchaSuccess(token) {
+            // Enable the submit button when CAPTCHA is completed
+            document.getElementById('submitBtn').disabled = false;
+            document.getElementById('h-captcha-token').value = token;
+        }
+
+        // Alternative: submit form automatically after CAPTCHA
+        document.getElementById('challengeForm').addEventListener('submit', function(e) {
+            var token = hcaptcha.getResponse();
+            if (!token) {
+                e.preventDefault();
+                alert('Please complete the CAPTCHA verification');
+                return false;
+            }
+        });
+    </script>
 </body>
-</html>`, threat.Type, challengeID, challengeID, r.RequestURI, getClientIP(r))
+</html>`, threat.Type, challengeID, r.RequestURI, getClientIP(r))
 
 	w.WriteHeader(http.StatusForbidden)
 	w.Write([]byte(challengeHTML))

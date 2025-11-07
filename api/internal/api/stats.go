@@ -221,8 +221,9 @@ func GetGeolocationHandler(db *gorm.DB) gin.HandlerFunc {
 func NewWAFChallengeVerifyHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var request struct {
-			ChallengeID    string `form:"challenge_id" binding:"required"`
+			ChallengeID     string `form:"challenge_id" binding:"required"`
 			OriginalRequest string `form:"original_request"`
+			CaptchaToken    string `form:"captcha_token"`
 		}
 
 		if err := c.ShouldBind(&request); err != nil {
@@ -231,10 +232,14 @@ func NewWAFChallengeVerifyHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		fmt.Printf("[INFO] Challenge verification received: ChallengeID=%s, OriginalRequest=%s\n", request.ChallengeID, request.OriginalRequest)
+		fmt.Printf("[INFO] Challenge verification received: ChallengeID=%s, OriginalRequest=%s, CaptchaToken=%s\n", request.ChallengeID, request.OriginalRequest, request.CaptchaToken)
 
-		// In production, you would verify the CAPTCHA token with hCaptcha or reCAPTCHA here
-		// For now, we just accept the challenge verification
+		// In production, you would verify the CAPTCHA token with hCaptcha here
+		// Example: verify with hCaptcha API if token is present
+		if request.CaptchaToken != "" {
+			fmt.Printf("[INFO] hCaptcha token received: %s\n", request.CaptchaToken)
+			// TODO: Verify token with hCaptcha API: https://hcaptcha.com/siteverify
+		}
 
 		// Log the successful challenge verification
 		auditLog := models.AuditLog{
@@ -249,16 +254,118 @@ func NewWAFChallengeVerifyHandler(db *gorm.DB) gin.HandlerFunc {
 			fmt.Printf("[ERROR] Failed to log challenge verification: %v\n", err)
 		}
 
-		// Redirect to the original request or a success page
-		redirectURL := request.OriginalRequest
-		if redirectURL == "" {
-			redirectURL = "/"
-		}
+		// Return success HTML page
+		successHTML := `<!DOCTYPE html>
+<html>
+<head>
+    <title>Verification Successful</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #111827;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #f3f4f6;
+        }
+        .container {
+            background: #1f2937;
+            border: 1px solid #374151;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 500px;
+        }
+        .icon-box {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .icon-box i {
+            font-size: 64px;
+            color: #10b981;
+        }
+        h1 {
+            color: #10b981;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 28px;
+        }
+        p {
+            color: #d1d5db;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        .success-box {
+            background: #064e3b;
+            border: 1px solid #059669;
+            border-left: 4px solid #10b981;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #a7f3d0;
+        }
+        .success-box strong { color: #d1fae5; }
+        a {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 24px;
+            background: #3b82f6;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        a:hover {
+            background: #2563eb;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        .info {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #374151;
+        }
+        .info p { margin: 5px 0; }
+    </style>
+    <script>
+        // Redirect after 3 seconds
+        setTimeout(function() {
+            window.location.href = '/';
+        }, 3000);
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="icon-box">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <h1>Verification Successful</h1>
+        <p>Thank you for verifying that you are human.</p>
+        <p>You will be redirected in 3 seconds...</p>
 
-		c.JSON(200, gin.H{
-			"success":  true,
-			"message":  "Challenge verified successfully",
-			"redirect": redirectURL,
-		})
+        <div class="success-box">
+            <strong>Challenge ID:</strong> ` + request.ChallengeID + `
+        </div>
+
+        <a href="/">Click here if not redirected</a>
+
+        <div class="info">
+            <p>You may now access the application normally.</p>
+        </div>
+    </div>
+</body>
+</html>`
+
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.String(200, successHTML)
 	}
 }
