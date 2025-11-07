@@ -21,16 +21,9 @@ const Login: React.FC = () => {
 
     try {
       await login(email, password)
-
-      // Check if this is first login and needs 2FA setup
-      const needsTwoFASetup = localStorage.getItem('needsTwoFASetup') === 'true'
-      if (needsTwoFASetup) {
-        localStorage.removeItem('needsTwoFASetup')
-        navigate('/setup-2fa')
-      } else {
-        // If no 2FA required, navigate to dashboard
-        navigate('/dashboard')
-      }
+      // The requiresTwoFASetup state will be updated by AuthContext
+      // The Login component will then render the "2FA Setup Required" screen via the conditional below
+      // No need to navigate manually - the component will re-render with the updated state
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed')
     } finally {

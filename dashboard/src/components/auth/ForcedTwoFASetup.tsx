@@ -7,7 +7,7 @@ import { useToast } from '@/contexts/SnackbarContext'
 
 const ForcedTwoFASetup: React.FC = () => {
   const navigate = useNavigate()
-  const { setupTwoFA } = useAuth()
+  const { setupTwoFA, completeTwoFASetup } = useAuth()
   const { showToast } = useToast()
 
   const [twoFASecret, setTwoFASecret] = useState<string>('')
@@ -104,6 +104,8 @@ const ForcedTwoFASetup: React.FC = () => {
       if (!twoFASecret) {
         throw new Error('Secret not initialized')
       }
+
+      // Use the fetch API to get backup codes, then call completeTwoFASetup to update context
       const response = await fetch('/api/auth/2fa/confirm', {
         method: 'POST',
         headers: {
@@ -120,6 +122,10 @@ const ForcedTwoFASetup: React.FC = () => {
 
       const data = await response.json()
       setBackupCodes(data.backup_codes || [])
+
+      // Update the auth context to reset the 2FA setup flag
+      await completeTwoFASetup(twoFASecret, twoFAOtpCode)
+
       setSetupComplete(true)
     } catch (e: any) {
       setTwoFAError(e?.message || 'Error confirming 2FA setup')
