@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
@@ -23,13 +22,6 @@ func init() {
 	httpcaddyfile.RegisterHandlerDirective("waf", parseCaddyfile)
 }
 
-// ThreatLog represents a recent threat that was logged
-type ThreatLog struct {
-	IP         string
-	ThreatType string
-	Timestamp  time.Time
-}
-
 // Middleware implements WAF functionality for Caddy
 type Middleware struct {
 	RulesFile     string `json:"rules_file,omitempty"`
@@ -42,11 +34,6 @@ type Middleware struct {
 	logger         *logger.Logger
 	httpClient     *http.Client
 	stopRuleReload chan bool // Channel to stop rule reloading goroutine
-
-	// Cache for recently logged threats to prevent duplicate logging
-	// when requests are retried after DROP action closes connection
-	recentThreats     []*ThreatLog
-	recentThreatsLock sync.RWMutex
 }
 
 // CaddyModule returns the Caddy module information
@@ -182,45 +169,6 @@ func (m *Middleware) reloadRulesBackground() {
 	}
 }
 
-// isRecentThreat checks if a threat was already logged recently (within 5 seconds)
-// This prevents duplicate logging when browser retries after DROP closes connection
-func (m *Middleware) isRecentThreat(ip string, threatType string) bool {
-	m.recentThreatsLock.RLock()
-	defer m.recentThreatsLock.RUnlock()
-
-	now := time.Now()
-	for _, threat := range m.recentThreats {
-		// Check if threat matches IP and type, and was logged within last 5 seconds
-		if threat.IP == ip && threat.ThreatType == threatType && now.Sub(threat.Timestamp) < 5*time.Second {
-			return true
-		}
-	}
-	return false
-}
-
-// addRecentThreat adds a threat to the recent threats cache and cleans old entries
-func (m *Middleware) addRecentThreat(ip string, threatType string) {
-	m.recentThreatsLock.Lock()
-	defer m.recentThreatsLock.Unlock()
-
-	// Add new threat
-	m.recentThreats = append(m.recentThreats, &ThreatLog{
-		IP:         ip,
-		ThreatType: threatType,
-		Timestamp:  time.Now(),
-	})
-
-	// Clean up old entries (older than 10 seconds)
-	now := time.Now()
-	cleaned := make([]*ThreatLog, 0)
-	for _, threat := range m.recentThreats {
-		if now.Sub(threat.Timestamp) < 10*time.Second {
-			cleaned = append(cleaned, threat)
-		}
-	}
-	m.recentThreats = cleaned
-}
-
 // ServeHTTP implements the middleware handler
 func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	// Inspect the request for threats
@@ -229,33 +177,25 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	if threat != nil {
 		clientIP := getClientIP(r)
 
-		// Check if we've already logged this threat recently
-		// This prevents duplicate logging when browser retries after DROP closes connection
-		isRecent := m.isRecentThreat(clientIP, threat.Type)
-
-		if !isRecent {
-			// Mark this threat as logged
-			m.addRecentThreat(clientIP, threat.Type)
-
-			// Log the threat
-			if m.logger != nil {
-				entry := logger.LogEntry{
-					ThreatType:  threat.Type,
-					Severity:    threat.Severity,
-					Description: threat.Description,
-					ClientIP:    clientIP,
-					Method:      r.Method,
-					URL:         r.URL.String(),
-					UserAgent:   r.UserAgent(),
-					Payload:     threat.Payload,
-				}
-				m.logger.Log(entry)
+		// Log the threat - always log, even if browser retries
+		// Dashboard should handle deduplication/grouping of threats
+		if m.logger != nil {
+			entry := logger.LogEntry{
+				ThreatType:  threat.Type,
+				Severity:    threat.Severity,
+				Description: threat.Description,
+				ClientIP:    clientIP,
+				Method:      r.Method,
+				URL:         r.URL.String(),
+				UserAgent:   r.UserAgent(),
+				Payload:     threat.Payload,
 			}
+			m.logger.Log(entry)
+		}
 
-			// Send event to API backend
-			if m.APIEndpoint != "" {
-				go m.sendEventToAPI(r, clientIP, threat)
-			}
+		// Send event to API backend
+		if m.APIEndpoint != "" {
+			go m.sendEventToAPI(r, clientIP, threat)
 		}
 
 		// Determine if we should block/handle the request based on threat and configuration
