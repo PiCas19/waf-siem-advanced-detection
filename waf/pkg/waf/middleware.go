@@ -336,9 +336,14 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
             text-align: center;
             max-width: 500px;
         }
-        .icon {
-            font-size: 48px;
+        .icon-box {
             margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .icon-box svg {
+            width: 48px;
+            height: 48px;
         }
         h1 {
             color: #60a5fa;
@@ -410,13 +415,17 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 </head>
 <body>
     <div class="container">
-        <div class="icon">🛡️</div>
+        <div class="icon-box">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M24 2C12.95 2 4 10.95 4 22v20h40V22c0-11.05-8.95-20-20-20zm0 4c8.84 0 16 7.16 16 16v2H8v-2c0-8.84 7.16-16 16-16zm-8 20h16v4H16zm0 6h16v4H16z" fill="#60a5fa"/>
+            </svg>
+        </div>
         <h1>Security Verification Required</h1>
         <p>We've detected suspicious activity on your request.</p>
         <p>Please verify you're human to continue.</p>
 
         <div class="threat-box">
-            <strong>⚠️ Threat Detected:</strong> %s
+            <strong>Threat Detected:</strong> %s
         </div>
 
         <div class="challenge-box">
@@ -426,7 +435,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
             <form method="POST" action="/api/waf/challenge/verify">
                 <input type="hidden" name="challenge_id" value="%s">
                 <input type="hidden" name="original_request" value="%s">
-                <button type="submit">✓ Verify & Continue</button>
+                <button type="submit">Verify and Continue</button>
             </form>
         </div>
 
