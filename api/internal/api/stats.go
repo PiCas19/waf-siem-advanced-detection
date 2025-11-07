@@ -1,7 +1,12 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -171,6 +176,76 @@ func WAFStatsHandler(c *gin.Context) {
 	c.JSON(200, stats)
 }
 
+// verifyRecaptchaToken verifies a reCAPTCHA v3 token with Google
+func verifyRecaptchaToken(token string) bool {
+	secretKey := os.Getenv("RECAPTCHA_SECRET_KEY")
+	if secretKey == "" {
+		fmt.Printf("[WARN] RECAPTCHA_SECRET_KEY not set in environment\n")
+		return false
+	}
+
+	// Prepare request to Google reCAPTCHA verification API
+	verifyURL := "https://www.google.com/recaptcha/api/siteverify"
+
+	// Create request body
+	requestBody := map[string]string{
+		"secret":   secretKey,
+		"response": token,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		fmt.Printf("[ERROR] Failed to marshal reCAPTCHA request: %v\n", err)
+		return false
+	}
+
+	// Make request to Google
+	resp, err := http.Post(verifyURL, "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		fmt.Printf("[ERROR] Failed to verify reCAPTCHA token: %v\n", err)
+		return false
+	}
+	defer resp.Body.Close()
+
+	// Read response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("[ERROR] Failed to read reCAPTCHA response: %v\n", err)
+		return false
+	}
+
+	// Parse response
+	var verifyResponse struct {
+		Success      bool    `json:"success"`
+		Score        float64 `json:"score"`
+		Action       string  `json:"action"`
+		ChallengeTS  string  `json:"challenge_ts"`
+		Hostname     string  `json:"hostname"`
+		ErrorCodes   []string `json:"error-codes"`
+	}
+
+	if err := json.Unmarshal(body, &verifyResponse); err != nil {
+		fmt.Printf("[ERROR] Failed to parse reCAPTCHA response: %v\n", err)
+		return false
+	}
+
+	// Check if verification was successful
+	if !verifyResponse.Success {
+		fmt.Printf("[WARN] reCAPTCHA verification failed: %v\n", verifyResponse.ErrorCodes)
+		return false
+	}
+
+	// Check score (0.0 to 1.0, where 1.0 is very likely human, 0.0 is very likely bot)
+	// For v3, we accept scores above 0.5 as human-like behavior
+	if verifyResponse.Score < 0.5 {
+		fmt.Printf("[WARN] reCAPTCHA score too low: %f (threshold: 0.5)\n", verifyResponse.Score)
+		return false
+	}
+
+	fmt.Printf("[INFO] reCAPTCHA verified with score: %f\n", verifyResponse.Score)
+	return true
+}
+
 // GeolocationData represents geolocation statistics
 type GeolocationData struct {
 	Country string `json:"country"`
@@ -234,11 +309,15 @@ func NewWAFChallengeVerifyHandler(db *gorm.DB) gin.HandlerFunc {
 
 		fmt.Printf("[INFO] Challenge verification received: ChallengeID=%s, OriginalRequest=%s, CaptchaToken=%s\n", request.ChallengeID, request.OriginalRequest, request.CaptchaToken)
 
-		// In production, you would verify the CAPTCHA token with hCaptcha here
-		// Example: verify with hCaptcha API if token is present
+		// Verify the reCAPTCHA token with Google
+		captchaVerified := false
 		if request.CaptchaToken != "" {
-			fmt.Printf("[INFO] hCaptcha token received: %s\n", request.CaptchaToken)
-			// TODO: Verify token with hCaptcha API: https://hcaptcha.com/siteverify
+			captchaVerified = verifyRecaptchaToken(request.CaptchaToken)
+			if captchaVerified {
+				fmt.Printf("[INFO] reCAPTCHA verification successful\n")
+			} else {
+				fmt.Printf("[WARN] reCAPTCHA verification failed\n")
+			}
 		}
 
 		// Log the successful challenge verification
