@@ -7,13 +7,19 @@ import (
 )
 
 type Threat struct {
-	Type        string
-	Description string
-	Severity    string
-	ClientIP    string
-	Payload     string
-	IsDefault   bool   // Indicates if this threat was detected by a default rule (always blocks)
-	Action      string // "log" or "block" - action to take for custom rules
+	Type               string
+	Description        string
+	Severity           string
+	ClientIP           string
+	Payload            string
+	IsDefault          bool   // Indicates if this threat was detected by a default rule (always blocks)
+	Action             string // "log" or "block" - action to take for custom rules
+	BlockAction        string // "none", "block", "drop", "redirect", "challenge"
+	RedirectURL        string // URL to redirect to (if BlockAction is "redirect")
+	BlockEnabled       bool   // True if block action is selected
+	DropEnabled        bool   // True if drop action is selected
+	RedirectEnabled    bool   // True if redirect action is selected
+	ChallengeEnabled   bool   // True if challenge action is selected
 }
 
 type Detector struct {
