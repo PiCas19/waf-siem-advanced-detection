@@ -316,6 +316,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
     <title>Security Challenge</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -341,9 +342,9 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
             display: flex;
             justify-content: center;
         }
-        .icon-box svg {
-            width: 48px;
-            height: 48px;
+        .icon-box i {
+            font-size: 48px;
+            color: #60a5fa;
         }
         h1 {
             color: #60a5fa;
@@ -416,9 +417,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 <body>
     <div class="container">
         <div class="icon-box">
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M24 2C12.95 2 4 10.95 4 22v20h40V22c0-11.05-8.95-20-20-20zm0 4c8.84 0 16 7.16 16 16v2H8v-2c0-8.84 7.16-16 16-16zm-8 20h16v4H16zm0 6h16v4H16z" fill="#60a5fa"/>
-            </svg>
+            <i class="fas fa-lock"></i>
         </div>
         <h1>Security Verification Required</h1>
         <p>We've detected suspicious activity on your request.</p>
