@@ -15,10 +15,7 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
     description: '',
     threatType: 'SQL Injection',
     mode: 'block' as 'block' | 'detect',
-    blockEnabled: false,
-    dropEnabled: false,
-    redirectEnabled: false,
-    challengeEnabled: false,
+    blockAction: 'none' as 'none' | 'block' | 'drop' | 'redirect' | 'challenge',
     redirectUrl: '',
   });
 
@@ -50,17 +47,18 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
     const token = localStorage.getItem('authToken');
 
     // Map mode to action: 'detect' -> 'log', 'block' -> 'block'
+    // Map blockAction to individual enabled flags for backend compatibility
     const payload = {
       name: formData.name,
       pattern: formData.pattern,
       description: formData.description,
       type: formData.threatType,
       action: formData.mode === 'detect' ? 'log' : 'block',
-      block_enabled: formData.blockEnabled,
-      drop_enabled: formData.dropEnabled,
-      redirect_enabled: formData.redirectEnabled,
-      challenge_enabled: formData.challengeEnabled,
-      redirect_url: formData.redirectUrl || '',
+      block_enabled: formData.mode === 'block' && formData.blockAction === 'block',
+      drop_enabled: formData.mode === 'block' && formData.blockAction === 'drop',
+      redirect_enabled: formData.mode === 'block' && formData.blockAction === 'redirect',
+      challenge_enabled: formData.mode === 'block' && formData.blockAction === 'challenge',
+      redirect_url: (formData.mode === 'block' && formData.blockAction === 'redirect') ? formData.redirectUrl : '',
     };
 
     try {
@@ -83,10 +81,7 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
           description: '',
           threatType: 'SQL Injection',
           mode: 'block',
-          blockEnabled: false,
-          dropEnabled: false,
-          redirectEnabled: false,
-          challengeEnabled: false,
+          blockAction: 'none',
           redirectUrl: '',
         });
       } else {
@@ -192,40 +187,61 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
           </div>
         </div>
 
-        {/* Automated Blocking Actions */}
-        <div>
+        {/* Automated Blocking Actions - Only available in Block mode */}
+        <div className={formData.mode === 'detect' ? 'opacity-50 pointer-events-none' : ''}>
           <label className="block text-sm font-medium text-gray-300 mb-3">
-            Apply automated blocking actions
+            Blocking Action {formData.mode === 'detect' && <span className="text-xs text-gray-500">(disabled in Detect mode)</span>}
           </label>
           <div className="space-y-2">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
-                type="checkbox"
-                checked={formData.blockEnabled}
-                onChange={(e) => setFormData({ ...formData, blockEnabled: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-600"
+                type="radio"
+                name="blockAction"
+                value="none"
+                checked={formData.blockAction === 'none'}
+                onChange={(e) => setFormData({ ...formData, blockAction: e.target.value as any })}
+                disabled={formData.mode === 'detect'}
+                className="w-4 h-4"
               />
-              <span className="text-gray-300">Block - Reject request immediately</span>
+              <span className="text-gray-300">None - Only log the threat</span>
             </label>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
-                type="checkbox"
-                checked={formData.dropEnabled}
-                onChange={(e) => setFormData({ ...formData, dropEnabled: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-600"
+                type="radio"
+                name="blockAction"
+                value="block"
+                checked={formData.blockAction === 'block'}
+                onChange={(e) => setFormData({ ...formData, blockAction: e.target.value as any })}
+                disabled={formData.mode === 'detect'}
+                className="w-4 h-4"
               />
-              <span className="text-gray-300">Drop - Terminate connection without response</span>
+              <span className="text-gray-300">Block - Reject request with 403 Forbidden</span>
             </label>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
-                type="checkbox"
-                checked={formData.redirectEnabled}
-                onChange={(e) => setFormData({ ...formData, redirectEnabled: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-600"
+                type="radio"
+                name="blockAction"
+                value="drop"
+                checked={formData.blockAction === 'drop'}
+                onChange={(e) => setFormData({ ...formData, blockAction: e.target.value as any })}
+                disabled={formData.mode === 'detect'}
+                className="w-4 h-4"
               />
-              <span className="text-gray-300">Redirect - Redirect to security page</span>
+              <span className="text-gray-300">Drop - Terminate connection immediately (no response)</span>
             </label>
-            {formData.redirectEnabled && (
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="blockAction"
+                value="redirect"
+                checked={formData.blockAction === 'redirect'}
+                onChange={(e) => setFormData({ ...formData, blockAction: e.target.value as any })}
+                disabled={formData.mode === 'detect'}
+                className="w-4 h-4"
+              />
+              <span className="text-gray-300">Redirect - Send to security/error page</span>
+            </label>
+            {formData.blockAction === 'redirect' && formData.mode === 'block' && (
               <div className="ml-7 mt-2">
                 <input
                   type="text"
@@ -238,10 +254,13 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
             )}
             <label className="flex items-center gap-3 cursor-pointer">
               <input
-                type="checkbox"
-                checked={formData.challengeEnabled}
-                onChange={(e) => setFormData({ ...formData, challengeEnabled: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-600"
+                type="radio"
+                name="blockAction"
+                value="challenge"
+                checked={formData.blockAction === 'challenge'}
+                onChange={(e) => setFormData({ ...formData, blockAction: e.target.value as any })}
+                disabled={formData.mode === 'detect'}
+                className="w-4 h-4"
               />
               <span className="text-gray-300">Challenge - Require CAPTCHA verification</span>
             </label>
