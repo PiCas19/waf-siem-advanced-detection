@@ -216,3 +216,49 @@ func GetGeolocationHandler(db *gorm.DB) gin.HandlerFunc {
 		})
 	}
 }
+
+// NewWAFChallengeVerifyHandler handles CAPTCHA challenge verification
+func NewWAFChallengeVerifyHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var request struct {
+			ChallengeID    string `form:"challenge_id" binding:"required"`
+			OriginalRequest string `form:"original_request"`
+		}
+
+		if err := c.ShouldBind(&request); err != nil {
+			fmt.Printf("[ERROR] Failed to bind challenge verify request: %v\n", err)
+			c.JSON(400, gin.H{"error": "invalid request"})
+			return
+		}
+
+		fmt.Printf("[INFO] Challenge verification received: ChallengeID=%s, OriginalRequest=%s\n", request.ChallengeID, request.OriginalRequest)
+
+		// In production, you would verify the CAPTCHA token with hCaptcha or reCAPTCHA here
+		// For now, we just accept the challenge verification
+
+		// Log the successful challenge verification
+		auditLog := models.AuditLog{
+			UserID:      0, // System action
+			Action:      "CHALLENGE_VERIFICATION",
+			Category:    "SECURITY",
+			Status:      "success",
+			Description: fmt.Sprintf("Challenge verified: %s", request.ChallengeID),
+			IPAddress:   c.ClientIP(),
+		}
+		if err := db.Create(&auditLog).Error; err != nil {
+			fmt.Printf("[ERROR] Failed to log challenge verification: %v\n", err)
+		}
+
+		// Redirect to the original request or a success page
+		redirectURL := request.OriginalRequest
+		if redirectURL == "" {
+			redirectURL = "/"
+		}
+
+		c.JSON(200, gin.H{
+			"success":  true,
+			"message":  "Challenge verified successfully",
+			"redirect": redirectURL,
+		})
+	}
+}

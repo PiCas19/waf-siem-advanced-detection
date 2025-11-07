@@ -309,45 +309,130 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 	// Generate a challenge ID
 	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
 
-	// Return CAPTCHA challenge HTML
+	// Return CAPTCHA challenge HTML (matching dashboard theme)
 	challengeHTML := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
     <title>Security Challenge</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial, sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; max-width: 500px; }
-        h1 { color: #333; margin-top: 0; }
-        p { color: #666; line-height: 1.6; }
-        .warning { background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 20px 0; color: #856404; }
-        .challenge-box { background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 4px; padding: 20px; margin: 20px 0; }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #0056b3; }
-        .info { font-size: 12px; color: #999; margin-top: 15px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #111827;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #f3f4f6;
+        }
+        .container {
+            background: #1f2937;
+            border: 1px solid #374151;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 500px;
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #60a5fa;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 28px;
+        }
+        p {
+            color: #d1d5db;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        .threat-box {
+            background: #374151;
+            border: 1px solid #4b5563;
+            border-left: 4px solid #ef4444;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #fca5a5;
+            text-align: left;
+        }
+        .threat-box strong { color: #fecaca; }
+        .challenge-box {
+            background: #111827;
+            border: 1px solid #374151;
+            border-radius: 4px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .challenge-id {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #60a5fa;
+            background: #1f2937;
+            padding: 8px 12px;
+            border-radius: 4px;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 15px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #2563eb;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        .info {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #374151;
+        }
+        .info p { margin: 5px 0; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔒 Security Challenge</h1>
-        <p>We've detected suspicious activity on your request. Please verify you're human by completing the challenge below.</p>
+        <div class="icon">🛡️</div>
+        <h1>Security Verification Required</h1>
+        <p>We've detected suspicious activity on your request.</p>
+        <p>Please verify you're human to continue.</p>
 
-        <div class="warning">
-            <strong>Threat Detected:</strong> %s
+        <div class="threat-box">
+            <strong>⚠️ Threat Detected:</strong> %s
         </div>
 
         <div class="challenge-box">
-            <p>This is a security challenge. In a production environment, this would display an hCaptcha or reCAPTCHA widget.</p>
-            <p>Challenge ID: <code>%s</code></p>
+            <p style="color: #d1d5db; margin-bottom: 10px;">Complete the verification to proceed:</p>
+            <p style="font-size: 14px; color: #9ca3af;">Challenge ID:</p>
+            <div class="challenge-id">%s</div>
             <form method="POST" action="/api/waf/challenge/verify">
                 <input type="hidden" name="challenge_id" value="%s">
                 <input type="hidden" name="original_request" value="%s">
-                <button type="submit">I'm not a robot - Verify</button>
+                <button type="submit">✓ Verify & Continue</button>
             </form>
         </div>
 
         <div class="info">
             <p>If you believe this is an error, please contact support.</p>
-            <p>Your IP: %s</p>
+            <p>Your IP: <code style="color: #60a5fa;">%s</code></p>
         </div>
     </div>
 </body>

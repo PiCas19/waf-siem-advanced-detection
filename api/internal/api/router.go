@@ -26,6 +26,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		public.POST("/waf/event", NewWAFEventHandler(db))
 		// WAF endpoint to fetch custom rules
 		public.GET("/waf/custom-rules", NewGetCustomRulesHandler(db))
+		// WAF challenge verification endpoint
+		public.POST("/waf/challenge/verify", NewWAFChallengeVerifyHandler(db))
 	}
 
 	protected := r.Group("/api")
