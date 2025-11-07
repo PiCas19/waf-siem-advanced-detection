@@ -197,17 +197,27 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			go m.sendEventToAPI(r, clientIP, threat)
 		}
 
-		// Determine if we should block the request:
-		// 1. Default rules always block (IsDefault: true)
-		// 2. Custom rules block if action is "block"
+		// Determine if we should block/handle the request based on threat and configuration
+		// 1. Default rules always block (IsDefault: true) - use block action
+		// 2. Custom rules: check their Action field ("block" or "log")
 		// 3. Global block mode blocks everything
-		shouldBlock := m.BlockMode || threat.IsDefault
-		if !threat.IsDefault && threat.Action == "block" {
-			shouldBlock = true
+
+		shouldHandle := false
+		if threat.IsDefault || m.BlockMode {
+			// Default rules and global block mode always trigger blocking
+			shouldHandle = true
+			// For default rules, default to "block" action if not specified
+			if threat.BlockAction == "" {
+				threat.BlockAction = "block"
+			}
+		} else if threat.Action == "block" {
+			// Custom rules only trigger blocking if action is "block"
+			shouldHandle = true
 		}
 
-		if shouldBlock {
-			return m.blockRequest(w, threat)
+		if shouldHandle {
+			// Execute the blocking action (block, drop, redirect, challenge, none)
+			return m.executeBlockingAction(w, r, threat)
 		}
 	}
 
@@ -215,7 +225,140 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	return next.ServeHTTP(w, r)
 }
 
-// blockRequest returns a 403 Forbidden response
+// executeBlockingAction handles the specified blocking action for detected threats
+func (m *Middleware) executeBlockingAction(w http.ResponseWriter, r *http.Request, threat *detector.Threat) error {
+	// Determine which action to execute
+	switch threat.BlockAction {
+	case "drop":
+		return m.handleDropAction(w, r, threat)
+	case "redirect":
+		return m.handleRedirectAction(w, r, threat)
+	case "challenge":
+		return m.handleChallengeAction(w, r, threat)
+	case "none":
+		// Only log, no blocking - shouldn't reach here but handle it
+		return nil
+	case "block":
+		return m.handleBlockAction(w, r, threat)
+	default:
+		// Default to block if unknown action
+		return m.handleBlockAction(w, r, threat)
+	}
+}
+
+// handleBlockAction returns HTTP 403 Forbidden
+func (m *Middleware) handleBlockAction(w http.ResponseWriter, r *http.Request, threat *detector.Threat) error {
+	w.Header().Set("X-WAF-Blocked", "true")
+	w.Header().Set("X-WAF-Threat", threat.Type)
+	w.Header().Set("X-WAF-Severity", threat.Severity)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusForbidden)
+
+	response := fmt.Sprintf(`{
+		"error": "Request blocked by WAF",
+		"threat_type": "%s",
+		"severity": "%s",
+		"description": "%s"
+	}`, threat.Type, threat.Severity, threat.Description)
+
+	w.Write([]byte(response))
+	return nil
+}
+
+// handleDropAction closes the connection immediately without response
+func (m *Middleware) handleDropAction(w http.ResponseWriter, r *http.Request, threat *detector.Threat) error {
+	// Try to hijack the connection and close it
+	if hijacker, ok := w.(http.Hijacker); ok {
+		conn, _, err := hijacker.Hijack()
+		if err != nil {
+			// Fallback to block if hijacking fails
+			return m.handleBlockAction(w, r, threat)
+		}
+		// Close the connection without sending any response
+		conn.Close()
+		return nil
+	}
+	// If hijacking not available, fall back to block
+	return m.handleBlockAction(w, r, threat)
+}
+
+// handleRedirectAction returns HTTP 302 with Location header
+func (m *Middleware) handleRedirectAction(w http.ResponseWriter, r *http.Request, threat *detector.Threat) error {
+	w.Header().Set("X-WAF-Blocked", "true")
+	w.Header().Set("X-WAF-Threat", threat.Type)
+	w.Header().Set("X-WAF-Severity", threat.Severity)
+	w.Header().Set("X-Original-URL", r.RequestURI)
+
+	// Use configured redirect URL or fall back to block if not set
+	if threat.RedirectURL != "" {
+		http.Redirect(w, r, threat.RedirectURL, http.StatusFound) // 302
+		return nil
+	}
+	// No redirect URL configured, fall back to block
+	return m.handleBlockAction(w, r, threat)
+}
+
+// handleChallengeAction returns HTTP 403 with CAPTCHA challenge HTML
+func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Request, threat *detector.Threat) error {
+	w.Header().Set("X-WAF-Blocked", "true")
+	w.Header().Set("X-WAF-Threat", threat.Type)
+	w.Header().Set("X-WAF-Severity", threat.Severity)
+	w.Header().Set("X-WAF-Challenge", "captcha-required")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	// Generate a challenge ID
+	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
+
+	// Return CAPTCHA challenge HTML
+	challengeHTML := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <title>Security Challenge</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; max-width: 500px; }
+        h1 { color: #333; margin-top: 0; }
+        p { color: #666; line-height: 1.6; }
+        .warning { background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 20px 0; color: #856404; }
+        .challenge-box { background: #f8f9fa; border: 2px solid #dee2e6; border-radius: 4px; padding: 20px; margin: 20px 0; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        .info { font-size: 12px; color: #999; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 Security Challenge</h1>
+        <p>We've detected suspicious activity on your request. Please verify you're human by completing the challenge below.</p>
+
+        <div class="warning">
+            <strong>Threat Detected:</strong> %s
+        </div>
+
+        <div class="challenge-box">
+            <p>This is a security challenge. In a production environment, this would display an hCaptcha or reCAPTCHA widget.</p>
+            <p>Challenge ID: <code>%s</code></p>
+            <form method="POST" action="/api/waf/challenge/verify">
+                <input type="hidden" name="challenge_id" value="%s">
+                <input type="hidden" name="original_request" value="%s">
+                <button type="submit">I'm not a robot - Verify</button>
+            </form>
+        </div>
+
+        <div class="info">
+            <p>If you believe this is an error, please contact support.</p>
+            <p>Your IP: %s</p>
+        </div>
+    </div>
+</body>
+</html>`, threat.Type, challengeID, challengeID, r.RequestURI, getClientIP(r))
+
+	w.WriteHeader(http.StatusForbidden)
+	w.Write([]byte(challengeHTML))
+	return nil
+}
+
+// blockRequest returns a 403 Forbidden response (deprecated, kept for compatibility)
 func (m *Middleware) blockRequest(w http.ResponseWriter, threat *detector.Threat) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusForbidden)
