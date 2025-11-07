@@ -380,7 +380,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 	// Generate a challenge ID
 	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
 
-	// Return CAPTCHA challenge HTML (matching dashboard theme) with Google reCAPTCHA v3
+	// Return CAPTCHA challenge HTML (matching dashboard theme) with Cloudflare Turnstile
 	challengeHTML := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
@@ -388,7 +388,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -457,7 +457,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
             word-break: break-all;
             margin: 10px 0;
         }
-        .recaptcha-container {
+        .turnstile-container {
             display: flex;
             justify-content: center;
             margin: 20px 0;
@@ -510,10 +510,10 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
             <form id="challengeForm" method="POST" action="/api/waf/challenge/verify">
                 <input type="hidden" name="challenge_id" value="%s">
                 <input type="hidden" name="original_request" value="%s">
-                <input type="hidden" id="recaptcha-token" name="captcha_token">
+                <input type="hidden" id="turnstile-token" name="captcha_token">
 
-                <div class="recaptcha-container">
-                    <div class="g-recaptcha" data-sitekey="6LfMqwUsAAAAAM2C3rZxYdGbFGyxDovAZ2aI8BDO" data-callback="onRecaptchaSuccess" data-size="normal"></div>
+                <div class="turnstile-container">
+                    <div class="cf-turnstile" data-sitekey="0x4AAAAAAB_vC04yTw3CJIFZ" data-callback="onTurnstileSuccess" data-theme="dark"></div>
                 </div>
 
                 <button type="submit" id="submitBtn">Verify and Continue</button>
@@ -527,17 +527,17 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
     </div>
 
     <script>
-        function onRecaptchaSuccess(token) {
-            // Store the token from reCAPTCHA
-            document.getElementById('recaptcha-token').value = token;
+        function onTurnstileSuccess(token) {
+            // Store the token from Turnstile
+            document.getElementById('turnstile-token').value = token;
         }
 
-        // Auto-submit form when reCAPTCHA is verified
+        // Verify form on submit
         document.getElementById('challengeForm').addEventListener('submit', function(e) {
-            var token = document.getElementById('recaptcha-token').value;
+            var token = document.getElementById('turnstile-token').value;
             if (!token) {
                 e.preventDefault();
-                alert('Please complete the reCAPTCHA verification');
+                alert('Please complete the Turnstile verification');
                 return false;
             }
         });

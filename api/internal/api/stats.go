@@ -176,16 +176,16 @@ func WAFStatsHandler(c *gin.Context) {
 	c.JSON(200, stats)
 }
 
-// verifyRecaptchaToken verifies a reCAPTCHA v3 token with Google
-func verifyRecaptchaToken(token string) bool {
-	secretKey := os.Getenv("RECAPTCHA_SECRET_KEY")
+// verifyTurnstileToken verifies a Cloudflare Turnstile token
+func verifyTurnstileToken(token string) bool {
+	secretKey := os.Getenv("TURNSTILE_SECRET_KEY")
 	if secretKey == "" {
-		fmt.Printf("[WARN] RECAPTCHA_SECRET_KEY not set in environment\n")
+		fmt.Printf("[WARN] TURNSTILE_SECRET_KEY not set in environment\n")
 		return false
 	}
 
-	// Prepare request to Google reCAPTCHA verification API
-	verifyURL := "https://www.google.com/recaptcha/api/siteverify"
+	// Prepare request to Cloudflare Turnstile verification API
+	verifyURL := "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
 	// Create request body
 	requestBody := map[string]string{
@@ -195,14 +195,14 @@ func verifyRecaptchaToken(token string) bool {
 
 	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to marshal reCAPTCHA request: %v\n", err)
+		fmt.Printf("[ERROR] Failed to marshal Turnstile request: %v\n", err)
 		return false
 	}
 
-	// Make request to Google
+	// Make request to Cloudflare
 	resp, err := http.Post(verifyURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to verify reCAPTCHA token: %v\n", err)
+		fmt.Printf("[ERROR] Failed to verify Turnstile token: %v\n", err)
 		return false
 	}
 	defer resp.Body.Close()
@@ -210,39 +210,30 @@ func verifyRecaptchaToken(token string) bool {
 	// Read response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to read reCAPTCHA response: %v\n", err)
+		fmt.Printf("[ERROR] Failed to read Turnstile response: %v\n", err)
 		return false
 	}
 
 	// Parse response
 	var verifyResponse struct {
-		Success      bool    `json:"success"`
-		Score        float64 `json:"score"`
-		Action       string  `json:"action"`
-		ChallengeTS  string  `json:"challenge_ts"`
-		Hostname     string  `json:"hostname"`
-		ErrorCodes   []string `json:"error-codes"`
+		Success     bool     `json:"success"`
+		ChallengeTS string   `json:"challenge_ts"`
+		Hostname    string   `json:"hostname"`
+		ErrorCodes  []string `json:"error-codes"`
 	}
 
 	if err := json.Unmarshal(body, &verifyResponse); err != nil {
-		fmt.Printf("[ERROR] Failed to parse reCAPTCHA response: %v\n", err)
+		fmt.Printf("[ERROR] Failed to parse Turnstile response: %v\n", err)
 		return false
 	}
 
 	// Check if verification was successful
 	if !verifyResponse.Success {
-		fmt.Printf("[WARN] reCAPTCHA verification failed: %v\n", verifyResponse.ErrorCodes)
+		fmt.Printf("[WARN] Turnstile verification failed: %v\n", verifyResponse.ErrorCodes)
 		return false
 	}
 
-	// Check score (0.0 to 1.0, where 1.0 is very likely human, 0.0 is very likely bot)
-	// For v3, we accept scores above 0.5 as human-like behavior
-	if verifyResponse.Score < 0.5 {
-		fmt.Printf("[WARN] reCAPTCHA score too low: %f (threshold: 0.5)\n", verifyResponse.Score)
-		return false
-	}
-
-	fmt.Printf("[INFO] reCAPTCHA verified with score: %f\n", verifyResponse.Score)
+	fmt.Printf("[INFO] Turnstile verified successfully\n")
 	return true
 }
 
@@ -309,14 +300,14 @@ func NewWAFChallengeVerifyHandler(db *gorm.DB) gin.HandlerFunc {
 
 		fmt.Printf("[INFO] Challenge verification received: ChallengeID=%s, OriginalRequest=%s, CaptchaToken=%s\n", request.ChallengeID, request.OriginalRequest, request.CaptchaToken)
 
-		// Verify the reCAPTCHA token with Google
+		// Verify the Turnstile token with Cloudflare
 		captchaVerified := false
 		if request.CaptchaToken != "" {
-			captchaVerified = verifyRecaptchaToken(request.CaptchaToken)
+			captchaVerified = verifyTurnstileToken(request.CaptchaToken)
 			if captchaVerified {
-				fmt.Printf("[INFO] reCAPTCHA verification successful\n")
+				fmt.Printf("[INFO] Turnstile verification successful\n")
 			} else {
-				fmt.Printf("[WARN] reCAPTCHA verification failed\n")
+				fmt.Printf("[WARN] Turnstile verification failed\n")
 			}
 		}
 
