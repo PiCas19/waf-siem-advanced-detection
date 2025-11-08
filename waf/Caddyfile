@@ -17,15 +17,6 @@
 # TAILSCALE FUNNEL - WAN (porta 8080)
 #===================================
 :8080 {
-    # Blocca traffico NON Tailscale
-    @public_traffic {
-        not remote_ip 100.0.0.0/8
-    }
-    handle @public_traffic {
-        respond "Access Denied - Tailscale VPN Required" 403
-        abort
-    }
-
     # WebSocket (prima di tutto, ha priorità)
     handle /ws {
         reverse_proxy {
