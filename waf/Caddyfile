@@ -14,14 +14,10 @@
     }
 }
 
-#=======================================
-# TAILSCALE - HTTPS (Let's Encrypt)
-# Accessible only to Tailscale users
-#=======================================
-https://caddy-waf.tail95e42.ts.net {
-    # Let's Encrypt automatic certificate
-    # (Caddy handles this automatically with auto_https on)
-
+#===================================
+# TAILSCALE FUNNEL - WAN (porta 8080 + 80)
+#===================================
+:8080 {
     # WebSocket (priorità)
     handle /ws {
         reverse_proxy {
@@ -105,7 +101,7 @@ https://caddy-waf.tail95e42.ts.net {
     # Resto con WAF
     handle {
         waf {
-            log_file /var/log/caddy/waf_tailscale.log
+            log_file /var/log/caddy/waf_wan.log
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
@@ -119,29 +115,21 @@ https://caddy-waf.tail95e42.ts.net {
         header {
             Cache-Control "public, max-age=3600"
             X-Content-Type-Options "nosniff"
-            X-Frame-Options "SAMEORIGIN"
+            X-Frame-Options "DENY"
             X-XSS-Protection "1; mode=block"
             Referrer-Policy "strict-origin-when-cross-origin"
-            Strict-Transport-Security "max-age=31536000; includeSubDomains"
-            Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' https://caddy-waf.tail95e42.ts.net https://challenges.cloudflare.com"
+            Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' http://172.16.216.10/api https://172.16.216.10:8443/api https://challenges.cloudflare.com"
         }
     }
 
     log {
-        output file /var/log/caddy/access_tailscale.log {
+        output file /var/log/caddy/access_wan.log {
             roll_size 100mb
             roll_keep 10
             roll_keep_for 720h
         }
         format json
     }
-}
-
-#=======================================
-# TAILSCALE - HTTP → HTTPS Redirect
-#=======================================
-http://caddy-waf.tail95e42.ts.net {
-    redir https://{host}{uri}
 }
 
 #=======================================
