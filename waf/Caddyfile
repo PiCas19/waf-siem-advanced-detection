@@ -25,7 +25,7 @@
 # TAILSCALE - HTTPS (Let's Encrypt via Plugin)
 #=======================================
 caddy-waf.tail95e42.ts.net {
-    bind tailscale
+    bind 100.78.40.22
 
     tls {
         get_certificate tailscale
@@ -145,7 +145,7 @@ caddy-waf.tail95e42.ts.net {
 # TAILSCALE - HTTP → HTTPS Redirect
 #=======================================
 http://caddy-waf.tail95e42.ts.net {
-    bind tailscale
+    bind 100.78.40.22
     redir https://{host}{uri}
 }
 
