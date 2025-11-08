@@ -118,7 +118,7 @@
 #=======================================
 # LAN - HTTPS (porta 8443)
 #=======================================
-:8443 {
+https://172.16.216.10:8443 {
     bind 0.0.0.0
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
 
