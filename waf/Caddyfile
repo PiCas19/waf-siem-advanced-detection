@@ -3,12 +3,15 @@
     auto_https off
     order waf before file_server
 
-    # PLUGIN TAILSCALE GLOBALE
+    # PLUGIN TAILSCALE GLOBALE con mTLS
     tailscale {
         auth_key {env.TS_AUTHKEY}
         ephemeral false
         state_dir /var/lib/caddy/tailscale
     }
+
+    # Certificati Tailscale con rinnovo automatico
+    cert_issuer tailscale
 
     servers {
         protocols h1 h2 h3
@@ -27,8 +30,9 @@
 caddy-waf.tail95e42.ts.net {
     bind 100.78.40.22
 
+    # Usa certificati Tailscale con rinnovo automatico
     tls {
-        get_certificate tailscale
+        issuer tailscale
     }
 
     # WebSocket (priorità)
