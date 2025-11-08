@@ -1,8 +1,7 @@
 {
     email pierpaolo.casati@student.supsi.ch
-    auto_https on
+    auto_https off
     order waf before file_server
-
     servers {
         protocols h1 h2 h3
         timeouts {
@@ -15,10 +14,10 @@
 }
 
 #===================================
-# TAILSCALE FUNNEL - WAN (porta 8080 + 80)
+# TAILSCALE FUNNEL - WAN (porta 8080)
 #===================================
 :8080 {
-    # WebSocket (priorità)
+    # WebSocket (prima di tutto, ha priorità)
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
@@ -37,24 +36,7 @@
         }
     }
 
-    # Challenge verification (bypass WAF)
-    handle /api/waf/challenge/verify {
-        reverse_proxy {
-            lb_policy least_conn
-            health_uri /health
-            health_interval 10s
-            health_timeout 2s
-            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
-            transport http {
-                read_timeout 30s
-                write_timeout 30s
-                dial_timeout 2s
-                keepalive 30s
-            }
-        }
-    }
-
-    # API
+    # API (prima di tutto, ha priorità)
     handle /api* {
         reverse_proxy {
             lb_policy least_conn
@@ -70,35 +52,35 @@
             }
         }
     }
-
-    # File statici
+    
+    # File statici (serviti senza WAF)
     handle /assets/* {
         root * /var/www/html
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-
+    
     handle /favicon.ico {
         root * /var/www/html
         file_server
     }
-
+    
     handle /manifest.json {
         root * /var/www/html
         file_server
     }
-
+    
     handle /robots.txt {
         root * /var/www/html
         file_server
     }
-
+    
     handle /vite.svg {
         root * /var/www/html
         file_server
     }
-
-    # Resto con WAF
+    
+    # Tutto il resto (HTML, routing SPA) con WAF
     handle {
         waf {
             log_file /var/log/caddy/waf_wan.log
@@ -106,12 +88,13 @@
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
         }
-
+        
         root * /var/www/html
         try_files {path} /index.html
         file_server
+        
         encode gzip zstd
-
+        
         header {
             Cache-Control "public, max-age=3600"
             X-Content-Type-Options "nosniff"
@@ -121,7 +104,7 @@
             Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' http://172.16.216.10/api https://172.16.216.10:8443/api https://challenges.cloudflare.com"
         }
     }
-
+    
     log {
         output file /var/log/caddy/access_wan.log {
             roll_size 100mb
@@ -139,7 +122,7 @@
     bind 0.0.0.0
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
 
-    # WebSocket
+    # WebSocket (prima di tutto)
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
@@ -152,23 +135,6 @@
             transport http {
                 read_timeout 0s
                 write_timeout 0s
-                dial_timeout 2s
-                keepalive 30s
-            }
-        }
-    }
-
-    # Challenge verification
-    handle /api/waf/challenge/verify {
-        reverse_proxy {
-            lb_policy least_conn
-            health_uri /health
-            health_interval 10s
-            health_timeout 2s
-            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
-            transport http {
-                read_timeout 30s
-                write_timeout 30s
                 dial_timeout 2s
                 keepalive 30s
             }
@@ -191,34 +157,34 @@
             }
         }
     }
-
+    
     # File statici
     handle /assets/* {
         root * /var/www/html
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-
+    
     handle /favicon.ico {
         root * /var/www/html
         file_server
     }
-
+    
     handle /manifest.json {
         root * /var/www/html
         file_server
     }
-
+    
     handle /robots.txt {
         root * /var/www/html
         file_server
     }
-
+    
     handle /vite.svg {
         root * /var/www/html
         file_server
     }
-
+    
     # Resto con WAF
     handle {
         waf {
@@ -231,6 +197,7 @@
         root * /var/www/html
         try_files {path} /index.html
         file_server
+
         encode gzip zstd
 
         header {
@@ -256,7 +223,7 @@
 # LAN - HTTP (porta 80)
 #=====================
 http://172.16.216.10 {
-    # WebSocket
+    # WebSocket (prima di tutto)
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
@@ -269,23 +236,6 @@ http://172.16.216.10 {
             transport http {
                 read_timeout 0s
                 write_timeout 0s
-                dial_timeout 2s
-                keepalive 30s
-            }
-        }
-    }
-
-    # Challenge verification
-    handle /api/waf/challenge/verify {
-        reverse_proxy {
-            lb_policy least_conn
-            health_uri /health
-            health_interval 10s
-            health_timeout 2s
-            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
-            transport http {
-                read_timeout 30s
-                write_timeout 30s
                 dial_timeout 2s
                 keepalive 30s
             }
@@ -308,34 +258,34 @@ http://172.16.216.10 {
             }
         }
     }
-
+    
     # File statici
     handle /assets/* {
         root * /var/www/html
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-
+    
     handle /favicon.ico {
         root * /var/www/html
         file_server
     }
-
+    
     handle /manifest.json {
         root * /var/www/html
         file_server
     }
-
+    
     handle /robots.txt {
         root * /var/www/html
         file_server
     }
-
+    
     handle /vite.svg {
         root * /var/www/html
         file_server
     }
-
+    
     # Resto con WAF
     handle {
         waf {
@@ -348,6 +298,7 @@ http://172.16.216.10 {
         root * /var/www/html
         try_files {path} /index.html
         file_server
+
         encode gzip zstd
 
         header {
