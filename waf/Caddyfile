@@ -88,13 +88,13 @@
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
         }
-
+        
         root * /var/www/html
         try_files {path} /index.html
         file_server
-
+        
         encode gzip zstd
-
+        
         header {
             Cache-Control "public, max-age=3600"
             X-Content-Type-Options "nosniff"
