@@ -90,10 +90,22 @@ caddy-waf.tail95e42.ts.net {
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-    handle /favicon.ico { root * /var/www/html; file_server }
-    handle /manifest.json { root * /var/www/html; file_server }
-    handle /robots.txt { root * /var/www/html; file_server }
-    handle /vite.svg { root * /var/www/html; file_server }
+    handle /favicon.ico {
+        root * /var/www/html
+        file_server
+    }
+    handle /manifest.json {
+        root * /var/www/html
+        file_server
+    }
+    handle /robots.txt {
+        root * /var/www/html
+        file_server
+    }
+    handle /vite.svg {
+        root * /var/www/html
+        file_server
+    }
 
     # Resto con WAF (log identici al vecchio funnel)
     handle {
@@ -200,10 +212,22 @@ http://caddy-waf.tail95e42.ts.net {
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-    handle /favicon.ico { root * /var/www/html; file_server }
-    handle /manifest.json { root * /var/www/html; file_server }
-    handle /robots.txt { root * /var/www/html; file_server }
-    handle /vite.svg { root * /var/www/html; file_server }
+    handle /favicon.ico {
+        root * /var/www/html
+        file_server
+    }
+    handle /manifest.json {
+        root * /var/www/html
+        file_server
+    }
+    handle /robots.txt {
+        root * /var/www/html
+        file_server
+    }
+    handle /vite.svg {
+        root * /var/www/html
+        file_server
+    }
 
     # Resto con WAF
     handle {
@@ -305,10 +329,22 @@ http://caddy-waf.tail95e42.ts.net {
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-    handle /favicon.ico { root * /var/www/html; file_server }
-    handle /manifest.json { root * /var/www/html; file_server }
-    handle /robots.txt { root * /var/www/html; file_server }
-    handle /vite.svg { root * /var/www/html; file_server }
+    handle /favicon.ico {
+        root * /var/www/html
+        file_server
+    }
+    handle /manifest.json {
+        root * /var/www/html
+        file_server
+    }
+    handle /robots.txt {
+        root * /var/www/html
+        file_server
+    }
+    handle /vite.svg {
+        root * /var/www/html
+        file_server
+    }
 
     # Resto con WAF
     handle {
@@ -406,10 +442,22 @@ http://172.16.216.10 {
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-    handle /favicon.ico { root * /var/www/html; file_server }
-    handle /manifest.json { root * /var/www/html; file_server }
-    handle /robots.txt { root * /var/www/html; file_server }
-    handle /vite.svg { root * /var/www/html; file_server }
+    handle /favicon.ico {
+        root * /var/www/html
+        file_server
+    }
+    handle /manifest.json {
+        root * /var/www/html
+        file_server
+    }
+    handle /robots.txt {
+        root * /var/www/html
+        file_server
+    }
+    handle /vite.svg {
+        root * /var/www/html
+        file_server
+    }
 
     # Resto con WAF
     handle {
