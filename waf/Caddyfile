@@ -43,7 +43,11 @@
     # ========================================
     
     # WebSocket
-    handle @tailscale_only /ws {
+    @tailscale_ws {
+        remote_ip 100.0.0.0/8
+        path /ws
+    }
+    handle @tailscale_ws {
         reverse_proxy {
             lb_policy least_conn
             health_uri /health
@@ -62,7 +66,11 @@
     }
 
     # API
-    handle @tailscale_only /api* {
+    @tailscale_api {
+        remote_ip 100.0.0.0/8
+        path /api*
+    }
+    handle @tailscale_api {
         reverse_proxy {
             lb_policy least_conn
             health_uri /health
@@ -79,28 +87,48 @@
     }
     
     # File statici
-    handle @tailscale_only /assets/* {
+    @tailscale_assets {
+        remote_ip 100.0.0.0/8
+        path /assets/*
+    }
+    handle @tailscale_assets {
         root * /var/www/html
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-    
-    handle @tailscale_only /favicon.ico {
+
+    @tailscale_favicon {
+        remote_ip 100.0.0.0/8
+        path /favicon.ico
+    }
+    handle @tailscale_favicon {
         root * /var/www/html
         file_server
     }
-    
-    handle @tailscale_only /manifest.json {
+
+    @tailscale_manifest {
+        remote_ip 100.0.0.0/8
+        path /manifest.json
+    }
+    handle @tailscale_manifest {
         root * /var/www/html
         file_server
     }
-    
-    handle @tailscale_only /robots.txt {
+
+    @tailscale_robots {
+        remote_ip 100.0.0.0/8
+        path /robots.txt
+    }
+    handle @tailscale_robots {
         root * /var/www/html
         file_server
     }
-    
-    handle @tailscale_only /vite.svg {
+
+    @tailscale_vite {
+        remote_ip 100.0.0.0/8
+        path /vite.svg
+    }
+    handle @tailscale_vite {
         root * /var/www/html
         file_server
     }
