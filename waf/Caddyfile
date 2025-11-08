@@ -3,6 +3,13 @@
     auto_https off
     order waf before file_server
 
+    # PLUGIN TAILSCALE GLOBALE
+    tailscale {
+        auth_key {env.TS_AUTHKEY}
+        ephemeral false
+        state_dir /var/lib/caddy/tailscale
+    }
+
     servers {
         protocols h1 h2 h3
         timeouts {
@@ -15,10 +22,15 @@
 }
 
 #=======================================
-# TAILSCALE - HTTPS (Let's Encrypt nativo)
+# TAILSCALE - HTTPS (Let's Encrypt via Plugin)
 #=======================================
 caddy-waf.tail95e42.ts.net {
-    tls
+    bind tailscale
+
+    tls {
+        get_certificate tailscale
+    }
+
     # WebSocket (priorità)
     handle /ws {
         reverse_proxy {
@@ -83,7 +95,7 @@ caddy-waf.tail95e42.ts.net {
     handle /robots.txt { root * /var/www/html; file_server }
     handle /vite.svg { root * /var/www/html; file_server }
 
-    # Resto con WAF (USA GLI STESSI LOG DEL FUNNEL!)
+    # Resto con WAF (log identici al vecchio funnel)
     handle {
         waf {
             log_file /var/log/caddy/waf_wan.log
@@ -107,7 +119,6 @@ caddy-waf.tail95e42.ts.net {
         }
     }
 
-    # LOG (commento fuori dalle graffe)
     log {
         output file /var/log/caddy/access_wan.log {
             roll_size 100mb
@@ -122,14 +133,15 @@ caddy-waf.tail95e42.ts.net {
 # TAILSCALE - HTTP → HTTPS Redirect
 #=======================================
 http://caddy-waf.tail95e42.ts.net {
+    bind tailscale
     redir https://{host}{uri}
 }
 
 #===================================
-# TAILSCALE FUNNEL - WAN (porta 8080) - MANTENUTO COME BACKUP
+# TAILSCALE FUNNEL - WAN (porta 8080) - BACKUP
 #===================================
 :8080 {
-    # WebSocket (priorità)
+    # WebSocket
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
@@ -148,7 +160,7 @@ http://caddy-waf.tail95e42.ts.net {
         }
     }
 
-    # Challenge verification (bypass WAF)
+    # Challenge verification
     handle /api/waf/challenge/verify {
         reverse_proxy {
             lb_policy least_conn
@@ -217,7 +229,6 @@ http://caddy-waf.tail95e42.ts.net {
         }
     }
 
-    # LOG
     log {
         output file /var/log/caddy/access_wan.log {
             roll_size 100mb
@@ -322,7 +333,6 @@ http://caddy-waf.tail95e42.ts.net {
         }
     }
 
-    # LOG
     log {
         output file /var/log/caddy/access_lan_https.log {
             roll_size 100mb
@@ -423,7 +433,6 @@ http://172.16.216.10 {
         }
     }
 
-    # LOG
     log {
         output file /var/log/caddy/access_lan_http.log {
             roll_size 100mb
