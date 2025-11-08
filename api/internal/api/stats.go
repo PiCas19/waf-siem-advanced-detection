@@ -102,6 +102,7 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 			Method:      event.Method,
 			URL:         event.Path,
 			UserAgent:   event.UA,
+			Payload:     event.Payload,
 			CreatedAt:   time.Now(),
 			Blocked:     event.Blocked,
 			BlockedBy:   event.BlockedBy,
@@ -151,6 +152,7 @@ func WAFStatsHandler(c *gin.Context) {
 			recentEvents = append(recentEvents, websocket.WAFEvent{
 				IP:        log.ClientIP,
 				Threat:    log.ThreatType,
+				Payload:   log.Payload,
 				Blocked:   log.Blocked,
 				BlockedBy: log.BlockedBy,
 				Timestamp: log.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
