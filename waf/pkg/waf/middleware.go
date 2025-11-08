@@ -237,9 +237,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		clientIP := getClientIP(r)
 
 		// Create a fingerprint of this request to detect retries
-		// Fingerprint = MD5(IP + method + path + threat_type + payload)
-		// This allows us to detect when browser retries the same malicious request
-		fingerprint := m.computeRequestFingerprint(clientIP, r.Method, r.URL.Path, threat.Type, threat.Payload)
+		// Fingerprint = MD5(IP + method + path + threat_type) - WITHOUT payload
+		// This prevents duplicate logging when same threat type is detected in multiple request parameters
+		fingerprint := m.computeRequestFingerprint(clientIP, r.Method, r.URL.Path, threat.Type, "")
 
 		// Check if we've already processed this exact request recently (within 3 seconds)
 		// This prevents logging the same attack multiple times when browser retries
