@@ -17,8 +17,32 @@
 # TAILSCALE FUNNEL - WAN (porta 8080)
 #===================================
 :8080 {
+    # ========================================
+    # FILTRO IP: Solo Tailscale (100.0.0.0/8)
+    # ========================================
+
+    # Matcher per IP Tailscale
+    @tailscale_only {
+        remote_ip 100.0.0.0/8
+    }
+
+    # Matcher per traffico pubblico (NON Tailscale)
+    @public_traffic {
+        not remote_ip 100.0.0.0/8
+    }
+
+    # Blocca traffico pubblico
+    handle @public_traffic {
+        respond "Access Denied - Tailscale VPN Required" 403
+        abort
+    }
+
+    # ========================================
+    # TRAFFICO TAILSCALE AUTORIZZATO
+    # ========================================
+
     # WebSocket (prima di tutto, ha priorità)
-    handle /ws {
+    handle @tailscale_only /ws {
         reverse_proxy {
             lb_policy least_conn
             health_uri /health
@@ -37,7 +61,7 @@
     }
 
     # API (prima di tutto, ha priorità)
-    handle /api* {
+    handle @tailscale_only /api* {
         reverse_proxy {
             lb_policy least_conn
             health_uri /health
@@ -52,36 +76,37 @@
             }
         }
     }
-    
+
     # File statici (serviti senza WAF)
-    handle /assets/* {
+    handle @tailscale_only /assets/* {
         root * /var/www/html
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-    
-    handle /favicon.ico {
+
+
+    handle @tailscale_only /favicon.ico {
         root * /var/www/html
         file_server
     }
-    
-    handle /manifest.json {
+
+    handle @tailscale_only /manifest.json {
         root * /var/www/html
         file_server
     }
-    
-    handle /robots.txt {
+
+    handle @tailscale_only /robots.txt {
         root * /var/www/html
         file_server
     }
-    
-    handle /vite.svg {
+
+    handle @tailscale_only /vite.svg {
         root * /var/www/html
         file_server
     }
-    
+
     # Tutto il resto (HTML, routing SPA) con WAF
-    handle {
+    handle @tailscale_only {
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
