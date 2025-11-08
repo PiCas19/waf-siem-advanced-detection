@@ -1,17 +1,7 @@
 {
     email pierpaolo.casati@student.supsi.ch
-    auto_https off
+    auto_https on
     order waf before file_server
-
-    # PLUGIN TAILSCALE GLOBALE con mTLS
-    tailscale {
-        auth_key {env.TS_AUTHKEY}
-        ephemeral false
-        state_dir /var/lib/caddy/tailscale
-    }
-
-    # Certificati Tailscale con rinnovo automatico
-    cert_issuer tailscale
 
     servers {
         protocols h1 h2 h3
@@ -25,15 +15,12 @@
 }
 
 #=======================================
-# TAILSCALE - HTTPS (Let's Encrypt via Plugin)
+# TAILSCALE - HTTPS (Let's Encrypt)
+# Accessible only to Tailscale users
 #=======================================
-caddy-waf.tail95e42.ts.net {
-    bind 100.78.40.22
-
-    # Usa certificati Tailscale con rinnovo automatico
-    tls {
-        issuer tailscale
-    }
+https://caddy-waf.tail95e42.ts.net {
+    # Let's Encrypt automatic certificate
+    # (Caddy handles this automatically with auto_https on)
 
     # WebSocket (priorità)
     handle /ws {
@@ -94,27 +81,31 @@ caddy-waf.tail95e42.ts.net {
         file_server
         header Cache-Control "public, max-age=31536000"
     }
+
     handle /favicon.ico {
         root * /var/www/html
         file_server
     }
+
     handle /manifest.json {
         root * /var/www/html
         file_server
     }
+
     handle /robots.txt {
         root * /var/www/html
         file_server
     }
+
     handle /vite.svg {
         root * /var/www/html
         file_server
     }
 
-    # Resto con WAF (log identici al vecchio funnel)
+    # Resto con WAF
     handle {
         waf {
-            log_file /var/log/caddy/waf_wan.log
+            log_file /var/log/caddy/waf_tailscale.log
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
@@ -128,15 +119,16 @@ caddy-waf.tail95e42.ts.net {
         header {
             Cache-Control "public, max-age=3600"
             X-Content-Type-Options "nosniff"
-            X-Frame-Options "DENY"
+            X-Frame-Options "SAMEORIGIN"
             X-XSS-Protection "1; mode=block"
             Referrer-Policy "strict-origin-when-cross-origin"
-            Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' https://caddy-waf.tail95e42.ts.net http://172.16.216.10 https://172.16.216.10:8443 https://challenges.cloudflare.com"
+            Strict-Transport-Security "max-age=31536000; includeSubDomains"
+            Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' https://caddy-waf.tail95e42.ts.net https://challenges.cloudflare.com"
         }
     }
 
     log {
-        output file /var/log/caddy/access_wan.log {
+        output file /var/log/caddy/access_tailscale.log {
             roll_size 100mb
             roll_keep 10
             roll_keep_for 720h
@@ -149,122 +141,7 @@ caddy-waf.tail95e42.ts.net {
 # TAILSCALE - HTTP → HTTPS Redirect
 #=======================================
 http://caddy-waf.tail95e42.ts.net {
-    bind 100.78.40.22
     redir https://{host}{uri}
-}
-
-#===================================
-# TAILSCALE FUNNEL - WAN (porta 8080) - BACKUP
-#===================================
-:8080 {
-    # WebSocket
-    handle /ws {
-        reverse_proxy {
-            lb_policy least_conn
-            health_uri /health
-            health_interval 10s
-            health_timeout 2s
-            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
-            header_up Connection "Upgrade"
-            header_up Upgrade "websocket"
-            transport http {
-                read_timeout 0s
-                write_timeout 0s
-                dial_timeout 2s
-                keepalive 30s
-            }
-        }
-    }
-
-    # Challenge verification
-    handle /api/waf/challenge/verify {
-        reverse_proxy {
-            lb_policy least_conn
-            health_uri /health
-            health_interval 10s
-            health_timeout 2s
-            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
-            transport http {
-                read_timeout 30s
-                write_timeout 30s
-                dial_timeout 2s
-                keepalive 30s
-            }
-        }
-    }
-
-    # API
-    handle /api* {
-        reverse_proxy {
-            lb_policy least_conn
-            health_uri /health
-            health_interval 10s
-            health_timeout 2s
-            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
-            transport http {
-                read_timeout 30s
-                write_timeout 30s
-                dial_timeout 2s
-                keepalive 30s
-            }
-        }
-    }
-
-    # File statici
-    handle /assets/* {
-        root * /var/www/html
-        file_server
-        header Cache-Control "public, max-age=31536000"
-    }
-    handle /favicon.ico {
-        root * /var/www/html
-        file_server
-    }
-    handle /manifest.json {
-        root * /var/www/html
-        file_server
-    }
-    handle /robots.txt {
-        root * /var/www/html
-        file_server
-    }
-    handle /vite.svg {
-        root * /var/www/html
-        file_server
-    }
-
-    # Resto con WAF
-    handle {
-        waf {
-            log_file /var/log/caddy/waf_wan.log
-            block_mode true
-            api_endpoint http://localhost:8081/api/waf/event
-            rules_endpoint http://localhost:8081/api/waf/custom-rules
-        }
-
-        root * /var/www/html
-        try_files {path} /index.html
-        file_server
-        encode gzip zstd
-
-        header {
-            Cache-Control "public, max-age=3600"
-            X-Content-Type-Options "nosniff"
-            X-Frame-Options "DENY"
-            X-XSS-Protection "1; mode=block"
-            Referrer-Policy "strict-origin-when-cross-origin"
-            Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' http://172.16.216.10/api https://172.16.216.10:8443/api https://challenges.cloudflare.com"
-        }
-    }
-
-    log {
-        output file /var/log/caddy/access_wan.log {
-            roll_size 100mb
-            roll_keep 10
-            roll_keep_for 720h
-        }
-        format json
-    }
 }
 
 #=======================================
@@ -333,18 +210,22 @@ http://caddy-waf.tail95e42.ts.net {
         file_server
         header Cache-Control "public, max-age=31536000"
     }
+
     handle /favicon.ico {
         root * /var/www/html
         file_server
     }
+
     handle /manifest.json {
         root * /var/www/html
         file_server
     }
+
     handle /robots.txt {
         root * /var/www/html
         file_server
     }
+
     handle /vite.svg {
         root * /var/www/html
         file_server
@@ -446,18 +327,22 @@ http://172.16.216.10 {
         file_server
         header Cache-Control "public, max-age=31536000"
     }
+
     handle /favicon.ico {
         root * /var/www/html
         file_server
     }
+
     handle /manifest.json {
         root * /var/www/html
         file_server
     }
+
     handle /robots.txt {
         root * /var/www/html
         file_server
     }
+
     handle /vite.svg {
         root * /var/www/html
         file_server
