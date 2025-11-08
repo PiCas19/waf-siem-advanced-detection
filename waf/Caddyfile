@@ -3,13 +3,6 @@
     auto_https off
     order waf before file_server
 
-    # TAILSCALE INTEGRATION
-    tailscale {
-        auth_key {env.TS_AUTHKEY}
-        ephemeral false
-        state_dir /var/lib/caddy/tailscale
-    }
-
     servers {
         protocols h1 h2 h3
         timeouts {
@@ -22,14 +15,10 @@
 }
 
 #=======================================
-# TAILSCALE - HTTPS (Let's Encrypt via Tailscale)
+# TAILSCALE - HTTPS (Let's Encrypt nativo)
 #=======================================
 caddy-waf.tail95e42.ts.net {
-    bind tailscale
-
-    tls {
-        get_certificate tailscale
-    }
+    tls  # <-- Caddy prende il certificato da Tailscale automaticamente
 
     # WebSocket
     handle /ws {
@@ -74,25 +63,10 @@ caddy-waf.tail95e42.ts.net {
         header Cache-Control "public, max-age=31536000"
     }
 
-    handle /favicon.ico {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /manifest.json {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /robots.txt {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /vite.svg {
-        root * /var/www/html
-        file_server
-    }
+    handle /favicon.ico { root * /var/www/html; file_server }
+    handle /manifest.json { root * /var/www/html; file_server }
+    handle /robots.txt { root * /var/www/html; file_server }
+    handle /vite.svg { root * /var/www/html; file_server }
 
     # Resto con WAF
     handle {
@@ -106,7 +80,6 @@ caddy-waf.tail95e42.ts.net {
         root * /var/www/html
         try_files {path} /index.html
         file_server
-
         encode gzip zstd
 
         header {
@@ -133,7 +106,6 @@ caddy-waf.tail95e42.ts.net {
 # TAILSCALE - HTTP → HTTPS Redirect
 #=======================================
 http://caddy-waf.tail95e42.ts.net {
-    bind tailscale
     redir https://{host}{uri}
 }
 
@@ -184,25 +156,10 @@ http://caddy-waf.tail95e42.ts.net {
         header Cache-Control "public, max-age=31536000"
     }
 
-    handle /favicon.ico {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /manifest.json {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /robots.txt {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /vite.svg {
-        root * /var/www/html
-        file_server
-    }
+    handle /favicon.ico { root * /var/www/html; file_server }
+    handle /manifest.json { root * /var/www/html; file_server }
+    handle /robots.txt { root * /var/www/html; file_server }
+    handle /vite.svg { root * /var/www/html; file_server }
 
     # Resto con WAF
     handle {
@@ -216,7 +173,6 @@ http://caddy-waf.tail95e42.ts.net {
         root * /var/www/html
         try_files {path} /index.html
         file_server
-
         encode gzip zstd
 
         header {
@@ -289,25 +245,10 @@ http://caddy-waf.tail95e42.ts.net {
         header Cache-Control "public, max-age=31536000"
     }
 
-    handle /favicon.ico {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /manifest.json {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /robots.txt {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /vite.svg {
-        root * /var/www/html
-        file_server
-    }
+    handle /favicon.ico { root * /var/www/html; file_server }
+    handle /manifest.json { root * /var/www/html; file_server }
+    handle /robots.txt { root * /var/www/html; file_server }
+    handle /vite.svg { root * /var/www/html; file_server }
 
     # Resto con WAF
     handle {
@@ -321,7 +262,6 @@ http://caddy-waf.tail95e42.ts.net {
         root * /var/www/html
         try_files {path} /index.html
         file_server
-
         encode gzip zstd
 
         header {
@@ -390,25 +330,10 @@ http://172.16.216.10 {
         header Cache-Control "public, max-age=31536000"
     }
 
-    handle /favicon.ico {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /manifest.json {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /robots.txt {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /vite.svg {
-        root * /var/www/html
-        file_server
-    }
+    handle /favicon.ico { root * /var/www/html; file_server }
+    handle /manifest.json { root * /var/www/html; file_server }
+    handle /robots.txt { root * /var/www/html; file_server }
+    handle /vite.svg { root * /var/www/html; file_server }
 
     # Resto con WAF
     handle {
@@ -422,7 +347,6 @@ http://172.16.216.10 {
         root * /var/www/html
         try_files {path} /index.html
         file_server
-
         encode gzip zstd
 
         header {
