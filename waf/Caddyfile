@@ -36,6 +36,23 @@
         }
     }
 
+    # API - Challenge verification endpoint (bypass WAF to avoid double logging)
+    handle /api/waf/challenge/verify {
+        reverse_proxy {
+            lb_policy least_conn
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
+    }
+
     # API (prima di tutto, ha priorità)
     handle /api* {
         reverse_proxy {
@@ -141,6 +158,23 @@
         }
     }
 
+    # API - Challenge verification endpoint (bypass WAF to avoid double logging)
+    handle /api/waf/challenge/verify {
+        reverse_proxy {
+            lb_policy least_conn
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
+    }
+
     # API
     handle /api* {
         reverse_proxy {
@@ -236,6 +270,23 @@ http://172.16.216.10 {
             transport http {
                 read_timeout 0s
                 write_timeout 0s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
+    }
+
+    # API - Challenge verification endpoint (bypass WAF to avoid double logging)
+    handle /api/waf/challenge/verify {
+        reverse_proxy {
+            lb_policy least_conn
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
                 dial_timeout 2s
                 keepalive 30s
             }
