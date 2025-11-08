@@ -601,6 +601,7 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 		"path":        r.URL.Path,
 		"query":       r.URL.RawQuery,
 		"user_agent":  r.UserAgent(),
+		"payload":     threat.Payload,
 		"timestamp":   time.Now().Format(time.RFC3339),
 		"blocked":     blocked,
 		"blocked_by":  blockedBy,
