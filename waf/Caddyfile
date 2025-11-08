@@ -15,24 +15,24 @@
 
 #===================================
 # TAILSCALE FUNNEL - WAN (porta 8080)
-# Let's Encrypt via Funnel + Solo IP Tailscale
+# Solo IP Tailscale (100.0.0.0/8)
 #===================================
 :8080 {
     # ========================================
-    # FILTRO IP: Solo Tailscale
+    # FILTRO IP: Tailscale completo
     # ========================================
     
-    # Matcher per IP Tailscale
+    # Matcher per IP Tailscale (range completo)
     @tailscale_only {
-        remote_ip 100.64.0.0/10
+        remote_ip 100.0.0.0/8
     }
     
     # Matcher per traffico pubblico
     @public_traffic {
-        not remote_ip 100.64.0.0/10
+        not remote_ip 100.0.0.0/8
     }
     
-    # Blocca traffico pubblico (non Tailscale)
+    # Blocca traffico pubblico
     handle @public_traffic {
         respond "Access Denied - Tailscale VPN Required" 403
         abort
@@ -42,7 +42,7 @@
     # TRAFFICO TAILSCALE AUTORIZZATO
     # ========================================
     
-    # WebSocket (solo per utenti Tailscale)
+    # WebSocket
     handle @tailscale_only /ws {
         reverse_proxy {
             lb_policy least_conn
@@ -61,7 +61,7 @@
         }
     }
 
-    # API (solo per utenti Tailscale)
+    # API
     handle @tailscale_only /api* {
         reverse_proxy {
             lb_policy least_conn
@@ -78,7 +78,7 @@
         }
     }
     
-    # File statici (solo per utenti Tailscale)
+    # File statici
     handle @tailscale_only /assets/* {
         root * /var/www/html
         file_server
@@ -105,7 +105,7 @@
         file_server
     }
     
-    # Applicazione principale con WAF (solo per utenti Tailscale)
+    # Applicazione con WAF
     handle @tailscale_only {
         waf {
             log_file /var/log/caddy/waf_wan.log
