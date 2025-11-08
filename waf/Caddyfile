@@ -17,7 +17,7 @@
 #===================================
 # TAILSCALE FUNNEL - WAN (porta 8080)
 #===================================
-:8080 {
+:443 {
     # WebSocket (prima di tutto, ha priorità)
     handle /ws {
         reverse_proxy {
