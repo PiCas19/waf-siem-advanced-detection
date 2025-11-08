@@ -19,7 +19,6 @@
 #=======================================
 caddy-waf.tail95e42.ts.net {
     tls
-
     # WebSocket (priorità)
     handle /ws {
         reverse_proxy {
