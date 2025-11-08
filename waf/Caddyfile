@@ -18,7 +18,7 @@
 # TAILSCALE - HTTPS (Let's Encrypt nativo)
 #=======================================
 caddy-waf.tail95e42.ts.net {
-    tls 
+    tls
 
     # WebSocket (priorità)
     handle /ws {
@@ -87,7 +87,7 @@ caddy-waf.tail95e42.ts.net {
     # Resto con WAF (USA GLI STESSI LOG DEL FUNNEL!)
     handle {
         waf {
-            log_file /var/log/caddy/waf_wan.log  # IDENTICO AL VECCHIO FUNNEL
+            log_file /var/log/caddy/waf_wan.log
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
@@ -108,8 +108,9 @@ caddy-waf.tail95e42.ts.net {
         }
     }
 
+    # LOG (commento fuori dalle graffe)
     log {
-        output file /var/log/caddy/access_wan.log {  # IDENTICO AL VECCHIO FUNNEL
+        output file /var/log/caddy/access_wan.log {
             roll_size 100mb
             roll_keep 10
             roll_keep_for 720h
@@ -196,7 +197,7 @@ http://caddy-waf.tail95e42.ts.net {
     # Resto con WAF
     handle {
         waf {
-            log_file /var/log/caddy/waf_wan.log  # STESSO LOG
+            log_file /var/log/caddy/waf_wan.log
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
@@ -217,8 +218,9 @@ http://caddy-waf.tail95e42.ts.net {
         }
     }
 
+    # LOG
     log {
-        output file /var/log/caddy/access_wan.log {  # STESSO LOG
+        output file /var/log/caddy/access_wan.log {
             roll_size 100mb
             roll_keep 10
             roll_keep_for 720h
@@ -301,7 +303,7 @@ http://caddy-waf.tail95e42.ts.net {
     # Resto con WAF
     handle {
         waf {
-            log_file /var/log/caddy/waf_lan.log  # INVARIATO
+            log_file /var/log/caddy/waf_lan.log
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
@@ -317,12 +319,13 @@ http://caddy-waf.tail95e42.ts.net {
             X-Frame-Options "SAMEORIGIN"
             X-XSS-Protection "1; mode=block"
             Strict-Transport-Security "max-age=31536000; includeSubDomains"
-            Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src '  self' https://challenges.cloudflare.com"
+            Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com"
         }
     }
 
+    # LOG
     log {
-        output file /var/log/caddy/access_lan_https.log {  # INVARIATO
+        output file /var/log/caddy/access_lan_https.log {
             roll_size 100mb
             roll_keep 10
             roll_keep_for 720h
@@ -402,7 +405,7 @@ http://172.16.216.10 {
     # Resto con WAF
     handle {
         waf {
-            log_file /var/log/caddy/waf_lan.log 
+            log_file /var/log/caddy/waf_lan.log
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
@@ -421,8 +424,9 @@ http://172.16.216.10 {
         }
     }
 
+    # LOG
     log {
-        output file /var/log/caddy/access_lan_http.log {  
+        output file /var/log/caddy/access_lan_http.log {
             roll_size 100mb
             roll_keep 10
             roll_keep_for 720h
