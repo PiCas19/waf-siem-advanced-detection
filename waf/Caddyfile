@@ -15,31 +15,10 @@
 
 #===================================
 # TAILSCALE FUNNEL - WAN (porta 8080)
-# Con filtro IP: Solo utenti Tailscale
 #===================================
 :8080 {
-    # ========================================
-    # FILTRO IP: Solo Tailscale (100.0.0.0/8)
-    # ========================================
-    @tailscale_only {
-        remote_ip 100.0.0.0/8
-    }
-    
-    @public_traffic {
-        not remote_ip 100.0.0.0/8
-    }
-    
-    # Blocca traffico non-Tailscale
-    handle @public_traffic {
-        respond "Access Denied - Tailscale VPN Required" 403
-    }
-    
-    # ========================================
-    # TRAFFICO TAILSCALE (Tua configurazione originale)
-    # ========================================
-    
-    # WebSocket
-    handle @tailscale_only /ws {
+    # WebSocket (prima di tutto, ha priorità)
+    handle /ws {
         reverse_proxy {
             lb_policy least_conn
             health_uri /health
@@ -57,8 +36,8 @@
         }
     }
 
-    # API
-    handle @tailscale_only /api* {
+    # API (prima di tutto, ha priorità)
+    handle /api* {
         reverse_proxy {
             lb_policy least_conn
             health_uri /health
@@ -74,35 +53,35 @@
         }
     }
     
-    # File statici
-    handle @tailscale_only /assets/* {
+    # File statici (serviti senza WAF)
+    handle /assets/* {
         root * /var/www/html
         file_server
         header Cache-Control "public, max-age=31536000"
     }
     
-    handle @tailscale_only /favicon.ico {
+    handle /favicon.ico {
         root * /var/www/html
         file_server
     }
     
-    handle @tailscale_only /manifest.json {
+    handle /manifest.json {
         root * /var/www/html
         file_server
     }
     
-    handle @tailscale_only /robots.txt {
+    handle /robots.txt {
         root * /var/www/html
         file_server
     }
     
-    handle @tailscale_only /vite.svg {
+    handle /vite.svg {
         root * /var/www/html
         file_server
     }
     
-    # Applicazione con WAF
-    handle @tailscale_only {
+    # Tutto il resto (HTML, routing SPA) con WAF
+    handle {
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
@@ -139,11 +118,11 @@
 #=======================================
 # LAN - HTTPS (porta 8443)
 #=======================================
-http://172.16.216.10:8443 {
+:8443 {
     bind 0.0.0.0
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
 
-    # WebSocket
+    # WebSocket (prima di tutto)
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
@@ -206,7 +185,7 @@ http://172.16.216.10:8443 {
         file_server
     }
     
-    # Applicazione con WAF
+    # Resto con WAF
     handle {
         waf {
             log_file /var/log/caddy/waf_lan.log
@@ -244,7 +223,7 @@ http://172.16.216.10:8443 {
 # LAN - HTTP (porta 80)
 #=====================
 http://172.16.216.10 {
-    # WebSocket
+    # WebSocket (prima di tutto)
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
@@ -307,7 +286,7 @@ http://172.16.216.10 {
         file_server
     }
     
-    # Applicazione con WAF
+    # Resto con WAF
     handle {
         waf {
             log_file /var/log/caddy/waf_lan.log
