@@ -15,39 +15,31 @@
 
 #===================================
 # TAILSCALE FUNNEL - WAN (porta 8080)
-# Solo IP Tailscale (100.0.0.0/8)
+# Con filtro IP: Solo utenti Tailscale
 #===================================
 :8080 {
     # ========================================
-    # FILTRO IP: Tailscale completo
+    # FILTRO IP: Solo Tailscale (100.0.0.0/8)
     # ========================================
-    
-    # Matcher per IP Tailscale (range completo)
     @tailscale_only {
         remote_ip 100.0.0.0/8
     }
     
-    # Matcher per traffico pubblico
     @public_traffic {
         not remote_ip 100.0.0.0/8
     }
     
-    # Blocca traffico pubblico
+    # Blocca traffico non-Tailscale
     handle @public_traffic {
         respond "Access Denied - Tailscale VPN Required" 403
-        abort
     }
     
     # ========================================
-    # TRAFFICO TAILSCALE AUTORIZZATO
+    # TRAFFICO TAILSCALE (Tua configurazione originale)
     # ========================================
     
     # WebSocket
-    @tailscale_ws {
-        remote_ip 100.0.0.0/8
-        path /ws
-    }
-    handle @tailscale_ws {
+    handle @tailscale_only /ws {
         reverse_proxy {
             lb_policy least_conn
             health_uri /health
@@ -66,11 +58,7 @@
     }
 
     # API
-    @tailscale_api {
-        remote_ip 100.0.0.0/8
-        path /api*
-    }
-    handle @tailscale_api {
+    handle @tailscale_only /api* {
         reverse_proxy {
             lb_policy least_conn
             health_uri /health
@@ -87,48 +75,28 @@
     }
     
     # File statici
-    @tailscale_assets {
-        remote_ip 100.0.0.0/8
-        path /assets/*
-    }
-    handle @tailscale_assets {
+    handle @tailscale_only /assets/* {
         root * /var/www/html
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-
-    @tailscale_favicon {
-        remote_ip 100.0.0.0/8
-        path /favicon.ico
-    }
-    handle @tailscale_favicon {
+    
+    handle @tailscale_only /favicon.ico {
         root * /var/www/html
         file_server
     }
-
-    @tailscale_manifest {
-        remote_ip 100.0.0.0/8
-        path /manifest.json
-    }
-    handle @tailscale_manifest {
+    
+    handle @tailscale_only /manifest.json {
         root * /var/www/html
         file_server
     }
-
-    @tailscale_robots {
-        remote_ip 100.0.0.0/8
-        path /robots.txt
-    }
-    handle @tailscale_robots {
+    
+    handle @tailscale_only /robots.txt {
         root * /var/www/html
         file_server
     }
-
-    @tailscale_vite {
-        remote_ip 100.0.0.0/8
-        path /vite.svg
-    }
-    handle @tailscale_vite {
+    
+    handle @tailscale_only /vite.svg {
         root * /var/www/html
         file_server
     }
