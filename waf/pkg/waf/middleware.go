@@ -189,10 +189,14 @@ func (m *Middleware) reloadRulesBackground() {
 
 // computeRequestFingerprint creates a unique fingerprint for a request
 // to detect retries of the same malicious request
-// Fingerprint = MD5(IP + method + path + threat_type + payload)
+// Fingerprint = MD5(IP + method + path + threat_type)
+// Note: payload is NOT included to avoid duplicate logging when same threat type
+// appears in multiple request parameters (headers, query, body)
 func (m *Middleware) computeRequestFingerprint(clientIP string, method string, path string, threatType string, payload string) string {
-	// Create a unique identifier for this request
-	uniqueStr := fmt.Sprintf("%s|%s|%s|%s|%s", clientIP, method, path, threatType, payload)
+	// Create a unique identifier for this request (without payload)
+	// This prevents duplicate logging when the same threat type is detected
+	// in multiple places (e.g., both in headers and body)
+	uniqueStr := fmt.Sprintf("%s|%s|%s|%s", clientIP, method, path, threatType)
 	hash := md5.Sum([]byte(uniqueStr))
 	return fmt.Sprintf("%x", hash)
 }
