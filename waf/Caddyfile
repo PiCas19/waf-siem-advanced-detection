@@ -18,9 +18,9 @@
 # TAILSCALE - HTTPS (Let's Encrypt nativo)
 #=======================================
 caddy-waf.tail95e42.ts.net {
-    tls  # <-- Caddy prende il certificato da Tailscale automaticamente
+    tls 
 
-    # WebSocket
+    # WebSocket (priorità)
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
@@ -33,6 +33,23 @@ caddy-waf.tail95e42.ts.net {
             transport http {
                 read_timeout 0s
                 write_timeout 0s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
+    }
+
+    # Challenge verification (bypass WAF)
+    handle /api/waf/challenge/verify {
+        reverse_proxy {
+            lb_policy least_conn
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
                 dial_timeout 2s
                 keepalive 30s
             }
@@ -62,16 +79,15 @@ caddy-waf.tail95e42.ts.net {
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-
     handle /favicon.ico { root * /var/www/html; file_server }
     handle /manifest.json { root * /var/www/html; file_server }
     handle /robots.txt { root * /var/www/html; file_server }
     handle /vite.svg { root * /var/www/html; file_server }
 
-    # Resto con WAF
+    # Resto con WAF (USA GLI STESSI LOG DEL FUNNEL!)
     handle {
         waf {
-            log_file /var/log/caddy/waf_tailscale.log
+            log_file /var/log/caddy/waf_wan.log  # IDENTICO AL VECCHIO FUNNEL
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
@@ -83,9 +99,9 @@ caddy-waf.tail95e42.ts.net {
         encode gzip zstd
 
         header {
-            Strict-Transport-Security "max-age=31536000; includeSubDomains"
+            Cache-Control "public, max-age=3600"
             X-Content-Type-Options "nosniff"
-            X-Frame-Options "SAMEORIGIN"
+            X-Frame-Options "DENY"
             X-XSS-Protection "1; mode=block"
             Referrer-Policy "strict-origin-when-cross-origin"
             Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' https://caddy-waf.tail95e42.ts.net http://172.16.216.10 https://172.16.216.10:8443 https://challenges.cloudflare.com"
@@ -93,7 +109,7 @@ caddy-waf.tail95e42.ts.net {
     }
 
     log {
-        output file /var/log/caddy/access_tailscale_https.log {
+        output file /var/log/caddy/access_wan.log {  # IDENTICO AL VECCHIO FUNNEL
             roll_size 100mb
             roll_keep 10
             roll_keep_for 720h
@@ -110,10 +126,10 @@ http://caddy-waf.tail95e42.ts.net {
 }
 
 #===================================
-# TAILSCALE FUNNEL - WAN (porta 8080)
+# TAILSCALE FUNNEL - WAN (porta 8080) - MANTENUTO COME BACKUP
 #===================================
 :8080 {
-    # WebSocket
+    # WebSocket (priorità)
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
@@ -126,6 +142,23 @@ http://caddy-waf.tail95e42.ts.net {
             transport http {
                 read_timeout 0s
                 write_timeout 0s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
+    }
+
+    # Challenge verification (bypass WAF)
+    handle /api/waf/challenge/verify {
+        reverse_proxy {
+            lb_policy least_conn
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
                 dial_timeout 2s
                 keepalive 30s
             }
@@ -155,7 +188,6 @@ http://caddy-waf.tail95e42.ts.net {
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-
     handle /favicon.ico { root * /var/www/html; file_server }
     handle /manifest.json { root * /var/www/html; file_server }
     handle /robots.txt { root * /var/www/html; file_server }
@@ -164,7 +196,7 @@ http://caddy-waf.tail95e42.ts.net {
     # Resto con WAF
     handle {
         waf {
-            log_file /var/log/caddy/waf_wan.log
+            log_file /var/log/caddy/waf_wan.log  # STESSO LOG
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
@@ -186,7 +218,7 @@ http://caddy-waf.tail95e42.ts.net {
     }
 
     log {
-        output file /var/log/caddy/access_wan.log {
+        output file /var/log/caddy/access_wan.log {  # STESSO LOG
             roll_size 100mb
             roll_keep 10
             roll_keep_for 720h
@@ -221,6 +253,23 @@ http://caddy-waf.tail95e42.ts.net {
         }
     }
 
+    # Challenge verification
+    handle /api/waf/challenge/verify {
+        reverse_proxy {
+            lb_policy least_conn
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
+    }
+
     # API
     handle /api* {
         reverse_proxy {
@@ -244,7 +293,6 @@ http://caddy-waf.tail95e42.ts.net {
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-
     handle /favicon.ico { root * /var/www/html; file_server }
     handle /manifest.json { root * /var/www/html; file_server }
     handle /robots.txt { root * /var/www/html; file_server }
@@ -253,7 +301,7 @@ http://caddy-waf.tail95e42.ts.net {
     # Resto con WAF
     handle {
         waf {
-            log_file /var/log/caddy/waf_lan.log
+            log_file /var/log/caddy/waf_lan.log  # INVARIATO
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
@@ -269,12 +317,12 @@ http://caddy-waf.tail95e42.ts.net {
             X-Frame-Options "SAMEORIGIN"
             X-XSS-Protection "1; mode=block"
             Strict-Transport-Security "max-age=31536000; includeSubDomains"
-            Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com"
+            Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src '  self' https://challenges.cloudflare.com"
         }
     }
 
     log {
-        output file /var/log/caddy/access_lan_https.log {
+        output file /var/log/caddy/access_lan_https.log {  # INVARIATO
             roll_size 100mb
             roll_keep 10
             roll_keep_for 720h
@@ -306,6 +354,23 @@ http://172.16.216.10 {
         }
     }
 
+    # Challenge verification
+    handle /api/waf/challenge/verify {
+        reverse_proxy {
+            lb_policy least_conn
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
+            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
+    }
+
     # API
     handle /api* {
         reverse_proxy {
@@ -329,7 +394,6 @@ http://172.16.216.10 {
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-
     handle /favicon.ico { root * /var/www/html; file_server }
     handle /manifest.json { root * /var/www/html; file_server }
     handle /robots.txt { root * /var/www/html; file_server }
@@ -338,7 +402,7 @@ http://172.16.216.10 {
     # Resto con WAF
     handle {
         waf {
-            log_file /var/log/caddy/waf_lan.log
+            log_file /var/log/caddy/waf_lan.log 
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
@@ -358,7 +422,7 @@ http://172.16.216.10 {
     }
 
     log {
-        output file /var/log/caddy/access_lan_http.log {
+        output file /var/log/caddy/access_lan_http.log {  
             roll_size 100mb
             roll_keep 10
             roll_keep_for 720h
