@@ -17,7 +17,7 @@
  # TAILSCALE SERVE - WAN (porta 8080)
  # via: tailscale serve --bg http://localhost:8080
  #========================================
-http://127.0.0.1:8080 {
+:8080 {
     # WebSocket (prima di tutto, ha priorità)
     handle /ws {
         reverse_proxy {
