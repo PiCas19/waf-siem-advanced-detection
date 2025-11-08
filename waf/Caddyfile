@@ -132,21 +132,26 @@
         file_server
     }
 
-    # Tutto il resto (HTML, routing SPA) con WAF
-    handle @tailscale_only {
+    # Root e SPA (HTML) con WAF
+    @tailscale_spa {
+        remote_ip 100.0.0.0/8
+        path /
+        path /*.html
+    }
+    handle @tailscale_spa {
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
             api_endpoint http://localhost:8081/api/waf/event
             rules_endpoint http://localhost:8081/api/waf/custom-rules
         }
-        
+
         root * /var/www/html
         try_files {path} /index.html
         file_server
-        
+
         encode gzip zstd
-        
+
         header {
             Cache-Control "public, max-age=3600"
             X-Content-Type-Options "nosniff"
@@ -155,6 +160,11 @@
             Referrer-Policy "strict-origin-when-cross-origin"
             Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://a.tile.openstreetmap.org https://b.tile.openstreetmap.org https://c.tile.openstreetmap.org https://*.openstreetmap.org https://api.dicebear.com; font-src 'self' https://cdnjs.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' http://172.16.216.10/api https://172.16.216.10:8443/api https://challenges.cloudflare.com"
         }
+    }
+
+    # Fallback per traffico Tailscale non materno
+    handle @tailscale_only {
+        respond "Not Found" 404
     }
     
     log {
