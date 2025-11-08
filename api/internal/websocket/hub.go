@@ -30,6 +30,7 @@ type WAFEvent struct {
 	Timestamp   string `json:"timestamp"`
 	Threat      string `json:"threat"`
 	Description string `json:"description"` // Rule name/description for per-rule blocking
+	Payload     string `json:"payload"`     // Detected malicious payload
 	Blocked     bool   `json:"blocked"`
 	BlockedBy   string `json:"blocked_by"`
 }
