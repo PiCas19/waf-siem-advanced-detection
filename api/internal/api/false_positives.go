@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -56,30 +57,18 @@ func NewReportFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Create audit log entry for false positive report
+		// Log to audit logs using the LogFalsePositiveAction helper
+		userID := uint(0)
 		userEmail := "system"
 		if user, exists := c.Get("user"); exists {
 			if userModel, ok := user.(*models.User); ok {
+				userID = userModel.ID
 				userEmail = userModel.Email
 			}
 		}
 
-		auditLog := models.AuditLog{
-			UserEmail:    userEmail,
-			Action:       "REPORT_FALSE_POSITIVE",
-			Category:     "THREAT_MANAGEMENT",
-			Description:  "Reported false positive for threat type: " + req.ThreatType + " from IP: " + req.ClientIP,
-			ResourceType: "WAF_EVENT",
-			ResourceID:   req.ClientIP,
-			Status:       "success",
-			Details:      "Threat: " + req.ThreatType + ", Method: " + req.Method + ", URL: " + req.URL,
-		}
-
-		if err := db.Create(&auditLog).Error; err != nil {
-			// Log error but don't fail the request
-			c.JSON(500, gin.H{"error": "false positive reported but audit log failed"})
-			return
-		}
+		ipAddress := c.ClientIP()
+		LogFalsePositiveAction(db, userID, userEmail, "REPORT", fmt.Sprintf("%d", falsePositive.ID), req.ThreatType, req.ClientIP, "pending", ipAddress)
 
 		c.JSON(201, gin.H{
 			"message": "False positive reported successfully",
