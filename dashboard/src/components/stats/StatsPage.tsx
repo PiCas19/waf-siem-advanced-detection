@@ -885,36 +885,6 @@ const StatsPage: React.FC = () => {
         showToast('Error reporting false positive', 'error');
       } else {
         showToast('False positive reported successfully', 'success');
-
-        // Log to audit logs
-        try {
-          const auditResp = await fetch('/api/audit-logs', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              action: 'REPORT_FALSE_POSITIVE',
-              category: 'THREAT_MANAGEMENT',
-              description: `Reported false positive for threat type: ${alert.threat} from IP: ${alert.ip}`,
-              resource_type: 'WAF_EVENT',
-              resource_id: alert.ip,
-              details: JSON.stringify({
-                threat_type: alert.threat,
-                client_ip: alert.ip,
-                method: alert.method,
-                url: alert.path,
-              }),
-            }),
-          });
-
-          if (!auditResp.ok) {
-            console.error('Failed to log audit entry');
-          }
-        } catch (auditError) {
-          console.error('Error logging audit entry:', auditError);
-        }
       }
     } catch (e) {
       showToast('Network error reporting false positive', 'error');
