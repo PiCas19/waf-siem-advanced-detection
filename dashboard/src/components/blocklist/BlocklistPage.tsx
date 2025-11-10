@@ -1,6 +1,55 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, CheckCircle, AlertTriangle, Trash2, Clock, Zap } from 'lucide-react';
+import { Lock, CheckCircle, AlertTriangle, Trash2, Clock, Zap, AlertCircle } from 'lucide-react';
 import { useToast } from '@/contexts/SnackbarContext';
+
+// Validation helpers
+const validateIP = (ip: string): { valid: boolean; error?: string } => {
+  const trimmed = ip.trim();
+  if (!trimmed) return { valid: false, error: 'IP address is required' };
+
+  // Simple IPv4 validation
+  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
+  // Simple IPv6 validation
+  const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4})$/;
+
+  if (!ipv4Regex.test(trimmed) && !ipv6Regex.test(trimmed)) {
+    return { valid: false, error: 'Invalid IP address format (IPv4 or IPv6 required)' };
+  }
+
+  // Reject loopback
+  if (trimmed === '127.0.0.1' || trimmed === '::1' || trimmed.startsWith('127.')) {
+    return { valid: false, error: 'Cannot block loopback IP address (127.0.0.1, ::1)' };
+  }
+
+  return { valid: true };
+};
+
+const validateReason = (reason: string): { valid: boolean; error?: string } => {
+  const trimmed = reason.trim();
+  if (!trimmed) return { valid: false, error: 'Reason is required' };
+  if (trimmed.length > 500) return { valid: false, error: 'Reason cannot exceed 500 characters' };
+
+  // Check for potentially dangerous characters
+  const validPattern = /^[a-zA-Z0-9\s\-_.(),;:'"\/\[\]]+$/;
+  if (!validPattern.test(trimmed)) {
+    return { valid: false, error: 'Reason contains invalid characters' };
+  }
+
+  return { valid: true };
+};
+
+const validateThreat = (threat: string): { valid: boolean; error?: string } => {
+  const trimmed = threat.trim();
+  if (!trimmed) return { valid: false, error: 'Threat type is required' };
+  if (trimmed.length > 255) return { valid: false, error: 'Threat type cannot exceed 255 characters' };
+
+  const validPattern = /^[a-zA-Z0-9\-_\s]+$/;
+  if (!validPattern.test(trimmed)) {
+    return { valid: false, error: 'Threat type contains invalid characters' };
+  }
+
+  return { valid: true };
+};
 
 interface BlockedEntry {
   id: string | number;
@@ -54,6 +103,10 @@ const BlocklistPage: React.FC = () => {
   const [customBlockDurationUnit, setCustomBlockDurationUnit] = useState<'hours' | 'days'>('hours');
   const [whiteForm, setWhiteForm] = useState({ ip: '', reason: '' });
 
+  // Validation error states
+  const [blockFormErrors, setBlockFormErrors] = useState<{ ip?: string; reason?: string; threat?: string }>({});
+  const [whiteFormErrors, setWhiteFormErrors] = useState<{ ip?: string; reason?: string }>({});
+
   // Carica dati
   useEffect(() => {
     loadData();
@@ -98,10 +151,24 @@ const BlocklistPage: React.FC = () => {
 
   const handleAddBlock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!blockForm.ip) {
-      showToast('IP is required', 'info', 4000);
+
+    // Validate all fields
+    const errors: typeof blockFormErrors = {};
+    const ipValidation = validateIP(blockForm.ip);
+    const reasonValidation = validateReason(blockForm.reason);
+    const threatValidation = validateThreat(blockForm.reason);
+
+    if (!ipValidation.valid) errors.ip = ipValidation.error;
+    if (!reasonValidation.valid) errors.reason = reasonValidation.error;
+    if (!threatValidation.valid) errors.threat = threatValidation.error;
+
+    if (Object.keys(errors).length > 0) {
+      setBlockFormErrors(errors);
+      showToast('Please fix the errors in the form', 'error', 4000);
       return;
     }
+
+    setBlockFormErrors({});
 
     // Calcola la durata in ore
     let durationHours = 24;
@@ -118,9 +185,9 @@ const BlocklistPage: React.FC = () => {
     try {
       const token = localStorage.getItem('authToken');
       const payloadToSend = {
-        ip: blockForm.ip,
-        threat: blockForm.reason || 'Manually blocked',
-        reason: blockForm.reason || 'Manually blocked',
+        ip: blockForm.ip.trim(),
+        threat: blockForm.reason.trim(),
+        reason: blockForm.reason.trim(),
         permanent: blockDuration === 'permanent',
         duration_hours: durationHours,
       };
@@ -142,10 +209,12 @@ const BlocklistPage: React.FC = () => {
         setBlockDuration(24);
         setCustomBlockDuration(24);
         setCustomBlockDurationUnit('hours');
+        setBlockFormErrors({});
         setShowAddBlockForm(false);
         loadData();
       } else {
-        showToast('Failed to block IP', 'error', 4000);
+        const errorData = await response.json().catch(() => ({}));
+        showToast(errorData.error || 'Failed to block IP', 'error', 4000);
       }
     } catch (error) {
       showToast('Failed to block IP', 'error', 4000);
@@ -154,10 +223,22 @@ const BlocklistPage: React.FC = () => {
 
   const handleAddWhite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!whiteForm.ip) {
-      showToast('IP is required', 'info', 4000);
+
+    // Validate all fields
+    const errors: typeof whiteFormErrors = {};
+    const ipValidation = validateIP(whiteForm.ip);
+    const reasonValidation = validateReason(whiteForm.reason);
+
+    if (!ipValidation.valid) errors.ip = ipValidation.error;
+    if (!reasonValidation.valid) errors.reason = reasonValidation.error;
+
+    if (Object.keys(errors).length > 0) {
+      setWhiteFormErrors(errors);
+      showToast('Please fix the errors in the form', 'error', 4000);
       return;
     }
+
+    setWhiteFormErrors({});
 
     try {
       const token = localStorage.getItem('authToken');
@@ -168,16 +249,20 @@ const BlocklistPage: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ip_address: whiteForm.ip,
-          reason: whiteForm.reason || 'Manually whitelisted',
+          ip_address: whiteForm.ip.trim(),
+          reason: whiteForm.reason.trim(),
         }),
       });
 
       if (response.ok) {
         showToast('IP whitelisted successfully', 'success', 4000);
         setWhiteForm({ ip: '', reason: '' });
+        setWhiteFormErrors({});
         setShowAddWhiteForm(false);
         loadData();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        showToast(errorData.error || 'Failed to whitelist IP', 'error', 4000);
       }
     } catch (error) {
       showToast('Failed to whitelist IP', 'error', 4000);
@@ -404,21 +489,53 @@ const BlocklistPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-300 mb-2">IP Address *</label>
                   <input
                     type="text"
-                    placeholder="192.168.1.100"
+                    placeholder="192.168.1.100 or IPv6 address"
                     value={blockForm.ip}
-                    onChange={(e) => setBlockForm({ ...blockForm, ip: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-red-500 focus:outline-none"
+                    onChange={(e) => {
+                      setBlockForm({ ...blockForm, ip: e.target.value });
+                      const validation = validateIP(e.target.value);
+                      if (validation.error) {
+                        setBlockFormErrors({ ...blockFormErrors, ip: validation.error });
+                      } else {
+                        setBlockFormErrors({ ...blockFormErrors, ip: undefined });
+                      }
+                    }}
+                    className={`w-full px-4 py-2 bg-gray-700 text-white rounded border transition-colors focus:outline-none ${
+                      blockFormErrors.ip ? 'border-red-500 focus:border-red-500' : 'border-gray-600 focus:border-red-500'
+                    }`}
                   />
+                  {blockFormErrors.ip && (
+                    <div className="flex items-center gap-2 mt-2 text-red-400 text-sm">
+                      <AlertCircle size={14} />
+                      {blockFormErrors.ip}
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Reason</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Reason/Threat Type * ({blockForm.reason.length}/500)</label>
                   <input
                     type="text"
-                    placeholder="e.g., SQL Injection attempts"
+                    placeholder="e.g., SQL Injection attempts, Brute Force Attack"
                     value={blockForm.reason}
-                    onChange={(e) => setBlockForm({ ...blockForm, reason: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-red-500 focus:outline-none"
+                    onChange={(e) => {
+                      setBlockForm({ ...blockForm, reason: e.target.value });
+                      const validation = validateReason(e.target.value);
+                      if (validation.error) {
+                        setBlockFormErrors({ ...blockFormErrors, reason: validation.error });
+                      } else {
+                        setBlockFormErrors({ ...blockFormErrors, reason: undefined });
+                      }
+                    }}
+                    className={`w-full px-4 py-2 bg-gray-700 text-white rounded border transition-colors focus:outline-none ${
+                      blockFormErrors.reason ? 'border-red-500 focus:border-red-500' : 'border-gray-600 focus:border-red-500'
+                    }`}
                   />
+                  {blockFormErrors.reason && (
+                    <div className="flex items-center gap-2 mt-2 text-red-400 text-sm">
+                      <AlertCircle size={14} />
+                      {blockFormErrors.reason}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3">Block Duration</label>
@@ -522,13 +639,21 @@ const BlocklistPage: React.FC = () => {
                 <div className="flex gap-3">
                   <button
                     type="submit"
-                    className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition"
+                    disabled={Object.keys(blockFormErrors).length > 0 || !blockForm.ip || !blockForm.reason}
+                    className={`px-6 py-2 text-white rounded font-medium transition flex items-center gap-2 ${
+                      Object.keys(blockFormErrors).length > 0 || !blockForm.ip || !blockForm.reason
+                        ? 'bg-red-600/50 text-red-300 cursor-not-allowed'
+                        : 'bg-red-600 hover:bg-red-700 cursor-pointer'
+                    }`}
                   >
                     Block IP
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowAddBlockForm(false)}
+                    onClick={() => {
+                      setShowAddBlockForm(false);
+                      setBlockFormErrors({});
+                    }}
                     className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition"
                   >
                     Cancel
@@ -632,32 +757,72 @@ const BlocklistPage: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-300 mb-2">IP Address *</label>
                   <input
                     type="text"
-                    placeholder="192.168.1.100"
+                    placeholder="192.168.1.100 or IPv6 address"
                     value={whiteForm.ip}
-                    onChange={(e) => setWhiteForm({ ...whiteForm, ip: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-green-500 focus:outline-none"
+                    onChange={(e) => {
+                      setWhiteForm({ ...whiteForm, ip: e.target.value });
+                      const validation = validateIP(e.target.value);
+                      if (validation.error) {
+                        setWhiteFormErrors({ ...whiteFormErrors, ip: validation.error });
+                      } else {
+                        setWhiteFormErrors({ ...whiteFormErrors, ip: undefined });
+                      }
+                    }}
+                    className={`w-full px-4 py-2 bg-gray-700 text-white rounded border transition-colors focus:outline-none ${
+                      whiteFormErrors.ip ? 'border-red-500 focus:border-red-500' : 'border-gray-600 focus:border-green-500'
+                    }`}
                   />
+                  {whiteFormErrors.ip && (
+                    <div className="flex items-center gap-2 mt-2 text-red-400 text-sm">
+                      <AlertCircle size={14} />
+                      {whiteFormErrors.ip}
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Reason</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Reason * ({whiteForm.reason.length}/500)</label>
                   <input
                     type="text"
-                    placeholder="e.g., Internal server, whitelisted user"
+                    placeholder="e.g., Internal server, Trusted partner IP, Development machine"
                     value={whiteForm.reason}
-                    onChange={(e) => setWhiteForm({ ...whiteForm, reason: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-green-500 focus:outline-none"
+                    onChange={(e) => {
+                      setWhiteForm({ ...whiteForm, reason: e.target.value });
+                      const validation = validateReason(e.target.value);
+                      if (validation.error) {
+                        setWhiteFormErrors({ ...whiteFormErrors, reason: validation.error });
+                      } else {
+                        setWhiteFormErrors({ ...whiteFormErrors, reason: undefined });
+                      }
+                    }}
+                    className={`w-full px-4 py-2 bg-gray-700 text-white rounded border transition-colors focus:outline-none ${
+                      whiteFormErrors.reason ? 'border-red-500 focus:border-red-500' : 'border-gray-600 focus:border-green-500'
+                    }`}
                   />
+                  {whiteFormErrors.reason && (
+                    <div className="flex items-center gap-2 mt-2 text-red-400 text-sm">
+                      <AlertCircle size={14} />
+                      {whiteFormErrors.reason}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <button
                     type="submit"
-                    className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition"
+                    disabled={Object.keys(whiteFormErrors).length > 0 || !whiteForm.ip || !whiteForm.reason}
+                    className={`px-6 py-2 text-white rounded font-medium transition flex items-center gap-2 ${
+                      Object.keys(whiteFormErrors).length > 0 || !whiteForm.ip || !whiteForm.reason
+                        ? 'bg-green-600/50 text-green-300 cursor-not-allowed'
+                        : 'bg-green-600 hover:bg-green-700 cursor-pointer'
+                    }`}
                   >
                     Whitelist IP
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowAddWhiteForm(false)}
+                    onClick={() => {
+                      setShowAddWhiteForm(false);
+                      setWhiteFormErrors({});
+                    }}
                     className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition"
                   >
                     Cancel
