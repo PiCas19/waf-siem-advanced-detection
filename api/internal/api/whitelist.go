@@ -58,6 +58,25 @@ func NewAddToWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Check if IP already exists in whitelist
+		var existingIP models.WhitelistedIP
+		if err := db.Where("ip_address = ?", validatedIP).First(&existingIP).Error; err == nil {
+			// IP already exists, update the reason instead
+			if err := db.Model(&existingIP).Update("reason", req.Reason).Error; err != nil {
+				c.JSON(500, gin.H{"error": "failed to update whitelist entry"})
+				return
+			}
+			c.JSON(200, gin.H{
+				"message": "Whitelist entry updated (IP already existed)",
+				"entry":   existingIP,
+			})
+			return
+		} else if err != gorm.ErrRecordNotFound {
+			// Some other error occurred
+			c.JSON(500, gin.H{"error": "failed to check whitelist"})
+			return
+		}
+
 		whitelist := models.WhitelistedIP{
 			IPAddress: validatedIP,
 			Reason:    req.Reason,
@@ -98,15 +117,13 @@ func NewRemoveFromWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 
 		// Fetch IP address before deleting for logging
 		var whitelistEntry models.WhitelistedIP
-		db.First(&whitelistEntry, uint(idUint))
-		ipAddr := whitelistEntry.IPAddress
+		if err := db.First(&whitelistEntry, uint(idUint)).Error; err != nil {
+			c.JSON(404, gin.H{"error": "Whitelist entry not found"})
+			return
+		}
 
-		if err := db.Delete(&models.WhitelistedIP{}, uint(idUint)).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				c.JSON(404, gin.H{"error": "Entry not found"})
-			} else {
-						c.JSON(500, gin.H{"error": "failed to remove from whitelist"})
-			}
+		if err := db.Delete(&whitelistEntry, uint(idUint)).Error; err != nil {
+			c.JSON(500, gin.H{"error": "failed to remove from whitelist"})
 			return
 		}
 
@@ -114,16 +131,30 @@ func NewRemoveFromWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 		userID, _ := c.Get("user_id")
 		userEmail, _ := c.Get("user_email")
 		LogAuditAction(db, userID.(uint), userEmail.(string), "REMOVE_WHITELIST", "WHITELIST",
-			"ip", ipAddr, fmt.Sprintf("Removed IP %s from whitelist", ipAddr),
-			map[string]interface{}{"ip": ipAddr}, c.ClientIP())
+			"ip", whitelistEntry.IPAddress, fmt.Sprintf("Removed IP %s from whitelist", whitelistEntry.IPAddress),
+			nil, c.ClientIP())
 
 		c.JSON(200, gin.H{"message": "IP removed from whitelist successfully"})
 	}
 }
 
-// IsIPWhitelisted - Controlla se un IP è whitelisted
-func IsIPWhitelisted(db *gorm.DB, ip string) bool {
-	var count int64
-	db.Model(&models.WhitelistedIP{}).Where("ip_address = ?", ip).Count(&count)
-	return count > 0
+// GetWhitelistForWAF - Ritorna la whitelist per il WAF (public endpoint)
+func NewGetWhitelistForWAFHandler(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var whitelisted []models.WhitelistedIP
+		if err := db.Find(&whitelisted).Error; err != nil {
+			c.JSON(500, gin.H{"error": "failed to fetch whitelist"})
+			return
+		}
+
+		// Convert to simple map for WAF consumption
+		whitelistMap := make(map[string]bool)
+		for _, entry := range whitelisted {
+			whitelistMap[entry.IPAddress] = true
+		}
+
+		c.JSON(200, gin.H{
+			"whitelisted_ips": whitelistMap,
+		})
+	}
 }
