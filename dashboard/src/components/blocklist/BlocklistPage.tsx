@@ -1111,7 +1111,8 @@ const BlocklistPage: React.FC = () => {
                           )}
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>
