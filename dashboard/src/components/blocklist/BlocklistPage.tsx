@@ -1023,7 +1023,7 @@ const BlocklistPage: React.FC = () => {
                 <table className="w-full">
                   <thead className="bg-gray-700">
                     <tr>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat Type</th>
+                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Type</th>
                       <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat/Rule</th>
                       <th className="text-left py-3 px-4 text-gray-300 font-medium">Method</th>
                       <th className="text-left py-3 px-4 text-gray-300 font-medium">Reason</th>
@@ -1072,7 +1072,7 @@ const BlocklistPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 text-center">
                           {fp.status === 'pending' && (
-                            <div className="inline-flex gap-1 flex-wrap">
+                            <div className="inline-flex gap-1 whitespace-nowrap">
                               <button
                                 onClick={() => handleMarkFalsePositive(fp.id, 'reviewed')}
                                 className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
