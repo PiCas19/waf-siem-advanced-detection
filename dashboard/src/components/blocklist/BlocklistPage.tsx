@@ -25,6 +25,8 @@ interface FalsePositive {
   client_ip: string;
   method: string;
   url: string;
+  payload?: string;
+  review_notes?: string;
   created_at: string;
   status: 'pending' | 'reviewed' | 'whitelisted';
 }
@@ -252,7 +254,20 @@ const BlocklistPage: React.FC = () => {
 
       if (response.ok) {
         showToast('Status updated successfully', 'success', 4000);
-        loadData();
+        // Update local state immediately for responsive UI
+        setFalsePositives(falsePositives.map(fp =>
+          fp.id === id ? { ...fp, status } : fp
+        ));
+        // Also reload whitelist if whitelisted status
+        if (status === 'whitelisted') {
+          const whiteRes = await fetch('/api/whitelist', {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (whiteRes.ok) {
+            const whiteData = await whiteRes.json();
+            setWhitelist(whiteData.whitelisted_ips || []);
+          }
+        }
       }
     } catch (error) {
       showToast('Failed to update status', 'error', 4000);
@@ -673,7 +688,7 @@ const BlocklistPage: React.FC = () => {
                     <tr>
                       <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>
                       <th className="text-left py-3 px-4 text-gray-300 font-medium">Reason</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Whitelisted Date</th>
+                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Added Date</th>
                       <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>
                     </tr>
                   </thead>
@@ -681,7 +696,7 @@ const BlocklistPage: React.FC = () => {
                     {filteredWhitelist.map((entry) => (
                       <tr key={entry.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
                         <td className="py-3 px-4 text-white font-mono">{entry.ip_address}</td>
-                        <td className="py-3 px-4 text-gray-300">{entry.reason}</td>
+                        <td className="py-3 px-4 text-gray-300 text-sm">{entry.reason || '-'}</td>
                         <td className="py-3 px-4 text-gray-400 text-sm">
                           {new Date(entry.created_at).toLocaleDateString('it-IT')}
                         </td>
@@ -721,33 +736,38 @@ const BlocklistPage: React.FC = () => {
                   'bg-gray-900/20 border-gray-700'
                 }`}>
                   <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <p className="text-white font-medium">{fp.threat_type}</p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="text-white font-medium">{fp.threat_type}</p>
+                        <span className={`px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
+                          fp.status === 'pending' ? 'bg-blue-500/20 text-blue-300' :
+                          fp.status === 'whitelisted' ? 'bg-green-500/20 text-green-300' :
+                          'bg-gray-500/20 text-gray-300'
+                        }`}>
+                          {fp.status === 'pending' ? (
+                            <>
+                              <Clock size={12} />
+                              Pending
+                            </>
+                          ) : fp.status === 'whitelisted' ? (
+                            <>
+                              <CheckCircle size={12} />
+                              Whitelisted
+                            </>
+                          ) : (
+                            <>
+                              <AlertTriangle size={12} />
+                              Reviewed
+                            </>
+                          )}
+                        </span>
+                      </div>
                       <p className="text-gray-400 text-sm">{fp.method} {fp.url}</p>
                       <p className="text-gray-500 text-xs mt-1">IP: {fp.client_ip}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
-                      fp.status === 'pending' ? 'bg-blue-500/20 text-blue-300' :
-                      fp.status === 'whitelisted' ? 'bg-green-500/20 text-green-300' :
-                      'bg-gray-500/20 text-gray-300'
-                    }`}>
-                      {fp.status === 'pending' ? (
-                        <>
-                          <Clock size={12} />
-                          Pending
-                        </>
-                      ) : fp.status === 'whitelisted' ? (
-                        <>
-                          <CheckCircle size={12} />
-                          Whitelisted
-                        </>
-                      ) : (
-                        <>
-                          <AlertTriangle size={12} />
-                          Reviewed
-                        </>
+                      {fp.payload && (
+                        <p className="text-gray-500 text-xs mt-1">Payload: {fp.payload}</p>
                       )}
-                    </span>
+                    </div>
                   </div>
 
                   <div className="flex gap-2 pt-3 border-t border-gray-700">
