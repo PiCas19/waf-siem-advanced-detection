@@ -76,6 +76,7 @@ interface FalsePositive {
   url: string;
   payload?: string;
   review_notes?: string;
+  reason?: string;
   created_at: string;
   status: 'pending' | 'reviewed' | 'whitelisted';
 }
@@ -107,10 +108,55 @@ const BlocklistPage: React.FC = () => {
   const [blockFormErrors, setBlockFormErrors] = useState<{ ip?: string; reason?: string; threat?: string }>({});
   const [whiteFormErrors, setWhiteFormErrors] = useState<{ ip?: string; reason?: string }>({});
 
-  // Carica dati
+  // Carica dati all'avvio e quando il tab cambia
   useEffect(() => {
     loadData();
   }, [activeTab]);
+
+  // Carica TUTTI i dati in real-time (non solo il tab attivo)
+  useEffect(() => {
+    const loadAllData = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+
+        // Load blocklist
+        const blockRes = await fetch('/api/blocklist', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (blockRes.ok) {
+          const data = await blockRes.json();
+          setBlocklist(data.blocked_ips || []);
+        }
+
+        // Load whitelist
+        const whiteRes = await fetch('/api/whitelist', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (whiteRes.ok) {
+          const data = await whiteRes.json();
+          setWhitelist(data.whitelisted_ips || []);
+        }
+
+        // Load false positives
+        const fpRes = await fetch('/api/false-positives', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (fpRes.ok) {
+          const data = await fpRes.json();
+          setFalsePositives(data.false_positives || []);
+        }
+      } catch (error) {
+        console.error('Failed to load data:', error);
+      }
+    };
+
+    // Load on mount
+    loadAllData();
+
+    // Reload every 5 seconds for real-time counts
+    const interval = setInterval(loadAllData, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
@@ -352,6 +398,8 @@ const BlocklistPage: React.FC = () => {
             const whiteData = await whiteRes.json();
             setWhitelist(whiteData.whitelisted_ips || []);
           }
+          // Auto-navigate to whitelist tab
+          setActiveTab('whitelist');
         }
       }
     } catch (error) {
@@ -931,6 +979,12 @@ const BlocklistPage: React.FC = () => {
                       <p className="text-gray-500 text-xs mt-1">IP: {fp.client_ip}</p>
                       {fp.payload && (
                         <p className="text-gray-500 text-xs mt-1">Payload: {fp.payload}</p>
+                      )}
+                      {fp.review_notes && (
+                        <p className="text-gray-500 text-xs mt-1">Review Notes: {fp.review_notes}</p>
+                      )}
+                      {fp.reason && (
+                        <p className="text-gray-500 text-xs mt-1">Reason: {fp.reason}</p>
                       )}
                     </div>
                   </div>
