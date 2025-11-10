@@ -83,12 +83,20 @@ interface FalsePositive {
 
 type Tab = 'blocklist' | 'whitelist' | 'false-positives';
 
+interface RuleInfo {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+}
+
 const BlocklistPage: React.FC = () => {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('blocklist');
   const [blocklist, setBlocklist] = useState<BlockedEntry[]>([]);
   const [whitelist, setWhitelist] = useState<WhitelistedEntry[]>([]);
   const [falsePositives, setFalsePositives] = useState<FalsePositive[]>([]);
+  const [rules, setRules] = useState<RuleInfo[]>([]);
 
   const [showAddBlockForm, setShowAddBlockForm] = useState(false);
   const [showAddWhiteForm, setShowAddWhiteForm] = useState(false);
@@ -118,6 +126,37 @@ const BlocklistPage: React.FC = () => {
     const loadAllData = async () => {
       try {
         const token = localStorage.getItem('authToken');
+
+        // Load rules (once per session is fine, but load on mount)
+        const rulesRes = await fetch('/api/rules', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (rulesRes.ok) {
+          const data = await rulesRes.json();
+          const allRules: RuleInfo[] = [];
+
+          // Add default rules
+          if (data.default_rules) {
+            allRules.push(...data.default_rules.map((r: any) => ({
+              id: r.id,
+              name: r.name,
+              type: r.type,
+              description: r.description,
+            })));
+          }
+
+          // Add custom rules
+          if (data.custom_rules) {
+            allRules.push(...data.custom_rules.map((r: any) => ({
+              id: r.id?.toString() || r.name,
+              name: r.name,
+              type: r.type,
+              description: r.description,
+            })));
+          }
+
+          setRules(allRules);
+        }
 
         // Load blocklist
         const blockRes = await fetch('/api/blocklist', {
@@ -193,6 +232,21 @@ const BlocklistPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to find rule that matches a threat type
+  const findRuleForThreatType = (threatType: string): RuleInfo | undefined => {
+    if (!threatType) return undefined;
+
+    const normalized = threatType.toUpperCase().replace(/[\s_-]/g, '');
+
+    // Try to find an exact match or partial match
+    return rules.find((rule) => {
+      const ruleType = rule.type.toUpperCase().replace(/[\s_-]/g, '');
+      const ruleName = rule.name.toUpperCase().replace(/[\s_-]/g, '');
+
+      return ruleType.includes(normalized) || normalized.includes(ruleType) || ruleName.includes(normalized);
+    });
   };
 
   const handleAddBlock = async (e: React.FormEvent) => {
@@ -980,12 +1034,14 @@ const BlocklistPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredFalsePositives.map((fp) => (
+                    {filteredFalsePositives.map((fp) => {
+                      const matchedRule = findRuleForThreatType(fp.threat_type);
+                      return (
                       <tr key={fp.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
                         <td className="py-3 px-4 text-gray-300">{fp.threat_type}</td>
-                        <td className="py-3 px-4 text-gray-300 text-sm">{fp.threat_type}</td>
+                        <td className="py-3 px-4 text-gray-300 text-sm">{matchedRule?.name || fp.threat_type}</td>
                         <td className="py-3 px-4 text-gray-300 text-sm">{fp.method || '-'}</td>
-                        <td className="py-3 px-4 text-gray-300 text-sm">{fp.description || '-'}</td>
+                        <td className="py-3 px-4 text-gray-300 text-sm">{matchedRule?.description || fp.description || '-'}</td>
                         <td className="py-3 px-4 text-white font-mono text-sm">{fp.client_ip}</td>
                         <td className="py-3 px-4">
                           <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
@@ -1016,7 +1072,15 @@ const BlocklistPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 text-center">
                           {fp.status === 'pending' && (
-                            <div className="inline-flex gap-2">
+                            <div className="inline-flex gap-1 flex-wrap">
+                              <button
+                                onClick={() => handleMarkFalsePositive(fp.id, 'reviewed')}
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
+                                title="Mark as reviewed"
+                              >
+                                <AlertTriangle size={12} />
+                                Review
+                              </button>
                               <button
                                 onClick={() => handleMarkFalsePositive(fp.id, 'whitelisted')}
                                 className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
