@@ -683,9 +683,9 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 		return
 	}
 
-	fmt.Printf("[INFO] WAF: Sending event to %s: %s\n", m.APIEndpoint, string(jsonData))
+	fmt.Printf("[INFO] WAF: Sending event to %s/waf/event: %s\n", m.APIEndpoint, string(jsonData))
 
-	req, err := http.NewRequest("POST", m.APIEndpoint, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", m.APIEndpoint+"/waf/event", bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Printf("[ERROR] WAF: Error creating request: %v\n", err)
 		return
