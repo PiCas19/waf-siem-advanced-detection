@@ -451,12 +451,21 @@ const BlocklistPage: React.FC = () => {
           }
 
           // Reload whitelist from server to ensure it's in sync
-          const whitelistRes = await fetch('/api/whitelist', {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          if (whitelistRes.ok) {
-            const whitelistData = await whitelistRes.json();
-            setWhitelist(whitelistData.whitelisted_ips || []);
+          try {
+            const whitelistRes = await fetch('/api/whitelist', {
+              headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (whitelistRes.ok) {
+              const whitelistData = await whitelistRes.json();
+              setWhitelist(whitelistData.whitelisted_ips || []);
+              showToast('IP added to whitelist', 'success', 2000);
+            } else {
+              showToast('Failed to reload whitelist', 'error', 4000);
+              return;
+            }
+          } catch (err) {
+            showToast('Error loading whitelist', 'error', 4000);
+            return;
           }
         }
       }
@@ -472,14 +481,15 @@ const BlocklistPage: React.FC = () => {
       });
 
       if (response.ok) {
-        showToast('Status updated successfully', 'success', 4000);
         // Update local state immediately for responsive UI
         setFalsePositives(falsePositives.map(fp =>
           fp.id === id ? { ...fp, status } : fp
         ));
-        // Auto-navigate to whitelist tab if whitelisted
+        // Auto-navigate to whitelist tab if whitelisted (after a small delay to ensure state is updated)
         if (status === 'whitelisted') {
-          setActiveTab('whitelist');
+          setTimeout(() => {
+            setActiveTab('whitelist');
+          }, 100);
         }
       }
     } catch (error) {
