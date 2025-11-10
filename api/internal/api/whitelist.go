@@ -71,6 +71,11 @@ func NewAddToWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 				c.JSON(500, gin.H{"error": "failed to update whitelist entry"})
 				return
 			}
+			// Reload the entry to get updated values
+			if err := db.First(&existingIP, existingIP.ID).Error; err != nil {
+				c.JSON(500, gin.H{"error": "failed to reload whitelist entry"})
+				return
+			}
 			c.JSON(200, gin.H{
 				"message": "Whitelist entry updated (IP already existed)",
 				"entry":   existingIP,
