@@ -973,18 +973,35 @@ const BlocklistPage: React.FC = () => {
                 }`}>
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <p className="text-white font-medium mb-2">{fp.threat_type}</p>
-                      <p className="text-gray-400 text-sm">{fp.method} {fp.url}</p>
-                      <div className="mt-2 space-y-1">
-                        <p className="text-gray-500 text-xs">IP: {fp.client_ip}</p>
+                      <p className="text-white font-medium mb-2">{fp.method} {fp.url}</p>
+
+                      {/* Other section */}
+                      <div className="mt-3 bg-gray-700/30 rounded p-3 space-y-1 text-xs">
+                        <div>
+                          <span className="text-gray-400 font-medium">Threat/Rule:</span>
+                          <span className="text-gray-300 ml-2">{fp.threat_type}</span>
+                        </div>
                         {fp.reason && (
-                          <p className="text-gray-500 text-xs">Reason: {fp.reason}</p>
+                          <div>
+                            <span className="text-gray-400 font-medium">Reason:</span>
+                            <span className="text-gray-300 ml-2">{fp.reason}</span>
+                          </div>
                         )}
+                        <div>
+                          <span className="text-gray-400 font-medium">IP:</span>
+                          <span className="text-gray-300 ml-2 font-mono">{fp.client_ip}</span>
+                        </div>
                         {fp.payload && (
-                          <p className="text-gray-500 text-xs">Payload: {fp.payload}</p>
+                          <div>
+                            <span className="text-gray-400 font-medium">Payload:</span>
+                            <span className="text-gray-300 ml-2">{fp.payload}</span>
+                          </div>
                         )}
                         {fp.review_notes && (
-                          <p className="text-gray-500 text-xs">Review Notes: {fp.review_notes}</p>
+                          <div>
+                            <span className="text-gray-400 font-medium">Review Notes:</span>
+                            <span className="text-gray-300 ml-2">{fp.review_notes}</span>
+                          </div>
                         )}
                       </div>
                     </div>
