@@ -55,7 +55,7 @@ func NewReportFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		if err := db.Create(&falsePositive).Error; err != nil {
-				c.JSON(500, gin.H{"error": "failed to report false positive"})
+			c.JSON(500, gin.H{"error": "failed to report false positive"})
 			return
 		}
 
@@ -116,24 +116,11 @@ func NewUpdateFalsePositiveStatusHandler(db *gorm.DB) gin.HandlerFunc {
 			if err == gorm.ErrRecordNotFound {
 				c.JSON(404, gin.H{"error": "Entry not found"})
 			} else {
-					c.JSON(500, gin.H{"error": "failed to update false positive"})
+				c.JSON(500, gin.H{"error": "failed to update false positive"})
 			}
 			return
 		}
 
-		// Se è whitelisted, aggiungi automaticamente l'IP alla whitelist
-		if req.Status == "whitelisted" {
-			var fp models.FalsePositive
-			db.First(&fp, uint(idUint))
-
-			whitelist := models.WhitelistedIP{
-				IPAddress: fp.ClientIP,
-				Reason:    "Auto-whitelisted from false positive: " + fp.ThreatType,
-			}
-			db.Create(&whitelist)
-		}
-
-	
 		c.JSON(200, gin.H{"message": "Status updated successfully"})
 	}
 }
@@ -152,11 +139,10 @@ func NewDeleteFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
 			if err == gorm.ErrRecordNotFound {
 				c.JSON(404, gin.H{"error": "Entry not found"})
 			} else {
-					c.JSON(500, gin.H{"error": "failed to delete false positive"})
+				c.JSON(500, gin.H{"error": "failed to delete false positive"})
 			}
 			return
 		}
-
 
 		c.JSON(200, gin.H{"message": "Entry deleted successfully"})
 	}
