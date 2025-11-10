@@ -58,10 +58,15 @@ func NewAddToWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Check if IP already exists in whitelist
+		// Check if IP already exists in whitelist (including soft-deleted)
 		var existingIP models.WhitelistedIP
-		if err := db.Where("ip_address = ?", validatedIP).First(&existingIP).Error; err == nil {
-			// IP already exists, update the reason instead
+		result := db.Unscoped().Where("ip_address = ?", validatedIP).First(&existingIP)
+		if result.Error == nil {
+			// IP already exists, restore it if soft-deleted and update the reason
+			if err := db.Model(&existingIP).Update("deleted_at", nil).Error; err != nil {
+				c.JSON(500, gin.H{"error": "failed to restore whitelist entry"})
+				return
+			}
 			if err := db.Model(&existingIP).Update("reason", req.Reason).Error; err != nil {
 				c.JSON(500, gin.H{"error": "failed to update whitelist entry"})
 				return
@@ -71,7 +76,7 @@ func NewAddToWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 				"entry":   existingIP,
 			})
 			return
-		} else if err != gorm.ErrRecordNotFound {
+		} else if result.Error != gorm.ErrRecordNotFound {
 			// Some other error occurred
 			c.JSON(500, gin.H{"error": "failed to check whitelist"})
 			return
