@@ -374,6 +374,37 @@ const BlocklistPage: React.FC = () => {
   const handleMarkFalsePositive = async (id: string | number, status: 'reviewed' | 'whitelisted') => {
     try {
       const token = localStorage.getItem('authToken');
+
+      // If whitelisting, first add to whitelist
+      if (status === 'whitelisted') {
+        const fp = falsePositives.find(f => f.id === id);
+        if (fp) {
+          const whiteRes = await fetch('/api/whitelist', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ip_address: fp.client_ip,
+              reason: `Auto-whitelisted from false positive: ${fp.threat_type}`,
+            }),
+          });
+
+          if (!whiteRes.ok) {
+            showToast('Failed to add to whitelist', 'error', 4000);
+            return;
+          }
+
+          // Update local whitelist state
+          const whiteData = await whiteRes.json();
+          if (whiteData.entry) {
+            setWhitelist([...whitelist, whiteData.entry]);
+          }
+        }
+      }
+
+      // Then update false positive status
       const response = await fetch(`/api/false-positives/${id}`, {
         method: 'PATCH',
         headers: {
@@ -389,16 +420,8 @@ const BlocklistPage: React.FC = () => {
         setFalsePositives(falsePositives.map(fp =>
           fp.id === id ? { ...fp, status } : fp
         ));
-        // Also reload whitelist if whitelisted status
+        // Auto-navigate to whitelist tab if whitelisted
         if (status === 'whitelisted') {
-          const whiteRes = await fetch('/api/whitelist', {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          if (whiteRes.ok) {
-            const whiteData = await whiteRes.json();
-            setWhitelist(whiteData.whitelisted_ips || []);
-          }
-          // Auto-navigate to whitelist tab
           setActiveTab('whitelist');
         }
       }
@@ -950,43 +973,43 @@ const BlocklistPage: React.FC = () => {
                 }`}>
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <p className="text-white font-medium">{fp.threat_type}</p>
-                        <span className={`px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
-                          fp.status === 'pending' ? 'bg-blue-500/20 text-blue-300' :
-                          fp.status === 'whitelisted' ? 'bg-green-500/20 text-green-300' :
-                          'bg-gray-500/20 text-gray-300'
-                        }`}>
-                          {fp.status === 'pending' ? (
-                            <>
-                              <Clock size={12} />
-                              Pending
-                            </>
-                          ) : fp.status === 'whitelisted' ? (
-                            <>
-                              <CheckCircle size={12} />
-                              Whitelisted
-                            </>
-                          ) : (
-                            <>
-                              <AlertTriangle size={12} />
-                              Reviewed
-                            </>
-                          )}
-                        </span>
-                      </div>
+                      <p className="text-white font-medium mb-2">{fp.threat_type}</p>
                       <p className="text-gray-400 text-sm">{fp.method} {fp.url}</p>
-                      <p className="text-gray-500 text-xs mt-1">IP: {fp.client_ip}</p>
-                      {fp.payload && (
-                        <p className="text-gray-500 text-xs mt-1">Payload: {fp.payload}</p>
-                      )}
-                      {fp.review_notes && (
-                        <p className="text-gray-500 text-xs mt-1">Review Notes: {fp.review_notes}</p>
-                      )}
-                      {fp.reason && (
-                        <p className="text-gray-500 text-xs mt-1">Reason: {fp.reason}</p>
-                      )}
+                      <div className="mt-2 space-y-1">
+                        <p className="text-gray-500 text-xs">IP: {fp.client_ip}</p>
+                        {fp.reason && (
+                          <p className="text-gray-500 text-xs">Reason: {fp.reason}</p>
+                        )}
+                        {fp.payload && (
+                          <p className="text-gray-500 text-xs">Payload: {fp.payload}</p>
+                        )}
+                        {fp.review_notes && (
+                          <p className="text-gray-500 text-xs">Review Notes: {fp.review_notes}</p>
+                        )}
+                      </div>
                     </div>
+                    <span className={`px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ml-2 ${
+                      fp.status === 'pending' ? 'bg-blue-500/20 text-blue-300' :
+                      fp.status === 'whitelisted' ? 'bg-green-500/20 text-green-300' :
+                      'bg-gray-500/20 text-gray-300'
+                    }`}>
+                      {fp.status === 'pending' ? (
+                        <>
+                          <Clock size={12} />
+                          Pending
+                        </>
+                      ) : fp.status === 'whitelisted' ? (
+                        <>
+                          <CheckCircle size={12} />
+                          Whitelisted
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle size={12} />
+                          Reviewed
+                        </>
+                      )}
+                    </span>
                   </div>
 
                   <div className="flex gap-2 pt-3 border-t border-gray-700">
