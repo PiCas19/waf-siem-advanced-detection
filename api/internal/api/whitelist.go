@@ -17,6 +17,10 @@ func NewGetWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": "failed to fetch whitelist"})
 			return
 		}
+		// Ensure we return an empty array instead of null
+		if whitelisted == nil {
+			whitelisted = []models.WhitelistedIP{}
+		}
 		c.JSON(200, gin.H{
 			"whitelisted_ips": whitelisted,
 			"count":           len(whitelisted),
