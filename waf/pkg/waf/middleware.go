@@ -30,6 +30,21 @@ type RequestFingerprint struct {
 	Timestamp   time.Time // When this request was first seen
 }
 
+// BlocklistEntry represents a single blocked IP entry
+type BlocklistEntry struct {
+	IPAddress   string
+	Description string
+	Reason      string
+	Permanent   bool
+	ExpiresAt   *time.Time
+}
+
+// WhitelistEntry represents a single whitelisted IP entry
+type WhitelistEntry struct {
+	IPAddress string
+	Reason    string
+}
+
 // Middleware implements WAF functionality for Caddy
 type Middleware struct {
 	RulesFile     string `json:"rules_file,omitempty"`
@@ -49,6 +64,18 @@ type Middleware struct {
 	// Deduplicates within 3 seconds window (typical browser retry timeout)
 	processedRequests     map[string]time.Time
 	processedRequestsLock sync.RWMutex
+
+	// Blocklist/Whitelist caching for performance
+	// We cache these to avoid database hits on every request
+	blocklist           map[string][]BlocklistEntry // Key: IP address, Value: list of block entries
+	blocklistLock       sync.RWMutex
+	blocklistLastUpdate time.Time
+
+	whitelist           map[string]bool // Key: IP address, Value: true if whitelisted
+	whitelistLock       sync.RWMutex
+	whitelistLastUpdate time.Time
+
+	stopListReload chan bool // Channel to stop list reloading goroutine
 }
 
 // CaddyModule returns the Caddy module information
@@ -81,6 +108,10 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	// Initialize processed requests cache
 	m.processedRequests = make(map[string]time.Time)
 
+	// Initialize blocklist/whitelist caches
+	m.blocklist = make(map[string][]BlocklistEntry)
+	m.whitelist = make(map[string]bool)
+
 	// Load initial custom rules from API endpoint
 	if m.RulesEndpoint != "" {
 		if err := m.loadCustomRulesFromAPI(); err != nil {
@@ -91,6 +122,20 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		// Start background goroutine to periodically reload rules from API
 		m.stopRuleReload = make(chan bool, 1)
 		go m.reloadRulesBackground()
+	}
+
+	// Load initial blocklist/whitelist from API endpoint
+	if m.APIEndpoint != "" {
+		if err := m.loadBlocklistFromAPI(); err != nil {
+			fmt.Printf("[WARN] WAF: Failed to load blocklist from API: %v\n", err)
+		}
+		if err := m.loadWhitelistFromAPI(); err != nil {
+			fmt.Printf("[WARN] WAF: Failed to load whitelist from API: %v\n", err)
+		}
+
+		// Start background goroutine to periodically reload blocklist/whitelist from API
+		m.stopListReload = make(chan bool, 1)
+		go m.reloadListsBackground()
 	}
 
 	return nil
@@ -230,12 +275,37 @@ func (m *Middleware) markAsProcessed(fingerprint string) {
 
 // ServeHTTP implements the middleware handler
 func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	// Inspect the request for threats
+	clientIP := getClientIP(r)
+
+	// FIRST: Check whitelist - if whitelisted, skip all checks and allow request
+	if m.isIPWhitelisted(clientIP) {
+		return next.ServeHTTP(w, r)
+	}
+
+	// SECOND: Check blocklist - if blocked, handle immediately
+	if m.isIPBlocked(clientIP) {
+		// IP is on the blocklist, block it
+		w.Header().Set("X-WAF-Blocked", "true")
+		w.Header().Set("X-WAF-Threat", "IP_BLOCKLIST")
+		w.Header().Set("X-WAF-Severity", "critical")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+
+		response := fmt.Sprintf(`{
+			"error": "Request blocked by WAF",
+			"threat_type": "IP_BLOCKLIST",
+			"severity": "critical",
+			"description": "This IP address has been blocked"
+		}`)
+
+		w.Write([]byte(response))
+		return nil
+	}
+
+	// THIRD: Inspect the request for threats
 	threat := m.detector.Inspect(r)
 
 	if threat != nil {
-		clientIP := getClientIP(r)
-
 		// Create a fingerprint of this request to detect retries
 		// Fingerprint = MD5(IP + method + path + threat_type) - WITHOUT payload
 		// This prevents duplicate logging when same threat type is detected in multiple request parameters
@@ -695,6 +765,123 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	var m Middleware
 	err := m.UnmarshalCaddyfile(h.Dispenser)
 	return &m, err
+}
+
+// loadBlocklistFromAPI fetches the blocklist from the API endpoint and updates the cache
+func (m *Middleware) loadBlocklistFromAPI() error {
+	apiURL := m.APIEndpoint + "/waf/blocklist"
+	resp, err := m.httpClient.Get(apiURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch blocklist from API: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	var data struct {
+		BlockedIPs []BlocklistEntry `json:"blocked_ips"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return fmt.Errorf("failed to decode blocklist response: %v", err)
+	}
+
+	// Build new cache (map by IP)
+	newCache := make(map[string][]BlocklistEntry)
+	for _, entry := range data.BlockedIPs {
+		// Skip expired entries
+		if !entry.Permanent && entry.ExpiresAt != nil && entry.ExpiresAt.Before(time.Now()) {
+			continue
+		}
+		newCache[entry.IPAddress] = append(newCache[entry.IPAddress], entry)
+	}
+
+	// Update cache
+	m.blocklistLock.Lock()
+	m.blocklist = newCache
+	m.blocklistLastUpdate = time.Now()
+	m.blocklistLock.Unlock()
+
+	fmt.Printf("[INFO] WAF: Loaded %d blocklist entries from API\n", len(data.BlockedIPs))
+	return nil
+}
+
+// loadWhitelistFromAPI fetches the whitelist from the API endpoint and updates the cache
+func (m *Middleware) loadWhitelistFromAPI() error {
+	apiURL := m.APIEndpoint + "/waf/whitelist"
+	resp, err := m.httpClient.Get(apiURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch whitelist from API: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	var data struct {
+		WhitelistedIPs []WhitelistEntry `json:"whitelisted_ips"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return fmt.Errorf("failed to decode whitelist response: %v", err)
+	}
+
+	// Build new cache (set by IP)
+	newCache := make(map[string]bool)
+	for _, entry := range data.WhitelistedIPs {
+		newCache[entry.IPAddress] = true
+	}
+
+	// Update cache
+	m.whitelistLock.Lock()
+	m.whitelist = newCache
+	m.whitelistLastUpdate = time.Now()
+	m.whitelistLock.Unlock()
+
+	fmt.Printf("[INFO] WAF: Loaded %d whitelist entries from API\n", len(data.WhitelistedIPs))
+	return nil
+}
+
+// reloadListsBackground periodically reloads blocklist/whitelist from API
+func (m *Middleware) reloadListsBackground() {
+	ticker := time.NewTicker(30 * time.Second) // Reload every 30 seconds
+	defer ticker.Stop()
+
+	fmt.Printf("[INFO] WAF: Started background list reloading from API (every 30 seconds)\n")
+
+	for {
+		select {
+		case <-m.stopListReload:
+			fmt.Printf("[INFO] WAF: Stopped background list reloading\n")
+			return
+		case <-ticker.C:
+			if err := m.loadBlocklistFromAPI(); err != nil {
+				fmt.Printf("[WARN] WAF: Failed to reload blocklist from API: %v\n", err)
+			}
+			if err := m.loadWhitelistFromAPI(); err != nil {
+				fmt.Printf("[WARN] WAF: Failed to reload whitelist from API: %v\n", err)
+			}
+		}
+	}
+}
+
+// isIPWhitelisted checks if an IP is in the whitelist cache
+func (m *Middleware) isIPWhitelisted(ip string) bool {
+	m.whitelistLock.RLock()
+	defer m.whitelistLock.RUnlock()
+	return m.whitelist[ip]
+}
+
+// isIPBlocked checks if an IP is in the blocklist cache
+// Returns true if IP is blocked, false otherwise
+func (m *Middleware) isIPBlocked(ip string) bool {
+	m.blocklistLock.RLock()
+	defer m.blocklistLock.RUnlock()
+	_, exists := m.blocklist[ip]
+	return exists
 }
 
 // Interface guards

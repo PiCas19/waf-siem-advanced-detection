@@ -49,7 +49,7 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 	var req struct {
 		IP            string `json:"ip" binding:"required"`
 		Threat        string `json:"threat" binding:"required"` // Nome della regola/descrizione (es: "Detect API Enumeration", "XSS")
-		Reason        string `json:"reason"`
+		Reason        string `json:"reason" binding:"required"`
 		Permanent     bool   `json:"permanent"`
 		DurationHours int    `json:"duration_hours"` // Custom duration in hours (-1 for permanent)
 	}
@@ -67,13 +67,54 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 		return
 	}
 
+	// Validate IP address
+	validatedIP, err := ValidateIP(req.IP)
+	if err != nil {
+		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+		LogAuditActionWithError(db, userID.(uint), userEmail.(string), "BLOCK_IP", "BLOCKLIST",
+			"ip", req.IP, "Invalid IP address", nil, c.ClientIP(), err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate threat type
+	if err := ValidateThreat(req.Threat); err != nil {
+		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+		LogAuditActionWithError(db, userID.(uint), userEmail.(string), "BLOCK_IP", "BLOCKLIST",
+			"ip", req.IP, "Invalid threat type", nil, c.ClientIP(), err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate reason
+	if err := ValidateReason(req.Reason); err != nil {
+		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+		LogAuditActionWithError(db, userID.(uint), userEmail.(string), "BLOCK_IP", "BLOCKLIST",
+			"ip", req.IP, "Invalid reason", nil, c.ClientIP(), err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate duration
+	if err := ValidateDuration(req.DurationHours); err != nil {
+		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+		LogAuditActionWithError(db, userID.(uint), userEmail.(string), "BLOCK_IP", "BLOCKLIST",
+			"ip", req.IP, "Invalid duration", nil, c.ClientIP(), err.Error())
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
 	// Controlla se esiste già un blocco per questo IP + descrizione
 	var existingBlock models.BlockedIP
-	blockExists := db.Where("ip_address = ? AND description = ?", req.IP, req.Threat).
+	blockExists := db.Where("ip_address = ? AND description = ?", validatedIP, req.Threat).
 		First(&existingBlock).Error == nil
 
 	blockedIP := models.BlockedIP{
-		IPAddress:   req.IP,
+		IPAddress:   validatedIP,
 		Description: req.Threat,
 		Reason:      req.Reason,
 		Permanent:   req.Permanent || req.DurationHours == -1,
@@ -268,4 +309,41 @@ func IsIPBlocked(db *gorm.DB, ip string, description string) bool {
 		ip, description, true, now).First(&blockedIP).Error
 
 	return err == nil
+}
+
+// NewGetBlocklistForWAF - Endpoint per il WAF per fetcare la lista degli IP bloccati
+// Public endpoint (no auth required) - WAF needs to fetch this frequently
+func NewGetBlocklistForWAF(db *gorm.DB) func(*gin.Context) {
+	return func(c *gin.Context) {
+		var blockedIPs []models.BlockedIP
+		now := time.Now()
+
+		// Recupera IP bloccati non scaduti dal database
+		if err := db.Where("permanent = ? OR expires_at > ?", true, now).
+			Find(&blockedIPs).Error; err != nil {
+			c.JSON(500, gin.H{"error": "Failed to fetch blocked IPs"})
+			return
+		}
+
+		c.JSON(200, gin.H{
+			"blocked_ips": blockedIPs,
+			"count":       len(blockedIPs),
+		})
+	}
+}
+
+// NewGetWhitelistForWAF - Endpoint per il WAF per fetcare la lista degli IP whitelisted
+// Public endpoint (no auth required) - WAF needs to fetch this frequently
+func NewGetWhitelistForWAF(db *gorm.DB) func(*gin.Context) {
+	return func(c *gin.Context) {
+		var whitelisted []models.WhitelistedIP
+		if err := db.Order("created_at DESC").Find(&whitelisted).Error; err != nil {
+			c.JSON(500, gin.H{"error": "failed to fetch whitelist"})
+			return
+		}
+		c.JSON(200, gin.H{
+			"whitelisted_ips": whitelisted,
+			"count":           len(whitelisted),
+		})
+	}
 }

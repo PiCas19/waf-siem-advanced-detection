@@ -29,7 +29,7 @@ func NewAddToWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			IPAddress string `json:"ip_address" binding:"required"`
-			Reason    string `json:"reason"`
+			Reason    string `json:"reason" binding:"required"`
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -37,8 +37,29 @@ func NewAddToWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Validate IP address
+		validatedIP, err := ValidateIP(req.IPAddress)
+		if err != nil {
+			userID, _ := c.Get("user_id")
+			userEmail, _ := c.Get("user_email")
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "ADD_WHITELIST", "WHITELIST",
+				"ip", req.IPAddress, "Invalid IP address", nil, c.ClientIP(), err.Error())
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Validate reason
+		if err := ValidateReason(req.Reason); err != nil {
+			userID, _ := c.Get("user_id")
+			userEmail, _ := c.Get("user_email")
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "ADD_WHITELIST", "WHITELIST",
+				"ip", validatedIP, "Invalid reason", nil, c.ClientIP(), err.Error())
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+
 		whitelist := models.WhitelistedIP{
-			IPAddress: req.IPAddress,
+			IPAddress: validatedIP,
 			Reason:    req.Reason,
 		}
 
