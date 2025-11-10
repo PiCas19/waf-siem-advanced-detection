@@ -47,11 +47,13 @@ type WhitelistEntry struct {
 
 // Middleware implements WAF functionality for Caddy
 type Middleware struct {
-	RulesFile     string `json:"rules_file,omitempty"`
-	LogFile       string `json:"log_file,omitempty"`
-	BlockMode     bool   `json:"block_mode,omitempty"`
-	APIEndpoint   string `json:"api_endpoint,omitempty"`
-	RulesEndpoint string `json:"rules_endpoint,omitempty"` // API endpoint to fetch custom rules
+	RulesFile          string `json:"rules_file,omitempty"`
+	LogFile            string `json:"log_file,omitempty"`
+	BlockMode          bool   `json:"block_mode,omitempty"`
+	APIEndpoint        string `json:"api_endpoint,omitempty"`
+	RulesEndpoint      string `json:"rules_endpoint,omitempty"`      // API endpoint to fetch custom rules
+	BlocklistEndpoint  string `json:"blocklist_endpoint,omitempty"`  // API endpoint to fetch blocklist
+	WhitelistEndpoint  string `json:"whitelist_endpoint,omitempty"`  // API endpoint to fetch whitelist
 
 	detector       *detector.Detector
 	logger         *logger.Logger
@@ -752,6 +754,14 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				if !d.Args(&m.RulesEndpoint) {
 					return d.ArgErr()
 				}
+			case "blocklist_endpoint":
+				if !d.Args(&m.BlocklistEndpoint) {
+					return d.ArgErr()
+				}
+			case "whitelist_endpoint":
+				if !d.Args(&m.WhitelistEndpoint) {
+					return d.ArgErr()
+				}
 			default:
 				return d.Errf("unknown subdirective: %s", d.Val())
 			}
@@ -769,8 +779,11 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 
 // loadBlocklistFromAPI fetches the blocklist from the API endpoint and updates the cache
 func (m *Middleware) loadBlocklistFromAPI() error {
-	apiURL := m.APIEndpoint + "/waf/blocklist"
-	resp, err := m.httpClient.Get(apiURL)
+	if m.BlocklistEndpoint == "" {
+		return nil
+	}
+
+	resp, err := m.httpClient.Get(m.BlocklistEndpoint)
 	if err != nil {
 		return fmt.Errorf("failed to fetch blocklist from API: %v", err)
 	}
@@ -810,8 +823,11 @@ func (m *Middleware) loadBlocklistFromAPI() error {
 
 // loadWhitelistFromAPI fetches the whitelist from the API endpoint and updates the cache
 func (m *Middleware) loadWhitelistFromAPI() error {
-	apiURL := m.APIEndpoint + "/waf/whitelist"
-	resp, err := m.httpClient.Get(apiURL)
+	if m.WhitelistEndpoint == "" {
+		return nil
+	}
+
+	resp, err := m.httpClient.Get(m.WhitelistEndpoint)
 	if err != nil {
 		return fmt.Errorf("failed to fetch whitelist from API: %v", err)
 	}
