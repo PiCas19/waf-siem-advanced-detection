@@ -450,10 +450,13 @@ const BlocklistPage: React.FC = () => {
             return;
           }
 
-          // Update local whitelist state
-          const whiteData = await whiteRes.json();
-          if (whiteData.entry) {
-            setWhitelist([...whitelist, whiteData.entry]);
+          // Reload whitelist from server to ensure it's in sync
+          const whitelistRes = await fetch('/api/whitelist', {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (whitelistRes.ok) {
+            const whitelistData = await whitelistRes.json();
+            setWhitelist(whitelistData.whitelisted_ips || []);
           }
         }
       }
