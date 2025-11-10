@@ -13,6 +13,7 @@ type FalsePositive struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
 	ThreatType  string `json:"threat_type"`
+	Description string `json:"description"` // Description/reason from the rule
 	ClientIP    string `gorm:"index" json:"client_ip"`
 	Method      string `json:"method"`
 	URL         string `json:"url"`

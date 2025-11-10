@@ -76,7 +76,7 @@ interface FalsePositive {
   url: string;
   payload?: string;
   review_notes?: string;
-  reason?: string;
+  description?: string;
   created_at: string;
   status: 'pending' | 'reviewed' | 'whitelisted';
 }
@@ -981,10 +981,10 @@ const BlocklistPage: React.FC = () => {
                           <span className="text-gray-400 font-medium">Threat/Rule:</span>
                           <span className="text-gray-300 ml-2">{fp.threat_type}</span>
                         </div>
-                        {fp.reason && (
+                        {fp.description && (
                           <div>
                             <span className="text-gray-400 font-medium">Reason:</span>
-                            <span className="text-gray-300 ml-2">{fp.reason}</span>
+                            <span className="text-gray-300 ml-2">{fp.description}</span>
                           </div>
                         )}
                         <div>
