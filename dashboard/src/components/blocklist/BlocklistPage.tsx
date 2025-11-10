@@ -964,100 +964,93 @@ const BlocklistPage: React.FC = () => {
           {loading ? (
             <div className="text-center py-12 text-gray-400">Loading...</div>
           ) : filteredFalsePositives.length > 0 ? (
-            <div className="space-y-4">
-              {filteredFalsePositives.map((fp) => (
-                <div key={fp.id} className={`border rounded-lg p-4 ${
-                  fp.status === 'pending' ? 'bg-blue-900/20 border-blue-700' :
-                  fp.status === 'whitelisted' ? 'bg-green-900/20 border-green-700' :
-                  'bg-gray-900/20 border-gray-700'
-                }`}>
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <p className="text-white font-medium mb-2">{fp.method} {fp.url}</p>
-
-                      {/* Other section */}
-                      <div className="mt-3 bg-gray-700/30 rounded p-3 space-y-1 text-xs">
-                        <div>
-                          <span className="text-gray-400 font-medium">Threat/Rule:</span>
-                          <span className="text-gray-300 ml-2">{fp.threat_type}</span>
-                        </div>
-                        {fp.description && (
-                          <div>
-                            <span className="text-gray-400 font-medium">Reason:</span>
-                            <span className="text-gray-300 ml-2">{fp.description}</span>
-                          </div>
-                        )}
-                        <div>
-                          <span className="text-gray-400 font-medium">IP:</span>
-                          <span className="text-gray-300 ml-2 font-mono">{fp.client_ip}</span>
-                        </div>
-                        {fp.payload && (
-                          <div>
-                            <span className="text-gray-400 font-medium">Payload:</span>
-                            <span className="text-gray-300 ml-2">{fp.payload}</span>
-                          </div>
-                        )}
-                        {fp.review_notes && (
-                          <div>
-                            <span className="text-gray-400 font-medium">Review Notes:</span>
-                            <span className="text-gray-300 ml-2">{fp.review_notes}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <span className={`px-2 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ml-2 ${
-                      fp.status === 'pending' ? 'bg-blue-500/20 text-blue-300' :
-                      fp.status === 'whitelisted' ? 'bg-green-500/20 text-green-300' :
-                      'bg-gray-500/20 text-gray-300'
-                    }`}>
-                      {fp.status === 'pending' ? (
-                        <>
-                          <Clock size={12} />
-                          Pending
-                        </>
-                      ) : fp.status === 'whitelisted' ? (
-                        <>
-                          <CheckCircle size={12} />
-                          Whitelisted
-                        </>
-                      ) : (
-                        <>
-                          <AlertTriangle size={12} />
-                          Reviewed
-                        </>
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="flex gap-2 pt-3 border-t border-gray-700">
-                    {fp.status === 'pending' && (
-                      <>
-                        <button
-                          onClick={() => handleMarkFalsePositive(fp.id, 'reviewed')}
-                          className="inline-flex items-center gap-2 px-4 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
-                        >
-                          <AlertTriangle size={14} />
-                          Mark as Reviewed
-                        </button>
-                        <button
-                          onClick={() => handleMarkFalsePositive(fp.id, 'whitelisted')}
-                          className="inline-flex items-center gap-2 px-4 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
-                        >
-                          <CheckCircle size={14} />
-                          Whitelist IP
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={() => handleDeleteFalsePositive(fp.id)}
-                      className="ml-auto inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
-                    >
-                      <Trash2 size={14} />
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
+            <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-700">
+                    <tr>
+                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat Type</th>
+                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat/Rule</th>
+                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Method</th>
+                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Reason</th>
+                      <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>
+                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Status</th>
+                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Date</th>
+                      <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredFalsePositives.map((fp) => (
+                      <tr key={fp.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
+                        <td className="py-3 px-4 text-gray-300">{fp.threat_type}</td>
+                        <td className="py-3 px-4 text-gray-300 text-sm">{fp.threat_type}</td>
+                        <td className="py-3 px-4 text-gray-300 text-sm">{fp.method || '-'}</td>
+                        <td className="py-3 px-4 text-gray-300 text-sm">{fp.description || '-'}</td>
+                        <td className="py-3 px-4 text-white font-mono text-sm">{fp.client_ip}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
+                            fp.status === 'pending' ? 'bg-blue-500/20 text-blue-300' :
+                            fp.status === 'whitelisted' ? 'bg-green-500/20 text-green-300' :
+                            'bg-gray-500/20 text-gray-300'
+                          }`}>
+                            {fp.status === 'pending' ? (
+                              <>
+                                <Clock size={12} />
+                                Pending
+                              </>
+                            ) : fp.status === 'whitelisted' ? (
+                              <>
+                                <CheckCircle size={12} />
+                                Whitelisted
+                              </>
+                            ) : (
+                              <>
+                                <AlertTriangle size={12} />
+                                Reviewed
+                              </>
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-gray-400 text-sm">
+                          {new Date(fp.created_at).toLocaleDateString('it-IT')}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {fp.status === 'pending' && (
+                            <div className="inline-flex gap-2">
+                              <button
+                                onClick={() => handleMarkFalsePositive(fp.id, 'whitelisted')}
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
+                                title="Add to whitelist"
+                              >
+                                <CheckCircle size={12} />
+                                Whitelist
+                              </button>
+                              <button
+                                onClick={() => handleDeleteFalsePositive(fp.id)}
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                                title="Delete"
+                              >
+                                <Trash2 size={12} />
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                          {fp.status !== 'pending' && (
+                            <button
+                              onClick={() => handleDeleteFalsePositive(fp.id)}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                              title="Delete"
+                            >
+                              <Trash2 size={12} />
+                              Delete
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center text-gray-400">
