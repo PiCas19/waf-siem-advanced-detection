@@ -29,12 +29,13 @@ func NewGetFalsePositivesHandler(db *gorm.DB) gin.HandlerFunc {
 func NewReportFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			ThreatType string `json:"threat_type" binding:"required"`
-			ClientIP   string `json:"client_ip" binding:"required"`
-			Method     string `json:"method"`
-			URL        string `json:"url"`
-			Payload    string `json:"payload"`
-			UserAgent  string `json:"user_agent"`
+			ThreatType  string `json:"threat_type" binding:"required"`
+			Description string `json:"description"`
+			ClientIP    string `json:"client_ip" binding:"required"`
+			Method      string `json:"method"`
+			URL         string `json:"url"`
+			Payload     string `json:"payload"`
+			UserAgent   string `json:"user_agent"`
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -43,13 +44,14 @@ func NewReportFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		falsePositive := models.FalsePositive{
-			ThreatType: req.ThreatType,
-			ClientIP:   req.ClientIP,
-			Method:     req.Method,
-			URL:        req.URL,
-			Payload:    req.Payload,
-			UserAgent:  req.UserAgent,
-			Status:     "pending",
+			ThreatType:  req.ThreatType,
+			Description: req.Description,
+			ClientIP:    req.ClientIP,
+			Method:      req.Method,
+			URL:         req.URL,
+			Payload:     req.Payload,
+			UserAgent:   req.UserAgent,
+			Status:      "pending",
 		}
 
 		if err := db.Create(&falsePositive).Error; err != nil {

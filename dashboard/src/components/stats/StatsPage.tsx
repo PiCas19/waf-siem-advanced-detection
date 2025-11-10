@@ -875,6 +875,7 @@ const StatsPage: React.FC = () => {
         },
         body: JSON.stringify({
           threat_type: alert.threat,
+          description: alert.description || '',
           client_ip: alert.ip,
           method: alert.method,
           url: alert.path,
