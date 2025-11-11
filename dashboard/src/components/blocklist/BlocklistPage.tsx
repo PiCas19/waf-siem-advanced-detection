@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Lock, CheckCircle, AlertTriangle, Trash2, Clock, Zap, AlertCircle } from 'lucide-react';
 import { useToast } from '@/contexts/SnackbarContext';
 
@@ -116,8 +116,16 @@ const BlocklistPage: React.FC = () => {
   const [blockFormErrors, setBlockFormErrors] = useState<{ ip?: string; reason?: string; threat?: string }>({});
   const [whiteFormErrors, setWhiteFormErrors] = useState<{ ip?: string; reason?: string }>({});
 
+  // Ref to track when whitelist was just loaded (to avoid reloading immediately)
+  const whitelistJustLoadedRef = useRef(false);
+
   // Carica dati all'avvio e quando il tab cambia
   useEffect(() => {
+    if (activeTab === 'whitelist' && whitelistJustLoadedRef.current) {
+      // Whitelist was just loaded, don't reload
+      whitelistJustLoadedRef.current = false;
+      return;
+    }
     loadData();
   }, [activeTab]);
 
@@ -458,6 +466,8 @@ const BlocklistPage: React.FC = () => {
             if (whitelistRes.ok) {
               const whitelistData = await whitelistRes.json();
               setWhitelist(whitelistData.whitelisted_ips || []);
+              // Mark that whitelist was just loaded, so don't reload on tab change
+              whitelistJustLoadedRef.current = true;
               showToast('IP added to whitelist', 'success', 2000);
             } else {
               showToast('Failed to reload whitelist', 'error', 4000);
@@ -485,7 +495,9 @@ const BlocklistPage: React.FC = () => {
         setFalsePositives(falsePositives.map(fp =>
           fp.id === id ? { ...fp, status } : fp
         ));
-        // Auto-navigate to whitelist tab if whitelisted (after a small delay to ensure state is updated)
+        // Auto-navigate to whitelist tab if whitelisted
+        // Note: whitelist was already loaded above and marked with whitelistJustLoadedRef,
+        // so the useEffect won't reload it when activeTab changes
         if (status === 'whitelisted') {
           setTimeout(() => {
             setActiveTab('whitelist');
