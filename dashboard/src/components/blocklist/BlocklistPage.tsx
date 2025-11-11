@@ -96,7 +96,6 @@ const BlocklistPage: React.FC = () => {
   const [blocklist, setBlocklist] = useState<BlockedEntry[]>([]);
   const [whitelist, setWhitelist] = useState<WhitelistedEntry[]>([]);
   const [falsePositives, setFalsePositives] = useState<FalsePositive[]>([]);
-  const [rules, setRules] = useState<RuleInfo[]>([]);
 
   const [showAddBlockForm, setShowAddBlockForm] = useState(false);
   const [showAddWhiteForm, setShowAddWhiteForm] = useState(false);
@@ -170,37 +169,6 @@ const BlocklistPage: React.FC = () => {
     const loadAllData = async () => {
       try {
         const token = localStorage.getItem('authToken');
-
-        // Load rules (once per session is fine, but load on mount)
-        const rulesRes = await fetch('/api/rules', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (rulesRes.ok) {
-          const data = await rulesRes.json();
-          const allRules: RuleInfo[] = [];
-
-          // Add default rules
-          if (data.default_rules) {
-            allRules.push(...data.default_rules.map((r: any) => ({
-              id: r.id,
-              name: r.name,
-              type: r.type,
-              description: r.description,
-            })));
-          }
-
-          // Add custom rules
-          if (data.custom_rules) {
-            allRules.push(...data.custom_rules.map((r: any) => ({
-              id: r.id?.toString() || r.name,
-              name: r.name,
-              type: r.type,
-              description: r.description,
-            })));
-          }
-
-          setRules(allRules);
-        }
 
         // Load blocklist
         const blockRes = await fetch('/api/blocklist', {
