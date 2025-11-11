@@ -278,21 +278,6 @@ const BlocklistPage: React.FC = () => {
     }
   };
 
-  // Helper function to find rule that matches a threat type
-  const findRuleForThreatType = (threatType: string): RuleInfo | undefined => {
-    if (!threatType) return undefined;
-
-    const normalized = threatType.toUpperCase().replace(/[\s_-]/g, '');
-
-    // Try to find an exact match or partial match
-    return rules.find((rule) => {
-      const ruleType = rule.type.toUpperCase().replace(/[\s_-]/g, '');
-      const ruleName = rule.name.toUpperCase().replace(/[\s_-]/g, '');
-
-      return ruleType.includes(normalized) || normalized.includes(ruleType) || ruleName.includes(normalized);
-    });
-  };
-
   const handleAddBlock = async (e: React.FormEvent) => {
     e.preventDefault();
 
