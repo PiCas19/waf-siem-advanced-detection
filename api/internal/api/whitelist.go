@@ -13,13 +13,19 @@ import (
 func NewGetWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		whitelisted := []models.WhitelistedIP{}
+
+		// First, check total count including soft-deleted
+		var totalCount int64
+		db.Model(&models.WhitelistedIP{}).Unscoped().Count(&totalCount)
+		fmt.Printf("[DEBUG] Total whitelist entries (including soft-deleted): %d\n", totalCount)
+
 		// GORM automatically applies soft delete filter (deleted_at IS NULL) for WhitelistedIP model
 		if err := db.Order("created_at DESC").Find(&whitelisted).Error; err != nil {
 			fmt.Printf("[ERROR] Failed to fetch whitelist: %v\n", err)
 			c.JSON(500, gin.H{"error": "failed to fetch whitelist"})
 			return
 		}
-		fmt.Printf("[DEBUG] Whitelist found %d entries\n", len(whitelisted))
+		fmt.Printf("[DEBUG] Whitelist found %d entries (non-deleted only)\n", len(whitelisted))
 		for _, entry := range whitelisted {
 			fmt.Printf("[DEBUG] IP: %s, Reason: %s, DeletedAt: %v\n", entry.IPAddress, entry.Reason, entry.DeletedAt)
 		}
