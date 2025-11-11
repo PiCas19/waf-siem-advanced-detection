@@ -316,8 +316,27 @@ const StatsPage: React.FC = () => {
         const data = await fetchStats();
         initializeTimeline();
 
-        // Carica logs (tutte le threat) dal database
         const token = localStorage.getItem('authToken');
+
+        // Carica i false positive segnalati dal database
+        const fpResponse = await fetch('/api/false-positives', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (fpResponse.ok) {
+          const fpData = await fpResponse.json();
+          // Crea un set di chiavi (ip::threat) dei false positive segnalati
+          const reportedFPs = new Set<string>();
+          (fpData.false_positives || []).forEach((fp: any) => {
+            const key = getAlertKey(fp.client_ip, fp.description || fp.threat_type);
+            reportedFPs.add(key);
+          });
+          setReportedFalsePositives(reportedFPs);
+        }
+
+        // Carica logs (tutte le threat) dal database
         const logsResponse = await fetch('/api/logs', {
           headers: {
             'Authorization': `Bearer ${token}`,
