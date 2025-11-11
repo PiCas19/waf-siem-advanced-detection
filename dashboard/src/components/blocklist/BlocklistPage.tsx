@@ -416,7 +416,7 @@ const BlocklistPage: React.FC = () => {
             },
             body: JSON.stringify({
               ip_address: fp.client_ip,
-              reason: `Auto-whitelisted from false positive: ${fp.threat_type}`,
+              reason: `Auto-whitelisted from false positive`,
             }),
           });
 
@@ -727,7 +727,8 @@ const BlocklistPage: React.FC = () => {
                       if (validation.error) {
                         setBlockFormErrors({ ...blockFormErrors, ip: validation.error });
                       } else {
-                        setBlockFormErrors({ ...blockFormErrors, ip: undefined });
+                        const { ip, ...rest } = blockFormErrors;
+                        setBlockFormErrors(rest);
                       }
                     }}
                     className={`w-full px-4 py-2 bg-gray-700 text-white rounded border transition-colors focus:outline-none ${
@@ -753,7 +754,8 @@ const BlocklistPage: React.FC = () => {
                       if (validation.error) {
                         setBlockFormErrors({ ...blockFormErrors, reason: validation.error });
                       } else {
-                        setBlockFormErrors({ ...blockFormErrors, reason: undefined });
+                        const { reason, ...rest } = blockFormErrors;
+                        setBlockFormErrors(rest);
                       }
                     }}
                     className={`w-full px-4 py-2 bg-gray-700 text-white rounded border transition-colors focus:outline-none ${
@@ -1119,7 +1121,7 @@ const BlocklistPage: React.FC = () => {
                       onClick={() => setBlocklistPage(page)}
                       className={`px-3 py-1 rounded text-sm font-medium transition ${
                         blocklistPage === page
-                          ? 'bg-red-600 text-white'
+                          ? 'bg-blue-600 text-white'
                           : 'bg-gray-700 text-white hover:bg-gray-600'
                       }`}
                     >
@@ -1167,7 +1169,8 @@ const BlocklistPage: React.FC = () => {
                       if (validation.error) {
                         setWhiteFormErrors({ ...whiteFormErrors, ip: validation.error });
                       } else {
-                        setWhiteFormErrors({ ...whiteFormErrors, ip: undefined });
+                        const { ip, ...rest } = whiteFormErrors;
+                        setWhiteFormErrors(rest);
                       }
                     }}
                     className={`w-full px-4 py-2 bg-gray-700 text-white rounded border transition-colors focus:outline-none ${
@@ -1193,7 +1196,8 @@ const BlocklistPage: React.FC = () => {
                       if (validation.error) {
                         setWhiteFormErrors({ ...whiteFormErrors, reason: validation.error });
                       } else {
-                        setWhiteFormErrors({ ...whiteFormErrors, reason: undefined });
+                        const { reason, ...rest } = whiteFormErrors;
+                        setWhiteFormErrors(rest);
                       }
                     }}
                     className={`w-full px-4 py-2 bg-gray-700 text-white rounded border transition-colors focus:outline-none ${
@@ -1370,7 +1374,7 @@ const BlocklistPage: React.FC = () => {
                       onClick={() => setWhitelistPage(page)}
                       className={`px-3 py-1 rounded text-sm font-medium transition ${
                         whitelistPage === page
-                          ? 'bg-green-600 text-white'
+                          ? 'bg-blue-600 text-white'
                           : 'bg-gray-700 text-white hover:bg-gray-600'
                       }`}
                     >
