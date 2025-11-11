@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock, CheckCircle, AlertTriangle, Trash2, Clock, Zap, AlertCircle } from 'lucide-react';
+import { Lock, CheckCircle, AlertTriangle, Trash2, Clock, Zap, AlertCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/contexts/SnackbarContext';
 
 // Validation helpers
@@ -116,32 +116,17 @@ const BlocklistPage: React.FC = () => {
   const [falsePositivesPage, setFalsePositivesPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Visible columns states
-  const [blocklistVisibleColumns, setBlocklistVisibleColumns] = useState({
-    ip: true,
-    threat: true,
-    reason: true,
-    type: true,
-    blockedDate: true,
-    expires: true,
-    actions: true,
-  });
+  // Sorting states for blocklist
+  const [blocklistSortColumn, setBlocklistSortColumn] = useState<'ip' | 'threat' | 'reason' | 'type' | 'blockedDate' | 'expires'>('blockedDate');
+  const [blocklistSortOrder, setBlocklistSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const [whitelistVisibleColumns, setWhitelistVisibleColumns] = useState({
-    ip: true,
-    reason: true,
-    addedDate: true,
-    actions: true,
-  });
+  // Sorting states for whitelist
+  const [whitelistSortColumn, setWhitelistSortColumn] = useState<'ip' | 'reason' | 'addedDate'>('addedDate');
+  const [whitelistSortOrder, setWhitelistSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const [fpVisibleColumns, setFpVisibleColumns] = useState({
-    threatType: true,
-    ip: true,
-    method: true,
-    status: true,
-    date: true,
-    actions: true,
-  });
+  // Sorting states for false positives
+  const [fpSortColumn, setFpSortColumn] = useState<'threatType' | 'ip' | 'method' | 'status' | 'date'>('date');
+  const [fpSortOrder, setFpSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Additional filters
   const [blocklistTypeFilter, setBlocklistTypeFilter] = useState<'all' | 'permanent' | 'temporary'>('all');
@@ -544,6 +529,96 @@ const BlocklistPage: React.FC = () => {
     return matchesSearch;
   });
 
+  // Sorting functions
+  const sortBlocklist = (list: BlockedEntry[]): BlockedEntry[] => {
+    return [...list].sort((a, b) => {
+      let aVal: any, bVal: any;
+
+      if (blocklistSortColumn === 'ip') {
+        aVal = a.ip_address;
+        bVal = b.ip_address;
+      } else if (blocklistSortColumn === 'threat') {
+        aVal = a.description;
+        bVal = b.description;
+      } else if (blocklistSortColumn === 'reason') {
+        aVal = a.reason;
+        bVal = b.reason;
+      } else if (blocklistSortColumn === 'type') {
+        aVal = a.permanent ? 'permanent' : 'temporary';
+        bVal = b.permanent ? 'permanent' : 'temporary';
+      } else if (blocklistSortColumn === 'blockedDate') {
+        aVal = new Date(a.created_at).getTime();
+        bVal = new Date(b.created_at).getTime();
+      } else if (blocklistSortColumn === 'expires') {
+        aVal = a.expires_at ? new Date(a.expires_at).getTime() : 0;
+        bVal = b.expires_at ? new Date(b.expires_at).getTime() : 0;
+      }
+
+      if (blocklistSortOrder === 'asc') {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+  };
+
+  const sortWhitelist = (list: WhitelistedEntry[]): WhitelistedEntry[] => {
+    return [...list].sort((a, b) => {
+      let aVal: any, bVal: any;
+
+      if (whitelistSortColumn === 'ip') {
+        aVal = a.ip_address;
+        bVal = b.ip_address;
+      } else if (whitelistSortColumn === 'reason') {
+        aVal = a.reason;
+        bVal = b.reason;
+      } else if (whitelistSortColumn === 'addedDate') {
+        aVal = new Date(a.created_at).getTime();
+        bVal = new Date(b.created_at).getTime();
+      }
+
+      if (whitelistSortOrder === 'asc') {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+  };
+
+  const sortFalsePositives = (list: FalsePositive[]): FalsePositive[] => {
+    return [...list].sort((a, b) => {
+      let aVal: any, bVal: any;
+
+      if (fpSortColumn === 'threatType') {
+        aVal = a.threat_type;
+        bVal = b.threat_type;
+      } else if (fpSortColumn === 'ip') {
+        aVal = a.client_ip;
+        bVal = b.client_ip;
+      } else if (fpSortColumn === 'method') {
+        aVal = a.method;
+        bVal = b.method;
+      } else if (fpSortColumn === 'status') {
+        aVal = a.status;
+        bVal = b.status;
+      } else if (fpSortColumn === 'date') {
+        aVal = new Date(a.created_at).getTime();
+        bVal = new Date(b.created_at).getTime();
+      }
+
+      if (fpSortOrder === 'asc') {
+        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+      } else {
+        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+      }
+    });
+  };
+
+  // Apply sorting to filtered data
+  const sortedBlocklist = sortBlocklist(filteredBlocklist);
+  const sortedWhitelist = sortWhitelist(filteredWhitelist);
+  const sortedFalsePositives = sortFalsePositives(filteredFalsePositives);
+
   return (
     <div className="min-h-screen bg-gray-900 p-6">
       <div className="space-y-6">
@@ -832,145 +907,188 @@ const BlocklistPage: React.FC = () => {
 
           {loading ? (
             <div className="text-center py-12 text-gray-400">Loading...</div>
-          ) : filteredBlocklist.length > 0 ? (
+          ) : sortedBlocklist.length > 0 ? (
             <>
               <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-                {/* Column Visibility Toggle */}
-                <div className="p-4 border-b border-gray-700">
-                  <details className="group">
-                    <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
-                      <span>Column Visibility</span>
-                      <span className="text-xs text-gray-500">(Click to toggle)</span>
-                    </summary>
-                    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={blocklistVisibleColumns.ip}
-                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, ip: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        IP Address
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={blocklistVisibleColumns.threat}
-                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, threat: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Threat/Rule
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={blocklistVisibleColumns.reason}
-                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, reason: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Reason
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={blocklistVisibleColumns.type}
-                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, type: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Type
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={blocklistVisibleColumns.blockedDate}
-                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, blockedDate: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Blocked Date
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={blocklistVisibleColumns.expires}
-                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, expires: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Expires
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={blocklistVisibleColumns.actions}
-                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, actions: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Actions
-                      </label>
-                    </div>
-                  </details>
-                </div>
-
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-700">
                       <tr>
-                        {blocklistVisibleColumns.ip && <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>}
-                        {blocklistVisibleColumns.threat && <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat/Rule</th>}
-                        {blocklistVisibleColumns.reason && <th className="text-left py-3 px-4 text-gray-300 font-medium">Reason</th>}
-                        {blocklistVisibleColumns.type && <th className="text-left py-3 px-4 text-gray-300 font-medium">Type</th>}
-                        {blocklistVisibleColumns.blockedDate && <th className="text-left py-3 px-4 text-gray-300 font-medium">Blocked Date</th>}
-                        {blocklistVisibleColumns.expires && <th className="text-left py-3 px-4 text-gray-300 font-medium">Expires</th>}
-                        {blocklistVisibleColumns.actions && <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>}
+                        <th
+                          onClick={() => {
+                            if (blocklistSortColumn === 'ip') {
+                              setBlocklistSortOrder(blocklistSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setBlocklistSortColumn('ip');
+                              setBlocklistSortOrder('asc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            IP Address
+                            {blocklistSortColumn === 'ip' && (
+                              blocklistSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => {
+                            if (blocklistSortColumn === 'threat') {
+                              setBlocklistSortOrder(blocklistSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setBlocklistSortColumn('threat');
+                              setBlocklistSortOrder('asc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            Threat/Rule
+                            {blocklistSortColumn === 'threat' && (
+                              blocklistSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => {
+                            if (blocklistSortColumn === 'reason') {
+                              setBlocklistSortOrder(blocklistSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setBlocklistSortColumn('reason');
+                              setBlocklistSortOrder('asc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            Reason
+                            {blocklistSortColumn === 'reason' && (
+                              blocklistSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => {
+                            if (blocklistSortColumn === 'type') {
+                              setBlocklistSortOrder(blocklistSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setBlocklistSortColumn('type');
+                              setBlocklistSortOrder('asc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            Type
+                            {blocklistSortColumn === 'type' && (
+                              blocklistSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => {
+                            if (blocklistSortColumn === 'blockedDate') {
+                              setBlocklistSortOrder(blocklistSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setBlocklistSortColumn('blockedDate');
+                              setBlocklistSortOrder('desc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            Blocked Date
+                            {blocklistSortColumn === 'blockedDate' && (
+                              blocklistSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => {
+                            if (blocklistSortColumn === 'expires') {
+                              setBlocklistSortOrder(blocklistSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setBlocklistSortColumn('expires');
+                              setBlocklistSortOrder('desc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            Expires
+                            {blocklistSortColumn === 'expires' && (
+                              blocklistSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredBlocklist.slice((blocklistPage - 1) * itemsPerPage, blocklistPage * itemsPerPage).map((entry) => (
+                      {sortedBlocklist.slice((blocklistPage - 1) * itemsPerPage, blocklistPage * itemsPerPage).map((entry) => (
                         <tr key={entry.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
-                          {blocklistVisibleColumns.ip && <td className="py-3 px-4 text-white font-mono">{entry.ip_address}</td>}
-                          {blocklistVisibleColumns.threat && <td className="py-3 px-4 text-gray-300 font-medium">{entry.description}</td>}
-                          {blocklistVisibleColumns.reason && <td className="py-3 px-4 text-gray-300">{entry.reason}</td>}
-                          {blocklistVisibleColumns.type && (
-                            <td className="py-3 px-4">
-                              <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
-                                entry.permanent
-                                  ? 'bg-red-500/20 text-red-300'
-                                  : 'bg-yellow-500/20 text-yellow-300'
-                              }`}>
-                                {entry.permanent ? (
-                                  <>
-                                    <Zap size={12} />
-                                    Permanent
-                                  </>
-                                ) : (
-                                  <>
-                                    <Clock size={12} />
-                                    Temporary
-                                  </>
-                                )}
-                              </span>
-                            </td>
-                          )}
-                          {blocklistVisibleColumns.blockedDate && (
-                            <td className="py-3 px-4 text-gray-400 text-sm">
-                              {new Date(entry.created_at).toLocaleDateString('it-IT')}
-                            </td>
-                          )}
-                          {blocklistVisibleColumns.expires && (
-                            <td className="py-3 px-4 text-gray-400 text-sm">
-                              {entry.expires_at ? new Date(entry.expires_at).toLocaleDateString('it-IT') : 'Never'}
-                            </td>
-                          )}
-                          {blocklistVisibleColumns.actions && (
-                            <td className="py-3 px-4 text-center">
-                              <button
-                                onClick={() => handleDeleteBlock(entry.ip_address, entry.description)}
-                                className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
-                              >
-                                <Trash2 size={14} />
-                                Remove
-                              </button>
-                            </td>
-                          )}
+                          <td className="py-3 px-4 text-white font-mono">{entry.ip_address}</td>
+                          <td className="py-3 px-4 text-gray-300 font-medium">{entry.description}</td>
+                          <td className="py-3 px-4 text-gray-300">{entry.reason}</td>
+                          <td className="py-3 px-4">
+                            <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
+                              entry.permanent
+                                ? 'bg-red-500/20 text-red-300'
+                                : 'bg-yellow-500/20 text-yellow-300'
+                            }`}>
+                              {entry.permanent ? (
+                                <>
+                                  <Zap size={12} />
+                                  Permanent
+                                </>
+                              ) : (
+                                <>
+                                  <Clock size={12} />
+                                  Temporary
+                                </>
+                              )}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-gray-400 text-sm">
+                            {new Date(entry.created_at).toLocaleDateString('it-IT')}
+                          </td>
+                          <td className="py-3 px-4 text-gray-400 text-sm">
+                            {entry.expires_at ? new Date(entry.expires_at).toLocaleDateString('it-IT') : 'Never'}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              onClick={() => handleDeleteBlock(entry.ip_address, entry.description)}
+                              className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                            >
+                              <Trash2 size={14} />
+                              Remove
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -981,7 +1099,7 @@ const BlocklistPage: React.FC = () => {
               {/* Pagination */}
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 flex items-center justify-between">
                 <div className="text-sm text-gray-400">
-                  Showing {Math.min((blocklistPage - 1) * itemsPerPage + 1, filteredBlocklist.length)} to {Math.min(blocklistPage * itemsPerPage, filteredBlocklist.length)} of {filteredBlocklist.length} items
+                  Showing {Math.min((blocklistPage - 1) * itemsPerPage + 1, sortedBlocklist.length)} to {Math.min(blocklistPage * itemsPerPage, sortedBlocklist.length)} of {sortedBlocklist.length} items
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -995,7 +1113,7 @@ const BlocklistPage: React.FC = () => {
                   >
                     Previous
                   </button>
-                  {Array.from({ length: Math.ceil(filteredBlocklist.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                  {Array.from({ length: Math.ceil(sortedBlocklist.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
                     <button
                       key={page}
                       onClick={() => setBlocklistPage(page)}
@@ -1009,10 +1127,10 @@ const BlocklistPage: React.FC = () => {
                     </button>
                   ))}
                   <button
-                    onClick={() => setBlocklistPage(Math.min(Math.ceil(filteredBlocklist.length / itemsPerPage), blocklistPage + 1))}
-                    disabled={blocklistPage >= Math.ceil(filteredBlocklist.length / itemsPerPage)}
+                    onClick={() => setBlocklistPage(Math.min(Math.ceil(sortedBlocklist.length / itemsPerPage), blocklistPage + 1))}
+                    disabled={blocklistPage >= Math.ceil(sortedBlocklist.length / itemsPerPage)}
                     className={`px-3 py-1 rounded text-sm font-medium transition ${
-                      blocklistPage >= Math.ceil(filteredBlocklist.length / itemsPerPage)
+                      blocklistPage >= Math.ceil(sortedBlocklist.length / itemsPerPage)
                         ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
                         : 'bg-gray-700 text-white hover:bg-gray-600'
                     }`}
@@ -1129,88 +1247,99 @@ const BlocklistPage: React.FC = () => {
 
           {loading ? (
             <div className="text-center py-12 text-gray-400">Loading...</div>
-          ) : filteredWhitelist.length > 0 ? (
+          ) : sortedWhitelist.length > 0 ? (
             <>
               <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-                {/* Column Visibility Toggle */}
-                <div className="p-4 border-b border-gray-700">
-                  <details className="group">
-                    <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
-                      <span>Column Visibility</span>
-                      <span className="text-xs text-gray-500">(Click to toggle)</span>
-                    </summary>
-                    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={whitelistVisibleColumns.ip}
-                          onChange={(e) => setWhitelistVisibleColumns({...whitelistVisibleColumns, ip: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        IP Address
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={whitelistVisibleColumns.reason}
-                          onChange={(e) => setWhitelistVisibleColumns({...whitelistVisibleColumns, reason: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Reason
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={whitelistVisibleColumns.addedDate}
-                          onChange={(e) => setWhitelistVisibleColumns({...whitelistVisibleColumns, addedDate: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Added Date
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={whitelistVisibleColumns.actions}
-                          onChange={(e) => setWhitelistVisibleColumns({...whitelistVisibleColumns, actions: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Actions
-                      </label>
-                    </div>
-                  </details>
-                </div>
-
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-700">
                       <tr>
-                        {whitelistVisibleColumns.ip && <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>}
-                        {whitelistVisibleColumns.reason && <th className="text-left py-3 px-4 text-gray-300 font-medium">Reason</th>}
-                        {whitelistVisibleColumns.addedDate && <th className="text-left py-3 px-4 text-gray-300 font-medium">Added Date</th>}
-                        {whitelistVisibleColumns.actions && <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>}
+                        <th
+                          onClick={() => {
+                            if (whitelistSortColumn === 'ip') {
+                              setWhitelistSortOrder(whitelistSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setWhitelistSortColumn('ip');
+                              setWhitelistSortOrder('asc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            IP Address
+                            {whitelistSortColumn === 'ip' && (
+                              whitelistSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => {
+                            if (whitelistSortColumn === 'reason') {
+                              setWhitelistSortOrder(whitelistSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setWhitelistSortColumn('reason');
+                              setWhitelistSortOrder('asc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            Reason
+                            {whitelistSortColumn === 'reason' && (
+                              whitelistSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => {
+                            if (whitelistSortColumn === 'addedDate') {
+                              setWhitelistSortOrder(whitelistSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setWhitelistSortColumn('addedDate');
+                              setWhitelistSortOrder('desc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            Added Date
+                            {whitelistSortColumn === 'addedDate' && (
+                              whitelistSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredWhitelist.slice((whitelistPage - 1) * itemsPerPage, whitelistPage * itemsPerPage).map((entry) => (
+                      {sortedWhitelist.slice((whitelistPage - 1) * itemsPerPage, whitelistPage * itemsPerPage).map((entry) => (
                         <tr key={entry.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
-                          {whitelistVisibleColumns.ip && <td className="py-3 px-4 text-white font-mono">{entry.ip_address}</td>}
-                          {whitelistVisibleColumns.reason && <td className="py-3 px-4 text-gray-300 text-sm">{entry.reason || '-'}</td>}
-                          {whitelistVisibleColumns.addedDate && (
-                            <td className="py-3 px-4 text-gray-400 text-sm">
-                              {new Date(entry.created_at).toLocaleDateString('it-IT')}
-                            </td>
-                          )}
-                          {whitelistVisibleColumns.actions && (
-                            <td className="py-3 px-4 text-center">
-                              <button
-                                onClick={() => handleDeleteWhite(entry.id)}
-                                className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
-                              >
-                                <Trash2 size={14} />
-                                Remove
-                              </button>
-                            </td>
-                          )}
+                          <td className="py-3 px-4 text-white font-mono">{entry.ip_address}</td>
+                          <td className="py-3 px-4 text-gray-300 text-sm">{entry.reason || '-'}</td>
+                          <td className="py-3 px-4 text-gray-400 text-sm">
+                            {new Date(entry.created_at).toLocaleDateString('it-IT')}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              onClick={() => handleDeleteWhite(entry.id)}
+                              className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                            >
+                              <Trash2 size={14} />
+                              Remove
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1221,7 +1350,7 @@ const BlocklistPage: React.FC = () => {
               {/* Pagination */}
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 flex items-center justify-between">
                 <div className="text-sm text-gray-400">
-                  Showing {Math.min((whitelistPage - 1) * itemsPerPage + 1, filteredWhitelist.length)} to {Math.min(whitelistPage * itemsPerPage, filteredWhitelist.length)} of {filteredWhitelist.length} items
+                  Showing {Math.min((whitelistPage - 1) * itemsPerPage + 1, sortedWhitelist.length)} to {Math.min(whitelistPage * itemsPerPage, sortedWhitelist.length)} of {sortedWhitelist.length} items
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -1235,7 +1364,7 @@ const BlocklistPage: React.FC = () => {
                   >
                     Previous
                   </button>
-                  {Array.from({ length: Math.ceil(filteredWhitelist.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                  {Array.from({ length: Math.ceil(sortedWhitelist.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
                     <button
                       key={page}
                       onClick={() => setWhitelistPage(page)}
@@ -1249,10 +1378,10 @@ const BlocklistPage: React.FC = () => {
                     </button>
                   ))}
                   <button
-                    onClick={() => setWhitelistPage(Math.min(Math.ceil(filteredWhitelist.length / itemsPerPage), whitelistPage + 1))}
-                    disabled={whitelistPage >= Math.ceil(filteredWhitelist.length / itemsPerPage)}
+                    onClick={() => setWhitelistPage(Math.min(Math.ceil(sortedWhitelist.length / itemsPerPage), whitelistPage + 1))}
+                    disabled={whitelistPage >= Math.ceil(sortedWhitelist.length / itemsPerPage)}
                     className={`px-3 py-1 rounded text-sm font-medium transition ${
-                      whitelistPage >= Math.ceil(filteredWhitelist.length / itemsPerPage)
+                      whitelistPage >= Math.ceil(sortedWhitelist.length / itemsPerPage)
                         ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
                         : 'bg-gray-700 text-white hover:bg-gray-600'
                     }`}
@@ -1274,155 +1403,178 @@ const BlocklistPage: React.FC = () => {
         <div className="space-y-6">
           {loading ? (
             <div className="text-center py-12 text-gray-400">Loading...</div>
-          ) : filteredFalsePositives.length > 0 ? (
+          ) : sortedFalsePositives.length > 0 ? (
             <>
               <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-                {/* Column Visibility Toggle */}
-                <div className="p-4 border-b border-gray-700">
-                  <details className="group">
-                    <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
-                      <span>Column Visibility</span>
-                      <span className="text-xs text-gray-500">(Click to toggle)</span>
-                    </summary>
-                    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={fpVisibleColumns.threatType}
-                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, threatType: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Threat Type
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={fpVisibleColumns.ip}
-                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, ip: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        IP Address
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={fpVisibleColumns.method}
-                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, method: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Method
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={fpVisibleColumns.status}
-                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, status: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Status
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={fpVisibleColumns.date}
-                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, date: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Date
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={fpVisibleColumns.actions}
-                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, actions: e.target.checked})}
-                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                        />
-                        Actions
-                      </label>
-                    </div>
-                  </details>
-                </div>
-
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-700">
                       <tr>
-                        {fpVisibleColumns.threatType && <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat Type</th>}
-                        {fpVisibleColumns.ip && <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>}
-                        {fpVisibleColumns.method && <th className="text-left py-3 px-4 text-gray-300 font-medium">Method</th>}
-                        {fpVisibleColumns.status && <th className="text-left py-3 px-4 text-gray-300 font-medium">Status</th>}
-                        {fpVisibleColumns.date && <th className="text-left py-3 px-4 text-gray-300 font-medium">Date</th>}
-                        {fpVisibleColumns.actions && <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>}
+                        <th
+                          onClick={() => {
+                            if (fpSortColumn === 'threatType') {
+                              setFpSortOrder(fpSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setFpSortColumn('threatType');
+                              setFpSortOrder('asc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            Threat Type
+                            {fpSortColumn === 'threatType' && (
+                              fpSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => {
+                            if (fpSortColumn === 'ip') {
+                              setFpSortOrder(fpSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setFpSortColumn('ip');
+                              setFpSortOrder('asc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            IP Address
+                            {fpSortColumn === 'ip' && (
+                              fpSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => {
+                            if (fpSortColumn === 'method') {
+                              setFpSortOrder(fpSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setFpSortColumn('method');
+                              setFpSortOrder('asc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            Method
+                            {fpSortColumn === 'method' && (
+                              fpSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => {
+                            if (fpSortColumn === 'status') {
+                              setFpSortOrder(fpSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setFpSortColumn('status');
+                              setFpSortOrder('asc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            Status
+                            {fpSortColumn === 'status' && (
+                              fpSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => {
+                            if (fpSortColumn === 'date') {
+                              setFpSortOrder(fpSortOrder === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setFpSortColumn('date');
+                              setFpSortOrder('desc');
+                            }
+                          }}
+                          className="text-left py-3 px-4 text-gray-300 font-medium cursor-pointer hover:text-white transition"
+                        >
+                          <div className="flex items-center gap-2">
+                            Date
+                            {fpSortColumn === 'date' && (
+                              fpSortOrder === 'asc' ? (
+                                <ArrowUp size={14} />
+                              ) : (
+                                <ArrowDown size={14} />
+                              )
+                            )}
+                          </div>
+                        </th>
+                        <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredFalsePositives.slice((falsePositivesPage - 1) * itemsPerPage, falsePositivesPage * itemsPerPage).map((fp) => (
+                      {sortedFalsePositives.slice((falsePositivesPage - 1) * itemsPerPage, falsePositivesPage * itemsPerPage).map((fp) => (
                         <tr key={fp.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
-                          {fpVisibleColumns.threatType && <td className="py-3 px-4 text-gray-300">{fp.threat_type}</td>}
-                          {fpVisibleColumns.ip && <td className="py-3 px-4 text-white font-mono text-sm">{fp.client_ip}</td>}
-                          {fpVisibleColumns.method && <td className="py-3 px-4 text-gray-300 text-sm">{fp.method || '-'}</td>}
-                          {fpVisibleColumns.status && (
-                            <td className="py-3 px-4">
-                              <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
-                                fp.status === 'pending' ? 'bg-blue-500/20 text-blue-300' :
-                                fp.status === 'whitelisted' ? 'bg-green-500/20 text-green-300' :
-                                'bg-gray-500/20 text-gray-300'
-                              }`}>
-                                {fp.status === 'pending' ? (
-                                  <>
-                                    <Clock size={12} />
-                                    Pending
-                                  </>
-                                ) : fp.status === 'whitelisted' ? (
-                                  <>
-                                    <CheckCircle size={12} />
-                                    Whitelisted
-                                  </>
-                                ) : (
-                                  <>
-                                    <AlertTriangle size={12} />
-                                    Reviewed
-                                  </>
-                                )}
-                              </span>
-                            </td>
-                          )}
-                          {fpVisibleColumns.date && (
-                            <td className="py-3 px-4 text-gray-400 text-sm">
-                              {new Date(fp.created_at).toLocaleDateString('it-IT')}
-                            </td>
-                          )}
-                          {fpVisibleColumns.actions && (
-                            <td className="py-3 px-4 text-center">
-                              {fp.status === 'pending' && (
-                                <div className="inline-flex gap-1 whitespace-nowrap">
-                                  <button
-                                    onClick={() => handleMarkFalsePositive(fp.id, 'reviewed')}
-                                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
-                                    title="Mark as reviewed"
-                                  >
-                                    <AlertTriangle size={12} />
-                                    Review
-                                  </button>
-                                  <button
-                                    onClick={() => handleMarkFalsePositive(fp.id, 'whitelisted')}
-                                    className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
-                                    title="Add to whitelist"
-                                  >
-                                    <CheckCircle size={12} />
-                                    Whitelist
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteFalsePositive(fp.id)}
-                                    className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
-                                    title="Delete"
-                                  >
-                                    <Trash2 size={12} />
-                                    Delete
-                                  </button>
-                                </div>
+                          <td className="py-3 px-4 text-gray-300">{fp.threat_type}</td>
+                          <td className="py-3 px-4 text-white font-mono text-sm">{fp.client_ip}</td>
+                          <td className="py-3 px-4 text-gray-300 text-sm">{fp.method || '-'}</td>
+                          <td className="py-3 px-4">
+                            <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
+                              fp.status === 'pending' ? 'bg-blue-500/20 text-blue-300' :
+                              fp.status === 'whitelisted' ? 'bg-green-500/20 text-green-300' :
+                              'bg-gray-500/20 text-gray-300'
+                            }`}>
+                              {fp.status === 'pending' ? (
+                                <>
+                                  <Clock size={12} />
+                                  Pending
+                                </>
+                              ) : fp.status === 'whitelisted' ? (
+                                <>
+                                  <CheckCircle size={12} />
+                                  Whitelisted
+                                </>
+                              ) : (
+                                <>
+                                  <AlertTriangle size={12} />
+                                  Reviewed
+                                </>
                               )}
-                              {fp.status !== 'pending' && (
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-gray-400 text-sm">
+                            {new Date(fp.created_at).toLocaleDateString('it-IT')}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {fp.status === 'pending' && (
+                              <div className="inline-flex gap-1 whitespace-nowrap">
+                                <button
+                                  onClick={() => handleMarkFalsePositive(fp.id, 'reviewed')}
+                                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
+                                  title="Mark as reviewed"
+                                >
+                                  <AlertTriangle size={12} />
+                                  Review
+                                </button>
+                                <button
+                                  onClick={() => handleMarkFalsePositive(fp.id, 'whitelisted')}
+                                  className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
+                                  title="Add to whitelist"
+                                >
+                                  <CheckCircle size={12} />
+                                  Whitelist
+                                </button>
                                 <button
                                   onClick={() => handleDeleteFalsePositive(fp.id)}
                                   className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
@@ -1431,9 +1583,19 @@ const BlocklistPage: React.FC = () => {
                                   <Trash2 size={12} />
                                   Delete
                                 </button>
-                              )}
-                            </td>
-                          )}
+                              </div>
+                            )}
+                            {fp.status !== 'pending' && (
+                              <button
+                                onClick={() => handleDeleteFalsePositive(fp.id)}
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                                title="Delete"
+                              >
+                                <Trash2 size={12} />
+                                Delete
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1444,7 +1606,7 @@ const BlocklistPage: React.FC = () => {
               {/* Pagination */}
               <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 flex items-center justify-between">
                 <div className="text-sm text-gray-400">
-                  Showing {Math.min((falsePositivesPage - 1) * itemsPerPage + 1, filteredFalsePositives.length)} to {Math.min(falsePositivesPage * itemsPerPage, filteredFalsePositives.length)} of {filteredFalsePositives.length} items
+                  Showing {Math.min((falsePositivesPage - 1) * itemsPerPage + 1, sortedFalsePositives.length)} to {Math.min(falsePositivesPage * itemsPerPage, sortedFalsePositives.length)} of {sortedFalsePositives.length} items
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -1458,7 +1620,7 @@ const BlocklistPage: React.FC = () => {
                   >
                     Previous
                   </button>
-                  {Array.from({ length: Math.ceil(filteredFalsePositives.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                  {Array.from({ length: Math.ceil(sortedFalsePositives.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
                     <button
                       key={page}
                       onClick={() => setFalsePositivesPage(page)}
@@ -1472,10 +1634,10 @@ const BlocklistPage: React.FC = () => {
                     </button>
                   ))}
                   <button
-                    onClick={() => setFalsePositivesPage(Math.min(Math.ceil(filteredFalsePositives.length / itemsPerPage), falsePositivesPage + 1))}
-                    disabled={falsePositivesPage >= Math.ceil(filteredFalsePositives.length / itemsPerPage)}
+                    onClick={() => setFalsePositivesPage(Math.min(Math.ceil(sortedFalsePositives.length / itemsPerPage), falsePositivesPage + 1))}
+                    disabled={falsePositivesPage >= Math.ceil(sortedFalsePositives.length / itemsPerPage)}
                     className={`px-3 py-1 rounded text-sm font-medium transition ${
-                      falsePositivesPage >= Math.ceil(filteredFalsePositives.length / itemsPerPage)
+                      falsePositivesPage >= Math.ceil(sortedFalsePositives.length / itemsPerPage)
                         ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
                         : 'bg-gray-700 text-white hover:bg-gray-600'
                     }`}
