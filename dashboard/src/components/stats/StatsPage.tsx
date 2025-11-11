@@ -222,6 +222,7 @@ const StatsPage: React.FC = () => {
   const [selectedDuration, setSelectedDuration] = useState<number | 'permanent' | 'custom'>(24);
   const [customBlockDuration, setCustomBlockDuration] = useState<number>(24);
   const [customBlockDurationUnit, setCustomBlockDurationUnit] = useState<'hours' | 'days'>('hours');
+  const [reportedFalsePositives, setReportedFalsePositives] = useState<Set<string>>(new Set());
 
   // Calcola i permessi dell'utente
   const canBlockThreats = user && hasPermission(user.role as any, 'threats_block');
@@ -886,6 +887,8 @@ const StatsPage: React.FC = () => {
         showToast('Error reporting false positive', 'error');
       } else {
         showToast('False positive reported successfully', 'success');
+        // Aggiungi al set di threat segnalati
+        setReportedFalsePositives(prev => new Set([...prev, key]));
       }
     } catch (e) {
       showToast('Network error reporting false positive', 'error');
@@ -1506,36 +1509,40 @@ const StatsPage: React.FC = () => {
                           <div className="flex gap-1">
                             {isDefaultThreat(alert.threat) ? (
                               // Default threats (XSS, SQLi, etc.) are ALWAYS auto-blocked - show Report FP button only
-                              <button
-                                onClick={() => handleReportFalsePositive(alert)}
-                                disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canReportFalsePositives}
-                                className={`px-2 py-1 rounded text-xs font-medium transition whitespace-nowrap ${
-                                  !canReportFalsePositives
-                                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                    : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                                }`}
-                                title={!canReportFalsePositives ? 'You do not have permission to report false positives' : 'Report this as a false positive'}
-                              >
-                                {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Report FP'}
-                              </button>
+                              reportedFalsePositives.has(getAlertKey(alert.ip, alert.description || alert.threat)) ? null : (
+                                <button
+                                  onClick={() => handleReportFalsePositive(alert)}
+                                  disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canReportFalsePositives}
+                                  className={`px-2 py-1 rounded text-xs font-medium transition whitespace-nowrap ${
+                                    !canReportFalsePositives
+                                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                      : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                                  }`}
+                                  title={!canReportFalsePositives ? 'You do not have permission to report false positives' : 'Report this as a false positive'}
+                                >
+                                  {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Report FP'}
+                                </button>
+                              )
                             ) : alert.blockedBy === 'auto' ? (
                               // Custom threat automatically blocked by rule - show Report FP button only
-                              <button
-                                onClick={() => handleReportFalsePositive(alert)}
-                                disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canReportFalsePositives}
-                                className={`px-2 py-1 rounded text-xs font-medium transition whitespace-nowrap ${
-                                  !canReportFalsePositives
-                                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                    : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                                }`}
-                                title={!canReportFalsePositives ? 'You do not have permission to report false positives' : 'Report this as a false positive'}
-                              >
-                                {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Report FP'}
-                              </button>
+                              reportedFalsePositives.has(getAlertKey(alert.ip, alert.description || alert.threat)) ? null : (
+                                <button
+                                  onClick={() => handleReportFalsePositive(alert)}
+                                  disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canReportFalsePositives}
+                                  className={`px-2 py-1 rounded text-xs font-medium transition whitespace-nowrap ${
+                                    !canReportFalsePositives
+                                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                      : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                                  }`}
+                                  title={!canReportFalsePositives ? 'You do not have permission to report false positives' : 'Report this as a false positive'}
+                                >
+                                  {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Report FP'}
+                                </button>
+                              )
                             ) : alert.blockedBy === 'manual' ? (
                               // Custom threat manually blocked by operator - show Unblock + Report FP buttons
                               <>
@@ -1553,20 +1560,22 @@ const StatsPage: React.FC = () => {
                                 >
                                   {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Unblock'}
                                 </button>
-                                <button
-                                  onClick={() => handleReportFalsePositive(alert)}
-                                  disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canReportFalsePositives}
-                                  className={`px-2 py-1 rounded text-xs font-medium transition whitespace-nowrap ${
-                                    !canReportFalsePositives
-                                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                      : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
-                                      ? 'bg-blue-600 text-white'
-                                      : 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                                  }`}
-                                  title={!canReportFalsePositives ? 'You do not have permission to report false positives' : 'Report this as a false positive'}
-                                >
-                                  {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Report FP'}
-                                </button>
+                                {!reportedFalsePositives.has(getAlertKey(alert.ip, alert.description || alert.threat)) && (
+                                  <button
+                                    onClick={() => handleReportFalsePositive(alert)}
+                                    disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canReportFalsePositives}
+                                    className={`px-2 py-1 rounded text-xs font-medium transition whitespace-nowrap ${
+                                      !canReportFalsePositives
+                                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                        : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                                    }`}
+                                    title={!canReportFalsePositives ? 'You do not have permission to report false positives' : 'Report this as a false positive'}
+                                  >
+                                    {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Report FP'}
+                                  </button>
+                                )}
                               </>
                             ) : (
                               // Custom threat Detected (not blocked) - show Block + Report FP buttons
@@ -1585,20 +1594,22 @@ const StatsPage: React.FC = () => {
                                 >
                                   {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Block'}
                                 </button>
-                                <button
-                                  onClick={() => handleReportFalsePositive(alert)}
-                                  disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canReportFalsePositives}
-                                  className={`px-2 py-1 rounded text-xs font-medium transition whitespace-nowrap ${
-                                    !canReportFalsePositives
-                                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                      : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
-                                      ? 'bg-blue-600 text-white'
-                                      : 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                                  }`}
-                                  title={!canReportFalsePositives ? 'You do not have permission to report false positives' : 'Report this as a false positive'}
-                                >
-                                  {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Report FP'}
-                                </button>
+                                {!reportedFalsePositives.has(getAlertKey(alert.ip, alert.description || alert.threat)) && (
+                                  <button
+                                    onClick={() => handleReportFalsePositive(alert)}
+                                    disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canReportFalsePositives}
+                                    className={`px-2 py-1 rounded text-xs font-medium transition whitespace-nowrap ${
+                                      !canReportFalsePositives
+                                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                        : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                                    }`}
+                                    title={!canReportFalsePositives ? 'You do not have permission to report false positives' : 'Report this as a false positive'}
+                                  >
+                                    {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Report FP'}
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
