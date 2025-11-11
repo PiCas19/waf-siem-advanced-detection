@@ -13,8 +13,8 @@ import (
 func NewGetWhitelistHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		whitelisted := []models.WhitelistedIP{}
-		// Query ONLY non-deleted entries (where deleted_at IS NULL)
-		if err := db.Where("deleted_at IS NULL").Order("created_at DESC").Find(&whitelisted).Error; err != nil {
+		// GORM automatically applies soft delete filter (deleted_at IS NULL) for WhitelistedIP model
+		if err := db.Order("created_at DESC").Find(&whitelisted).Error; err != nil {
 			fmt.Printf("[ERROR] Failed to fetch whitelist: %v\n", err)
 			c.JSON(500, gin.H{"error": "failed to fetch whitelist"})
 			return
