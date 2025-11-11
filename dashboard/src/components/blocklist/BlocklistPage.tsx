@@ -119,6 +119,43 @@ const BlocklistPage: React.FC = () => {
   // Ref to track when whitelist was just loaded (to avoid reloading immediately)
   const whitelistJustLoadedRef = useRef(false);
 
+  // Pagination states
+  const [blocklistPage, setBlocklistPage] = useState(1);
+  const [whitelistPage, setWhitelistPage] = useState(1);
+  const [falsePositivesPage, setFalsePositivesPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Visible columns states
+  const [blocklistVisibleColumns, setBlocklistVisibleColumns] = useState({
+    ip: true,
+    threat: true,
+    reason: true,
+    type: true,
+    blockedDate: true,
+    expires: true,
+    actions: true,
+  });
+
+  const [whitelistVisibleColumns, setWhitelistVisibleColumns] = useState({
+    ip: true,
+    reason: true,
+    addedDate: true,
+    actions: true,
+  });
+
+  const [fpVisibleColumns, setFpVisibleColumns] = useState({
+    threatType: true,
+    ip: true,
+    method: true,
+    status: true,
+    date: true,
+    actions: true,
+  });
+
+  // Additional filters
+  const [blocklistTypeFilter, setBlocklistTypeFilter] = useState<'all' | 'permanent' | 'temporary'>('all');
+  const [fpStatusFilter, setFpStatusFilter] = useState<'all' | 'pending' | 'reviewed' | 'whitelisted'>('all');
+
   // Carica dati all'avvio e quando il tab cambia
   useEffect(() => {
     if (activeTab === 'whitelist' && whitelistJustLoadedRef.current) {
@@ -541,8 +578,8 @@ const BlocklistPage: React.FC = () => {
     const matchesSearch = (entry.ip_address?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                          (entry.reason?.toLowerCase() || '').includes(searchTerm.toLowerCase());
 
-    if (filterStatus === 'permanent') return matchesSearch && entry.permanent;
-    if (filterStatus === 'temporary') return matchesSearch && !entry.permanent;
+    if (blocklistTypeFilter === 'permanent') return matchesSearch && entry.permanent;
+    if (blocklistTypeFilter === 'temporary') return matchesSearch && !entry.permanent;
     return matchesSearch;
   });
 
@@ -551,11 +588,16 @@ const BlocklistPage: React.FC = () => {
     (entry.reason?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
-  const filteredFalsePositives = falsePositives.filter((entry) =>
-    (entry.threat_type?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (entry.client_ip?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (entry.url?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-  );
+  const filteredFalsePositives = falsePositives.filter((entry) => {
+    const matchesSearch = (entry.threat_type?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                         (entry.client_ip?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                         (entry.url?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+
+    if (fpStatusFilter === 'pending') return matchesSearch && entry.status === 'pending';
+    if (fpStatusFilter === 'reviewed') return matchesSearch && entry.status === 'reviewed';
+    if (fpStatusFilter === 'whitelisted') return matchesSearch && entry.status === 'whitelisted';
+    return matchesSearch;
+  });
 
   return (
     <div className="min-h-screen bg-gray-900 p-6">
@@ -615,13 +657,31 @@ const BlocklistPage: React.FC = () => {
           />
           {activeTab === 'blocklist' && (
             <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as any)}
+              value={blocklistTypeFilter}
+              onChange={(e) => {
+                setBlocklistTypeFilter(e.target.value as any);
+                setBlocklistPage(1);
+              }}
               className="px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
             >
-              <option value="all">All</option>
+              <option value="all">All Types</option>
               <option value="permanent">Permanent</option>
-              <option value="temporary">Temporary (24h)</option>
+              <option value="temporary">Temporary</option>
+            </select>
+          )}
+          {activeTab === 'false-positives' && (
+            <select
+              value={fpStatusFilter}
+              onChange={(e) => {
+                setFpStatusFilter(e.target.value as any);
+                setFalsePositivesPage(1);
+              }}
+              className="px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="whitelisted">Whitelisted</option>
             </select>
           )}
         </div>
@@ -828,66 +888,195 @@ const BlocklistPage: React.FC = () => {
           {loading ? (
             <div className="text-center py-12 text-gray-400">Loading...</div>
           ) : filteredBlocklist.length > 0 ? (
-            <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-700">
-                    <tr>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat/Rule</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Reason</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Type</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Blocked Date</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Expires</th>
-                      <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredBlocklist.map((entry) => (
-                      <tr key={entry.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
-                        <td className="py-3 px-4 text-white font-mono">{entry.ip_address}</td>
-                        <td className="py-3 px-4 text-gray-300 font-medium">{entry.description}</td>
-                        <td className="py-3 px-4 text-gray-300">{entry.reason}</td>
-                        <td className="py-3 px-4">
-                          <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
-                            entry.permanent
-                              ? 'bg-red-500/20 text-red-300'
-                              : 'bg-yellow-500/20 text-yellow-300'
-                          }`}>
-                            {entry.permanent ? (
-                              <>
-                                <Zap size={12} />
-                                Permanent
-                              </>
-                            ) : (
-                              <>
-                                <Clock size={12} />
-                                Temporary
-                              </>
-                            )}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-gray-400 text-sm">
-                          {new Date(entry.created_at).toLocaleDateString('it-IT')}
-                        </td>
-                        <td className="py-3 px-4 text-gray-400 text-sm">
-                          {entry.expires_at ? new Date(entry.expires_at).toLocaleDateString('it-IT') : 'Never'}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <button
-                            onClick={() => handleDeleteBlock(entry.ip_address, entry.description)}
-                            className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
-                          >
-                            <Trash2 size={14} />
-                            Remove
-                          </button>
-                        </td>
+            <>
+              <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+                {/* Column Visibility Toggle */}
+                <div className="p-4 border-b border-gray-700">
+                  <details className="group">
+                    <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
+                      <span>Column Visibility</span>
+                      <span className="text-xs text-gray-500">(Click to toggle)</span>
+                    </summary>
+                    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={blocklistVisibleColumns.ip}
+                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, ip: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        IP Address
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={blocklistVisibleColumns.threat}
+                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, threat: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Threat/Rule
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={blocklistVisibleColumns.reason}
+                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, reason: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Reason
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={blocklistVisibleColumns.type}
+                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, type: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Type
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={blocklistVisibleColumns.blockedDate}
+                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, blockedDate: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Blocked Date
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={blocklistVisibleColumns.expires}
+                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, expires: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Expires
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={blocklistVisibleColumns.actions}
+                          onChange={(e) => setBlocklistVisibleColumns({...blocklistVisibleColumns, actions: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Actions
+                      </label>
+                    </div>
+                  </details>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-700">
+                      <tr>
+                        {blocklistVisibleColumns.ip && <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>}
+                        {blocklistVisibleColumns.threat && <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat/Rule</th>}
+                        {blocklistVisibleColumns.reason && <th className="text-left py-3 px-4 text-gray-300 font-medium">Reason</th>}
+                        {blocklistVisibleColumns.type && <th className="text-left py-3 px-4 text-gray-300 font-medium">Type</th>}
+                        {blocklistVisibleColumns.blockedDate && <th className="text-left py-3 px-4 text-gray-300 font-medium">Blocked Date</th>}
+                        {blocklistVisibleColumns.expires && <th className="text-left py-3 px-4 text-gray-300 font-medium">Expires</th>}
+                        {blocklistVisibleColumns.actions && <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredBlocklist.slice((blocklistPage - 1) * itemsPerPage, blocklistPage * itemsPerPage).map((entry) => (
+                        <tr key={entry.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
+                          {blocklistVisibleColumns.ip && <td className="py-3 px-4 text-white font-mono">{entry.ip_address}</td>}
+                          {blocklistVisibleColumns.threat && <td className="py-3 px-4 text-gray-300 font-medium">{entry.description}</td>}
+                          {blocklistVisibleColumns.reason && <td className="py-3 px-4 text-gray-300">{entry.reason}</td>}
+                          {blocklistVisibleColumns.type && (
+                            <td className="py-3 px-4">
+                              <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
+                                entry.permanent
+                                  ? 'bg-red-500/20 text-red-300'
+                                  : 'bg-yellow-500/20 text-yellow-300'
+                              }`}>
+                                {entry.permanent ? (
+                                  <>
+                                    <Zap size={12} />
+                                    Permanent
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock size={12} />
+                                    Temporary
+                                  </>
+                                )}
+                              </span>
+                            </td>
+                          )}
+                          {blocklistVisibleColumns.blockedDate && (
+                            <td className="py-3 px-4 text-gray-400 text-sm">
+                              {new Date(entry.created_at).toLocaleDateString('it-IT')}
+                            </td>
+                          )}
+                          {blocklistVisibleColumns.expires && (
+                            <td className="py-3 px-4 text-gray-400 text-sm">
+                              {entry.expires_at ? new Date(entry.expires_at).toLocaleDateString('it-IT') : 'Never'}
+                            </td>
+                          )}
+                          {blocklistVisibleColumns.actions && (
+                            <td className="py-3 px-4 text-center">
+                              <button
+                                onClick={() => handleDeleteBlock(entry.ip_address, entry.description)}
+                                className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                              >
+                                <Trash2 size={14} />
+                                Remove
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+
+              {/* Pagination */}
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 flex items-center justify-between">
+                <div className="text-sm text-gray-400">
+                  Showing {Math.min((blocklistPage - 1) * itemsPerPage + 1, filteredBlocklist.length)} to {Math.min(blocklistPage * itemsPerPage, filteredBlocklist.length)} of {filteredBlocklist.length} items
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setBlocklistPage(Math.max(1, blocklistPage - 1))}
+                    disabled={blocklistPage === 1}
+                    className={`px-3 py-1 rounded text-sm font-medium transition ${
+                      blocklistPage === 1
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                    }`}
+                  >
+                    Previous
+                  </button>
+                  {Array.from({ length: Math.ceil(filteredBlocklist.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setBlocklistPage(page)}
+                      className={`px-3 py-1 rounded text-sm font-medium transition ${
+                        blocklistPage === page
+                          ? 'bg-red-600 text-white'
+                          : 'bg-gray-700 text-white hover:bg-gray-600'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setBlocklistPage(Math.min(Math.ceil(filteredBlocklist.length / itemsPerPage), blocklistPage + 1))}
+                    disabled={blocklistPage >= Math.ceil(filteredBlocklist.length / itemsPerPage)}
+                    className={`px-3 py-1 rounded text-sm font-medium transition ${
+                      blocklistPage >= Math.ceil(filteredBlocklist.length / itemsPerPage)
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                    }`}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center text-gray-400">
               <p>No blocked IPs</p>
@@ -996,40 +1185,138 @@ const BlocklistPage: React.FC = () => {
           {loading ? (
             <div className="text-center py-12 text-gray-400">Loading...</div>
           ) : filteredWhitelist.length > 0 ? (
-            <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-700">
-                    <tr>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Reason</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Added Date</th>
-                      <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredWhitelist.map((entry) => (
-                      <tr key={entry.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
-                        <td className="py-3 px-4 text-white font-mono">{entry.ip_address}</td>
-                        <td className="py-3 px-4 text-gray-300 text-sm">{entry.reason || '-'}</td>
-                        <td className="py-3 px-4 text-gray-400 text-sm">
-                          {new Date(entry.created_at).toLocaleDateString('it-IT')}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <button
-                            onClick={() => handleDeleteWhite(entry.id)}
-                            className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
-                          >
-                            <Trash2 size={14} />
-                            Remove
-                          </button>
-                        </td>
+            <>
+              <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+                {/* Column Visibility Toggle */}
+                <div className="p-4 border-b border-gray-700">
+                  <details className="group">
+                    <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
+                      <span>Column Visibility</span>
+                      <span className="text-xs text-gray-500">(Click to toggle)</span>
+                    </summary>
+                    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={whitelistVisibleColumns.ip}
+                          onChange={(e) => setWhitelistVisibleColumns({...whitelistVisibleColumns, ip: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        IP Address
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={whitelistVisibleColumns.reason}
+                          onChange={(e) => setWhitelistVisibleColumns({...whitelistVisibleColumns, reason: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Reason
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={whitelistVisibleColumns.addedDate}
+                          onChange={(e) => setWhitelistVisibleColumns({...whitelistVisibleColumns, addedDate: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Added Date
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={whitelistVisibleColumns.actions}
+                          onChange={(e) => setWhitelistVisibleColumns({...whitelistVisibleColumns, actions: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Actions
+                      </label>
+                    </div>
+                  </details>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-700">
+                      <tr>
+                        {whitelistVisibleColumns.ip && <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>}
+                        {whitelistVisibleColumns.reason && <th className="text-left py-3 px-4 text-gray-300 font-medium">Reason</th>}
+                        {whitelistVisibleColumns.addedDate && <th className="text-left py-3 px-4 text-gray-300 font-medium">Added Date</th>}
+                        {whitelistVisibleColumns.actions && <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredWhitelist.slice((whitelistPage - 1) * itemsPerPage, whitelistPage * itemsPerPage).map((entry) => (
+                        <tr key={entry.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
+                          {whitelistVisibleColumns.ip && <td className="py-3 px-4 text-white font-mono">{entry.ip_address}</td>}
+                          {whitelistVisibleColumns.reason && <td className="py-3 px-4 text-gray-300 text-sm">{entry.reason || '-'}</td>}
+                          {whitelistVisibleColumns.addedDate && (
+                            <td className="py-3 px-4 text-gray-400 text-sm">
+                              {new Date(entry.created_at).toLocaleDateString('it-IT')}
+                            </td>
+                          )}
+                          {whitelistVisibleColumns.actions && (
+                            <td className="py-3 px-4 text-center">
+                              <button
+                                onClick={() => handleDeleteWhite(entry.id)}
+                                className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                              >
+                                <Trash2 size={14} />
+                                Remove
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+
+              {/* Pagination */}
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 flex items-center justify-between">
+                <div className="text-sm text-gray-400">
+                  Showing {Math.min((whitelistPage - 1) * itemsPerPage + 1, filteredWhitelist.length)} to {Math.min(whitelistPage * itemsPerPage, filteredWhitelist.length)} of {filteredWhitelist.length} items
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setWhitelistPage(Math.max(1, whitelistPage - 1))}
+                    disabled={whitelistPage === 1}
+                    className={`px-3 py-1 rounded text-sm font-medium transition ${
+                      whitelistPage === 1
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                    }`}
+                  >
+                    Previous
+                  </button>
+                  {Array.from({ length: Math.ceil(filteredWhitelist.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setWhitelistPage(page)}
+                      className={`px-3 py-1 rounded text-sm font-medium transition ${
+                        whitelistPage === page
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-700 text-white hover:bg-gray-600'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setWhitelistPage(Math.min(Math.ceil(filteredWhitelist.length / itemsPerPage), whitelistPage + 1))}
+                    disabled={whitelistPage >= Math.ceil(filteredWhitelist.length / itemsPerPage)}
+                    className={`px-3 py-1 rounded text-sm font-medium transition ${
+                      whitelistPage >= Math.ceil(filteredWhitelist.length / itemsPerPage)
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                    }`}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center text-gray-400">
               <p>No whitelisted IPs</p>
@@ -1043,105 +1330,219 @@ const BlocklistPage: React.FC = () => {
           {loading ? (
             <div className="text-center py-12 text-gray-400">Loading...</div>
           ) : filteredFalsePositives.length > 0 ? (
-            <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-700">
-                    <tr>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Type</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat/Rule</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Method</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Reason</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Status</th>
-                      <th className="text-left py-3 px-4 text-gray-300 font-medium">Date</th>
-                      <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredFalsePositives.map((fp) => {
-                      const matchedRule = findRuleForThreatType(fp.threat_type);
-                      return (
-                      <tr key={fp.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
-                        <td className="py-3 px-4 text-gray-300">{fp.threat_type}</td>
-                        <td className="py-3 px-4 text-gray-300 text-sm">{matchedRule?.name || fp.threat_type}</td>
-                        <td className="py-3 px-4 text-gray-300 text-sm">{fp.method || '-'}</td>
-                        <td className="py-3 px-4 text-gray-300 text-sm">{matchedRule?.description || fp.description || '-'}</td>
-                        <td className="py-3 px-4 text-white font-mono text-sm">{fp.client_ip}</td>
-                        <td className="py-3 px-4">
-                          <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
-                            fp.status === 'pending' ? 'bg-blue-500/20 text-blue-300' :
-                            fp.status === 'whitelisted' ? 'bg-green-500/20 text-green-300' :
-                            'bg-gray-500/20 text-gray-300'
-                          }`}>
-                            {fp.status === 'pending' ? (
-                              <>
-                                <Clock size={12} />
-                                Pending
-                              </>
-                            ) : fp.status === 'whitelisted' ? (
-                              <>
-                                <CheckCircle size={12} />
-                                Whitelisted
-                              </>
-                            ) : (
-                              <>
-                                <AlertTriangle size={12} />
-                                Reviewed
-                              </>
-                            )}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-gray-400 text-sm">
-                          {new Date(fp.created_at).toLocaleDateString('it-IT')}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {fp.status === 'pending' && (
-                            <div className="inline-flex gap-1 whitespace-nowrap">
-                              <button
-                                onClick={() => handleMarkFalsePositive(fp.id, 'reviewed')}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
-                                title="Mark as reviewed"
-                              >
-                                <AlertTriangle size={12} />
-                                Review
-                              </button>
-                              <button
-                                onClick={() => handleMarkFalsePositive(fp.id, 'whitelisted')}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
-                                title="Add to whitelist"
-                              >
-                                <CheckCircle size={12} />
-                                Whitelist
-                              </button>
-                              <button
-                                onClick={() => handleDeleteFalsePositive(fp.id)}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
-                                title="Delete"
-                              >
-                                <Trash2 size={12} />
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                          {fp.status !== 'pending' && (
-                            <button
-                              onClick={() => handleDeleteFalsePositive(fp.id)}
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
-                              title="Delete"
-                            >
-                              <Trash2 size={12} />
-                              Delete
-                            </button>
-                          )}
-                        </td>
+            <>
+              <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+                {/* Column Visibility Toggle */}
+                <div className="p-4 border-b border-gray-700">
+                  <details className="group">
+                    <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white flex items-center gap-2">
+                      <span>Column Visibility</span>
+                      <span className="text-xs text-gray-500">(Click to toggle)</span>
+                    </summary>
+                    <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={fpVisibleColumns.threatType}
+                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, threatType: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Threat Type
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={fpVisibleColumns.ip}
+                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, ip: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        IP Address
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={fpVisibleColumns.method}
+                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, method: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Method
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={fpVisibleColumns.status}
+                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, status: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Status
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={fpVisibleColumns.date}
+                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, date: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Date
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer hover:text-white">
+                        <input
+                          type="checkbox"
+                          checked={fpVisibleColumns.actions}
+                          onChange={(e) => setFpVisibleColumns({...fpVisibleColumns, actions: e.target.checked})}
+                          className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                        />
+                        Actions
+                      </label>
+                    </div>
+                  </details>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-700">
+                      <tr>
+                        {fpVisibleColumns.threatType && <th className="text-left py-3 px-4 text-gray-300 font-medium">Threat Type</th>}
+                        {fpVisibleColumns.ip && <th className="text-left py-3 px-4 text-gray-300 font-medium">IP Address</th>}
+                        {fpVisibleColumns.method && <th className="text-left py-3 px-4 text-gray-300 font-medium">Method</th>}
+                        {fpVisibleColumns.status && <th className="text-left py-3 px-4 text-gray-300 font-medium">Status</th>}
+                        {fpVisibleColumns.date && <th className="text-left py-3 px-4 text-gray-300 font-medium">Date</th>}
+                        {fpVisibleColumns.actions && <th className="text-center py-3 px-4 text-gray-300 font-medium">Actions</th>}
                       </tr>
-                    );
-                    })}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredFalsePositives.slice((falsePositivesPage - 1) * itemsPerPage, falsePositivesPage * itemsPerPage).map((fp) => {
+                        const matchedRule = findRuleForThreatType(fp.threat_type);
+                        return (
+                        <tr key={fp.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
+                          {fpVisibleColumns.threatType && <td className="py-3 px-4 text-gray-300">{fp.threat_type}</td>}
+                          {fpVisibleColumns.ip && <td className="py-3 px-4 text-white font-mono text-sm">{fp.client_ip}</td>}
+                          {fpVisibleColumns.method && <td className="py-3 px-4 text-gray-300 text-sm">{fp.method || '-'}</td>}
+                          {fpVisibleColumns.status && (
+                            <td className="py-3 px-4">
+                              <span className={`px-3 py-1 rounded text-xs font-medium inline-flex items-center gap-1 ${
+                                fp.status === 'pending' ? 'bg-blue-500/20 text-blue-300' :
+                                fp.status === 'whitelisted' ? 'bg-green-500/20 text-green-300' :
+                                'bg-gray-500/20 text-gray-300'
+                              }`}>
+                                {fp.status === 'pending' ? (
+                                  <>
+                                    <Clock size={12} />
+                                    Pending
+                                  </>
+                                ) : fp.status === 'whitelisted' ? (
+                                  <>
+                                    <CheckCircle size={12} />
+                                    Whitelisted
+                                  </>
+                                ) : (
+                                  <>
+                                    <AlertTriangle size={12} />
+                                    Reviewed
+                                  </>
+                                )}
+                              </span>
+                            </td>
+                          )}
+                          {fpVisibleColumns.date && (
+                            <td className="py-3 px-4 text-gray-400 text-sm">
+                              {new Date(fp.created_at).toLocaleDateString('it-IT')}
+                            </td>
+                          )}
+                          {fpVisibleColumns.actions && (
+                            <td className="py-3 px-4 text-center">
+                              {fp.status === 'pending' && (
+                                <div className="inline-flex gap-1 whitespace-nowrap">
+                                  <button
+                                    onClick={() => handleMarkFalsePositive(fp.id, 'reviewed')}
+                                    className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
+                                    title="Mark as reviewed"
+                                  >
+                                    <AlertTriangle size={12} />
+                                    Review
+                                  </button>
+                                  <button
+                                    onClick={() => handleMarkFalsePositive(fp.id, 'whitelisted')}
+                                    className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
+                                    title="Add to whitelist"
+                                  >
+                                    <CheckCircle size={12} />
+                                    Whitelist
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteFalsePositive(fp.id)}
+                                    className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                                    title="Delete"
+                                  >
+                                    <Trash2 size={12} />
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                              {fp.status !== 'pending' && (
+                                <button
+                                  onClick={() => handleDeleteFalsePositive(fp.id)}
+                                  className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={12} />
+                                  Delete
+                                </button>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+
+              {/* Pagination */}
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 flex items-center justify-between">
+                <div className="text-sm text-gray-400">
+                  Showing {Math.min((falsePositivesPage - 1) * itemsPerPage + 1, filteredFalsePositives.length)} to {Math.min(falsePositivesPage * itemsPerPage, filteredFalsePositives.length)} of {filteredFalsePositives.length} items
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setFalsePositivesPage(Math.max(1, falsePositivesPage - 1))}
+                    disabled={falsePositivesPage === 1}
+                    className={`px-3 py-1 rounded text-sm font-medium transition ${
+                      falsePositivesPage === 1
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                    }`}
+                  >
+                    Previous
+                  </button>
+                  {Array.from({ length: Math.ceil(filteredFalsePositives.length / itemsPerPage) }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setFalsePositivesPage(page)}
+                      className={`px-3 py-1 rounded text-sm font-medium transition ${
+                        falsePositivesPage === page
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-700 text-white hover:bg-gray-600'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setFalsePositivesPage(Math.min(Math.ceil(filteredFalsePositives.length / itemsPerPage), falsePositivesPage + 1))}
+                    disabled={falsePositivesPage >= Math.ceil(filteredFalsePositives.length / itemsPerPage)}
+                    className={`px-3 py-1 rounded text-sm font-medium transition ${
+                      falsePositivesPage >= Math.ceil(filteredFalsePositives.length / itemsPerPage)
+                        ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                    }`}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="bg-gray-800 border border-gray-700 rounded-lg p-12 text-center text-gray-400">
               <p>No false positives</p>
