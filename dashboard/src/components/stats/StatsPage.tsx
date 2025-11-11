@@ -31,6 +31,17 @@ interface WAFEvent {
   threat_type?: string;
   created_at?: string;
   url?: string;
+  // Threat Intelligence fields
+  ip_reputation?: number;
+  is_malicious?: boolean;
+  asn?: string;
+  isp?: string;
+  country?: string;
+  threat_level?: string;
+  threat_source?: string;
+  is_on_blocklist?: boolean;
+  blocklist_name?: string;
+  abuse_reports?: number;
 }
 
 interface ChartDataPoint {
@@ -302,7 +313,7 @@ const StatsPage: React.FC = () => {
   const itemsPerPage = 10;
 
   // Sorting states (solo per All Alerts table)
-  const [allAlertsSortColumn, setAllAlertsSortColumn] = useState<'timestamp' | 'ip' | 'method' | 'path' | 'threat'>('timestamp');
+  const [allAlertsSortColumn, setAllAlertsSortColumn] = useState<'timestamp' | 'ip' | 'method' | 'path' | 'threat' | 'threat_level'>('timestamp');
   const [allAlertsSortOrder, setAllAlertsSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Search states
@@ -704,6 +715,17 @@ const StatsPage: React.FC = () => {
       if (allAlertsSortColumn === 'threat') {
         aVal = a.threat;
         bVal = b.threat;
+      } else if (allAlertsSortColumn === 'threat_level') {
+        // Convert threat levels to numeric values for sorting
+        const threatLevelMap: { [key: string]: number } = {
+          'critical': 4,
+          'high': 3,
+          'medium': 2,
+          'low': 1,
+          'none': 0
+        };
+        aVal = threatLevelMap[a.threat_level || 'none'] || 0;
+        bVal = threatLevelMap[b.threat_level || 'none'] || 0;
       } else if (allAlertsSortColumn === 'ip') {
         aVal = a.ip;
         bVal = b.ip;
@@ -1498,6 +1520,30 @@ const StatsPage: React.FC = () => {
                         )}
                       </div>
                     </th>
+                    <th
+                      onClick={() => {
+                        if (allAlertsSortColumn === 'threat_level') {
+                          setAllAlertsSortOrder(allAlertsSortOrder === 'asc' ? 'desc' : 'asc');
+                        } else {
+                          setAllAlertsSortColumn('threat_level');
+                          setAllAlertsSortOrder('asc');
+                        }
+                      }}
+                      className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition w-24"
+                    >
+                      <div className="flex items-center gap-2">
+                        TI Level
+                        {allAlertsSortColumn === 'threat_level' && (
+                          allAlertsSortOrder === 'asc' ? (
+                            <ArrowUp size={14} />
+                          ) : (
+                            <ArrowDown size={14} />
+                          )
+                        )}
+                      </div>
+                    </th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">IP Rep</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium w-16">ASN</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">Status</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">Action</th>
                   </tr>
@@ -1520,6 +1566,43 @@ const StatsPage: React.FC = () => {
                           {alert.path}
                         </td>
                         <td className="py-3 px-4 text-gray-300">{alert.threat}</td>
+                        <td className="py-3 px-4">
+                          {alert.threat_level ? (
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              alert.threat_level === 'critical' ? 'bg-red-500/20 text-red-300' :
+                              alert.threat_level === 'high' ? 'bg-orange-500/20 text-orange-300' :
+                              alert.threat_level === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
+                              alert.threat_level === 'low' ? 'bg-blue-500/20 text-blue-300' :
+                              'bg-gray-500/20 text-gray-300'
+                            }`}>
+                              {alert.threat_level.charAt(0).toUpperCase() + alert.threat_level.slice(1)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 text-xs">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {alert.ip_reputation !== undefined && alert.ip_reputation !== null ? (
+                            <div className="flex items-center gap-1">
+                              <span className={`text-xs font-medium ${
+                                alert.ip_reputation >= 75 ? 'text-red-400' :
+                                alert.ip_reputation >= 50 ? 'text-orange-400' :
+                                alert.ip_reputation >= 25 ? 'text-yellow-400' :
+                                'text-green-400'
+                              }`}>
+                                {alert.ip_reputation}%
+                              </span>
+                              {alert.is_malicious && (
+                                <span className="text-red-400 font-bold text-xs">⚠</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-500 text-xs">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-gray-300 text-xs">
+                          {alert.asn || '-'}
+                        </td>
                         <td className="py-3 px-4">
                           {alert.blockedBy === 'auto' ? (
                             <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium inline-flex items-center gap-1">

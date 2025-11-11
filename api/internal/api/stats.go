@@ -12,6 +12,7 @@ import (
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/threatintel"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/websocket"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -30,6 +31,8 @@ var (
 	stats   = WAFStats{
 		Recent: make([]websocket.WAFEvent, 0, 5),
 	}
+	// Threat intelligence enrichment service
+	tiService = threatintel.NewEnrichmentService()
 )
 
 // GetSeverityFromThreatType determines severity level based on threat type
@@ -110,6 +113,17 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 		if err := db.Create(&log).Error; err != nil {
 			fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)
+		} else {
+			// Enrich log with threat intelligence asynchronously after saving
+			go func(logID uint) {
+				if err := tiService.EnrichLog(&log); err != nil {
+					fmt.Printf("[WARN] Failed to enrich log with threat intelligence: %v\n", err)
+				}
+				// Update the log with enriched threat intel data
+				if err := db.Model(&models.Log{}).Where("id = ?", logID).Updates(&log).Error; err != nil {
+					fmt.Printf("[WARN] Failed to update log with threat intelligence: %v\n", err)
+				}
+			}(log.ID)
 		}
 
 		websocket.Broadcast(event)
