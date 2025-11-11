@@ -1119,7 +1119,7 @@ const BlocklistPage: React.FC = () => {
                       onClick={() => setBlocklistPage(page)}
                       className={`px-3 py-1 rounded text-sm font-medium transition ${
                         blocklistPage === page
-                          ? 'bg-red-600 text-white'
+                          ? 'bg-blue-600 text-white'
                           : 'bg-gray-700 text-white hover:bg-gray-600'
                       }`}
                     >
@@ -1370,7 +1370,7 @@ const BlocklistPage: React.FC = () => {
                       onClick={() => setWhitelistPage(page)}
                       className={`px-3 py-1 rounded text-sm font-medium transition ${
                         whitelistPage === page
-                          ? 'bg-green-600 text-white'
+                          ? 'bg-blue-600 text-white'
                           : 'bg-gray-700 text-white hover:bg-gray-600'
                       }`}
                     >
