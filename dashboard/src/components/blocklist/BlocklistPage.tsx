@@ -83,13 +83,6 @@ interface FalsePositive {
 
 type Tab = 'blocklist' | 'whitelist' | 'false-positives';
 
-interface RuleInfo {
-  id: string;
-  name: string;
-  type: string;
-  description: string;
-}
-
 const BlocklistPage: React.FC = () => {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('blocklist');
