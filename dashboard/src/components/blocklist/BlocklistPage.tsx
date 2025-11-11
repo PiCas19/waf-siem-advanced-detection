@@ -103,7 +103,6 @@ const BlocklistPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'permanent' | 'temporary'>('all');
 
   // Form states
   const [blockForm, setBlockForm] = useState({ ip: '', reason: '', duration: '24h' });
@@ -1411,9 +1410,7 @@ const BlocklistPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredFalsePositives.slice((falsePositivesPage - 1) * itemsPerPage, falsePositivesPage * itemsPerPage).map((fp) => {
-                        const matchedRule = findRuleForThreatType(fp.threat_type);
-                        return (
+                      {filteredFalsePositives.slice((falsePositivesPage - 1) * itemsPerPage, falsePositivesPage * itemsPerPage).map((fp) => (
                         <tr key={fp.id} className="border-t border-gray-700 hover:bg-gray-700/50 transition">
                           {fpVisibleColumns.threatType && <td className="py-3 px-4 text-gray-300">{fp.threat_type}</td>}
                           {fpVisibleColumns.ip && <td className="py-3 px-4 text-white font-mono text-sm">{fp.client_ip}</td>}
@@ -1492,8 +1489,7 @@ const BlocklistPage: React.FC = () => {
                             </td>
                           )}
                         </tr>
-                      );
-                      })}
+                      ))}
                     </tbody>
                   </table>
                 </div>
