@@ -330,7 +330,7 @@ const StatsPage: React.FC = () => {
           // Crea un set di chiavi (ip::threat) dei false positive segnalati
           const reportedFPs = new Set<string>();
           (fpData.false_positives || []).forEach((fp: any) => {
-            const key = getAlertKey(fp.client_ip, fp.description || fp.threat_type);
+            const key = `${fp.client_ip || ''}::${fp.description || fp.threat_type || ''}`;
             reportedFPs.add(key);
           });
           setReportedFalsePositives(reportedFPs);
