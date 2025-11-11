@@ -906,8 +906,22 @@ const StatsPage: React.FC = () => {
         showToast('Error reporting false positive', 'error');
       } else {
         showToast('False positive reported successfully', 'success');
-        // Aggiungi al set di threat segnalati
-        setReportedFalsePositives(prev => new Set([...prev, key]));
+        // Ricarica i false positive dal backend per sincronizzare
+        const fpResponse = await fetch('/api/false-positives', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (fpResponse.ok) {
+          const fpData = await fpResponse.json();
+          const reportedFPs = new Set<string>();
+          (fpData.false_positives || []).forEach((fp: any) => {
+            const fpKey = `${fp.client_ip || ''}::${fp.description || fp.threat_type || ''}`;
+            reportedFPs.add(fpKey);
+          });
+          setReportedFalsePositives(reportedFPs);
+        }
       }
     } catch (e) {
       showToast('Network error reporting false positive', 'error');
