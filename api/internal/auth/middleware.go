@@ -65,29 +65,34 @@ func AdminMiddleware() gin.HandlerFunc {
 var RolePermissions = map[string][]string{
 	"admin":    {
 		// Admin: Full access
-		"view_logs", "export_logs", "delete_logs",
-		"manage_rules", "manage_blocklist", "manage_whitelist",
-		"view_false_positives", "report_false_positives", "resolve_false_positives", "delete_false_positives",
-		"manage_threats",
-		"manage_users",
+		"logs_view", "logs_export", "logs_delete",
+		"rules_view", "rules_create", "rules_edit", "rules_delete",
+		"blocklist_view", "blocklist_add", "blocklist_remove",
+		"whitelist_view", "whitelist_add", "whitelist_remove",
+		"false_positives_view", "false_positives_report", "false_positives_resolve", "false_positives_delete",
+		"threats_block", "threats_unblock",
+		"users_view", "users_create", "users_edit", "users_delete", "users_change_role",
+		"access_control",
 	},
 	"operator": {
 		// Operator: Can do everything except manage users
-		"view_logs", "export_logs",  // Can view/export logs but not delete
-		"manage_rules",              // Can create/edit/toggle but not delete
-		"manage_blocklist", "manage_whitelist",
-		"view_false_positives", "report_false_positives",  // Can report but not resolve/delete
-		"manage_threats",
-		// NO: manage_users
+		"logs_view", "logs_export",  // Can view/export logs but not delete
+		"rules_view", "rules_create", "rules_edit",  // Can create/edit but not delete
+		"blocklist_view", "blocklist_add", "blocklist_remove",
+		"whitelist_view", "whitelist_add", "whitelist_remove",
+		"false_positives_view", "false_positives_report",  // Can report but not resolve/delete
+		"threats_block", "threats_unblock",
+		"access_control",
+		// NO: users_view, users_create, users_edit, users_delete, users_change_role
 	},
 	"analyst": {
 		// Analyst: Read-only access to logs and dashboard
-		"view_logs",  // Can view but not export/delete
-		// NO: manage_rules, manage_blocklist, manage_whitelist, manage_false_positives, manage_threats, manage_users
+		"logs_view",  // Can view but not export/delete
+		// NO: rules, blocklist, whitelist, false_positives, threats, users
 	},
 	"user": {
-		// User: Minimal access
-		// Only dashboard access, no other permissions
+		// User: Minimal access - only dashboard
+		// NO PERMISSIONS
 	},
 }
 
