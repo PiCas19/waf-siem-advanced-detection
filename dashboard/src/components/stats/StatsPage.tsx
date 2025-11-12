@@ -42,6 +42,7 @@ interface WAFEvent {
   is_on_blocklist?: boolean;
   blocklist_name?: string;
   abuse_reports?: number;
+  enriched_at?: string | null;
 }
 
 interface ChartDataPoint {
@@ -367,6 +368,18 @@ const StatsPage: React.FC = () => {
             blockedBy: log.blocked_by || '', // "auto", "manual", or ""
             user_agent: log.user_agent,
             description: log.description || log.threat_type,
+            // Threat Intelligence fields
+            ip_reputation: log.ip_reputation || 0,
+            is_malicious: log.is_malicious || false,
+            asn: log.asn || '',
+            isp: log.isp || '',
+            country: log.country || '',
+            threat_level: log.threat_level || 'low',
+            threat_source: log.threat_source || '',
+            is_on_blocklist: log.is_on_blocklist || false,
+            blocklist_name: log.blocklist_name || '',
+            abuse_reports: log.abuse_reports || 0,
+            enriched_at: log.enriched_at || null,
           }));
           setRecentAlerts(mappedLogs);
         } else {
