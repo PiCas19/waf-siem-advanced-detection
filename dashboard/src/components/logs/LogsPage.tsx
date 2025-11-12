@@ -4,6 +4,8 @@ import {
   AlertTriangle, Database, Shield, File, FolderOpen, Zap,
   KeyRound, Bot, Lock, Eye, BlocksIcon, Activity, History
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { hasPermission, UserRole } from '@/types/rbac';
 
 interface Log {
   id: number;
@@ -50,6 +52,21 @@ interface FilterState {
 }
 
 export default function LogsPage(): React.ReactElement {
+  const { user } = useAuth();
+
+  // Block access if user doesn't have logs_view permission
+  if (!user || !hasPermission(user.role as UserRole, 'logs_view')) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
+          <p className="text-gray-400">You do not have permission to view logs.</p>
+        </div>
+      </div>
+    );
+  }
+
   const [logs, setLogs] = useState<Log[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<Log[]>([]);

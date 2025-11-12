@@ -48,7 +48,12 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 			rules.PATCH("/:id/toggle", NewToggleRuleHandler(db))
 		}
 
-		protected.GET("/logs", NewGetLogsHandler(db))
+		// Logs endpoints - require logs_view permission
+		logsGroup := protected.Group("/logs")
+		logsGroup.Use(auth.PermissionMiddleware("view_logs"))
+		{
+			logsGroup.GET("", NewGetLogsHandler(db))
+		}
 
 		// Audit logs endpoints
 		protected.GET("/audit-logs", NewGetAuditLogsHandler(db))
