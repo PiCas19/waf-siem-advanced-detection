@@ -54,7 +54,7 @@ interface FilterState {
 export default function LogsPage(): React.ReactElement {
   const { user } = useAuth();
 
-  // Block access if user doesn't have logs_view permission
+  // Block access if user doesn't have permission (analyst and above can view logs)
   if (!user || !hasPermission(user.role as UserRole, 'logs_view')) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
