@@ -72,6 +72,7 @@ var RolePermissions = map[string][]string{
 		"false_positives_view", "false_positives_report", "false_positives_resolve", "false_positives_delete",
 		"threats_block", "threats_unblock",
 		"users_view", "users_create", "users_edit", "users_delete", "users_change_role",
+		"manage_users",  // Required by AdminMiddleware
 		"access_control",
 	},
 	"operator": {
