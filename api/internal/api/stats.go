@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,6 +40,44 @@ var (
 func InitTIService(db *gorm.DB) {
 	tiService = threatintel.NewEnrichmentService()
 	tiService.SetDB(db)
+}
+
+// extractRealClientIP extracts the real client IP from proxy headers
+// Checks in order: X-Forwarded-For, CF-Connecting-IP, X-Real-IP, X-Client-IP
+// Returns empty string if no header found
+func extractRealClientIP(c *gin.Context) string {
+	// X-Forwarded-For: 203.0.113.45, 198.51.100.10 (comma-separated, first is client)
+	if xForwardedFor := c.GetHeader("X-Forwarded-For"); xForwardedFor != "" {
+		// Take the first IP (the actual client)
+		ips := strings.Split(xForwardedFor, ",")
+		if len(ips) > 0 {
+			realIP := strings.TrimSpace(ips[0])
+			if realIP != "" {
+				fmt.Printf("[DEBUG] X-Forwarded-For header found: %s\n", xForwardedFor)
+				return realIP
+			}
+		}
+	}
+
+	// CF-Connecting-IP: Cloudflare header
+	if cfIP := c.GetHeader("CF-Connecting-IP"); cfIP != "" {
+		fmt.Printf("[DEBUG] CF-Connecting-IP header found: %s\n", cfIP)
+		return cfIP
+	}
+
+	// X-Real-IP: Nginx, Apache proxy header
+	if xRealIP := c.GetHeader("X-Real-IP"); xRealIP != "" {
+		fmt.Printf("[DEBUG] X-Real-IP header found: %s\n", xRealIP)
+		return xRealIP
+	}
+
+	// X-Client-IP: Generic proxy header
+	if xClientIP := c.GetHeader("X-Client-IP"); xClientIP != "" {
+		fmt.Printf("[DEBUG] X-Client-IP header found: %s\n", xClientIP)
+		return xClientIP
+	}
+
+	return ""
 }
 
 // GetSeverityFromThreatType determines severity level based on threat type
@@ -78,6 +117,14 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 			fmt.Printf("[ERROR] Request body: %v\n", c.Request.Body)
 			c.JSON(400, gin.H{"error": "invalid json"})
 			return
+		}
+
+		// Extract real client IP from proxy headers if available
+		realIP := extractRealClientIP(c)
+		if realIP != event.IP && realIP != "" {
+			fmt.Printf("[INFO] Real client IP detected from headers: %s (WAF reported: %s)\n", realIP, event.IP)
+			// Update event IP to the real one
+			event.IP = realIP
 		}
 
 		fmt.Printf("[INFO] Received WAF event: IP=%s, Threat=%s, Method=%s, Path=%s\n", event.IP, event.Threat, event.Method, event.Path)
