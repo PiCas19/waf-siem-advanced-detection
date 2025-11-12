@@ -275,6 +275,9 @@ func (es *EnrichmentService) checkIPAPI(ip string) (*ThreatIntelData, error) {
 		return nil, err
 	}
 
+	// Log the complete raw JSON response for debugging
+	fmt.Printf("[DEBUG] ipapi.co complete JSON response for IP %s:\n%s\n", ip, string(body))
+
 	// ipapi.co returns many fields, we only extract what we need
 	var apiResp struct {
 		Org        string `json:"org"`          // e.g., "AS1234 Company Name"
@@ -290,7 +293,7 @@ func (es *EnrichmentService) checkIPAPI(ip string) (*ThreatIntelData, error) {
 	}
 
 	// Log what we received for debugging
-	fmt.Printf("[DEBUG] ipapi.co raw response for IP %s: org=%s, country=%s, isp=%s, city=%s\n",
+	fmt.Printf("[DEBUG] ipapi.co parsed response for IP %s: org=%s, country=%s, isp=%s, city=%s\n",
 		ip, apiResp.Org, apiResp.Country, apiResp.ISP, apiResp.CityName)
 
 	data := &ThreatIntelData{
