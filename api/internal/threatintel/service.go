@@ -66,9 +66,17 @@ func (es *EnrichmentService) SetDB(db *gorm.DB) {
 // EnrichLog enriches a Log entry with threat intelligence data
 func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 	isPrivate := isPrivateIP(log.ClientIP)
+	isReserved := isReservedRange(log.ClientIP)
+
+	if isReserved {
+		fmt.Printf("[WARN] IP %s is in reserved range (CGN/NAT) - cannot be geolocated directly\n", log.ClientIP)
+		// For reserved range IPs, we can't do much since they're behind NAT
+		// Just mark as internal and continue
+		isPrivate = true
+	}
 
 	if isPrivate {
-		fmt.Printf("[INFO] Private IP detected: %s - will enrich with geolocation only (no abuse score)\n", log.ClientIP)
+		fmt.Printf("[INFO] Private/Reserved IP detected: %s - will enrich with geolocation only (no abuse score)\n", log.ClientIP)
 	}
 
 	// Check cache first
@@ -355,6 +363,33 @@ func isPrivateIP(ipStr string) bool {
 	}
 
 	return ip.IsPrivate() || ip.IsLoopback()
+}
+
+// isReservedRange checks if an IP is in a reserved range (like carrier-grade NAT)
+// Reserved ranges include:
+// - 100.64.0.0/10 (Carrier-Grade NAT - RFC 6598)
+// - Other special ranges that AlienVault OTX rejects
+func isReservedRange(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+
+	// Carrier-Grade NAT range (100.64.0.0/10)
+	cgn := net.IPNet{
+		IP:   net.ParseIP("100.64.0.0"),
+		Mask: net.CIDRMask(10, 32),
+	}
+	if cgn.Contains(ip) {
+		return true
+	}
+
+	// Other reserved ranges
+	if ip.IsPrivate() || ip.IsLoopback() || ip.IsMulticast() {
+		return true
+	}
+
+	return false
 }
 
 // parseASN extracts ASN from organization string (e.g., "AS12345 Company Name")
