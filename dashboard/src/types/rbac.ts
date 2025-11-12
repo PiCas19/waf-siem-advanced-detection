@@ -118,15 +118,15 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   },
 
   analyst: {
-    // Analysts: can only view dashboard/stats (no threat actions)
+    // Analysts: can view dashboard and logs (READ-ONLY, no actions)
     dashboard: true,
     rules_view: false,
     rules_create: false,
     rules_edit: false,
     rules_delete: false,
-    logs_view: false,
-    logs_export: false,
-    logs_delete: false,
+    logs_view: true,      // ✓ Can view logs
+    logs_export: false,   // ✗ Cannot export
+    logs_delete: false,   // ✗ Cannot delete
     blocklist_view: false,
     blocklist_add: false,
     blocklist_remove: false,
@@ -134,12 +134,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     whitelist_add: false,
     whitelist_remove: false,
     false_positives_view: false,
-    false_positives_report: false,
+    false_positives_report: false,  // ✗ Cannot report FP
     false_positives_resolve: false,
     false_positives_delete: false,
-    threats_block: false,
-    threats_unblock: false,
-    users_view: false,
+    threats_block: false,           // ✗ Cannot block
+    threats_unblock: false,         // ✗ Cannot unblock
+    users_view: false,              // ✗ Cannot see Users menu
     users_create: false,
     users_edit: false,
     users_delete: false,

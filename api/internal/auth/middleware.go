@@ -61,11 +61,34 @@ func AdminMiddleware() gin.HandlerFunc {
 
 // RolePermissions maps roles to a list of capabilities/permissions.
 // Add or adjust permissions here to control what each role can do.
+// IMPORTANT: Keep in sync with dashboard/src/types/rbac.ts ROLE_PERMISSIONS
 var RolePermissions = map[string][]string{
-	"admin":    {"manage_users", "manage_rules", "view_logs", "manage_blocklist", "manage_whitelist", "manage_false_positives", "manage_threats"},
-	"operator": {"manage_rules", "manage_blocklist", "manage_whitelist", "view_logs", "manage_threats"},
-	"analyst":  {},
-	"user":     {},
+	"admin":    {
+		// Admin: Full access
+		"view_logs", "export_logs", "delete_logs",
+		"manage_rules", "manage_blocklist", "manage_whitelist",
+		"view_false_positives", "report_false_positives", "resolve_false_positives", "delete_false_positives",
+		"manage_threats",
+		"manage_users",
+	},
+	"operator": {
+		// Operator: Can do everything except manage users
+		"view_logs", "export_logs",  // Can view/export logs but not delete
+		"manage_rules",              // Can create/edit/toggle but not delete
+		"manage_blocklist", "manage_whitelist",
+		"view_false_positives", "report_false_positives",  // Can report but not resolve/delete
+		"manage_threats",
+		// NO: manage_users
+	},
+	"analyst": {
+		// Analyst: Read-only access to logs and dashboard
+		"view_logs",  // Can view but not export/delete
+		// NO: manage_rules, manage_blocklist, manage_whitelist, manage_false_positives, manage_threats, manage_users
+	},
+	"user": {
+		// User: Minimal access
+		// Only dashboard access, no other permissions
+	},
 }
 
 // HasPermission returns true if the role has the requested permission.
