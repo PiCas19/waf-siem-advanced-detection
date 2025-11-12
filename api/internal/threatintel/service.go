@@ -65,10 +65,10 @@ func (es *EnrichmentService) SetDB(db *gorm.DB) {
 
 // EnrichLog enriches a Log entry with threat intelligence data
 func (es *EnrichmentService) EnrichLog(log *models.Log) error {
-	// Skip private/local IPs
-	if isPrivateIP(log.ClientIP) {
-		fmt.Printf("[INFO] Skipping TI enrichment for private IP: %s\n", log.ClientIP)
-		return nil
+	isPrivate := isPrivateIP(log.ClientIP)
+
+	if isPrivate {
+		fmt.Printf("[INFO] Private IP detected: %s - will enrich with geolocation only (no abuse score)\n", log.ClientIP)
 	}
 
 	// Check cache first
@@ -83,61 +83,83 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 	// Enrich from multiple sources
 	data := &ThreatIntelData{}
 
-	// 1. Try AbuseIPDB (primary source for IP reputation)
-	fmt.Printf("[INFO] Querying AbuseIPDB for IP %s\n", log.ClientIP)
-	abuseData, err := es.checkAbuseIPDB(log.ClientIP)
-	if err == nil && abuseData != nil {
-		fmt.Printf("[INFO] AbuseIPDB success for IP %s: reputation=%d, isMalicious=%v, reports=%d, threatLevel=%s\n",
-			log.ClientIP, abuseData.IPReputation, abuseData.IsMalicious, abuseData.AbuseReports, abuseData.ThreatLevel)
-		data = abuseData
-		// Also get geolocation from ipapi.co as fallback for missing fields
-		if data.Country == "" {
-			fmt.Printf("[INFO] AbuseIPDB missing Country, fetching from ipapi.co\n")
-			apiData, _ := es.checkIPAPI(log.ClientIP)
-			if apiData != nil && apiData.Country != "" {
-				data.Country = apiData.Country
-			}
-		}
-	} else {
-		if err != nil {
-			fmt.Printf("[WARN] AbuseIPDB failed for IP %s: %v - attempting fallback\n", log.ClientIP, err)
-		} else {
-			fmt.Printf("[WARN] AbuseIPDB returned nil data for IP %s - attempting fallback\n", log.ClientIP)
-		}
-
-		// 2. Fallback to ipapi.co for basic geolocation and ASN
-		fmt.Printf("[INFO] Querying ipapi.co (fallback) for IP %s\n", log.ClientIP)
-		apiData, err := es.checkIPAPI(log.ClientIP)
-		if err == nil && apiData != nil {
-			fmt.Printf("[INFO] ipapi.co success for IP %s: ASN=%s, ISP=%s, Country=%s\n",
-				log.ClientIP, apiData.ASN, apiData.ISP, apiData.Country)
-
-			// If we got data from AbuseIPDB, merge it with ipapi.co data
-			if data.IPReputation > 0 {
-				// Already have reputation from AbuseIPDB
-				if data.Country == "" {
+	// 1. Try AbuseIPDB only for public IPs (primary source for IP reputation)
+	if !isPrivate {
+		fmt.Printf("[INFO] Querying AbuseIPDB for public IP %s\n", log.ClientIP)
+		abuseData, err := es.checkAbuseIPDB(log.ClientIP)
+		if err == nil && abuseData != nil {
+			fmt.Printf("[INFO] AbuseIPDB success for IP %s: reputation=%d, isMalicious=%v, reports=%d, threatLevel=%s\n",
+				log.ClientIP, abuseData.IPReputation, abuseData.IsMalicious, abuseData.AbuseReports, abuseData.ThreatLevel)
+			data = abuseData
+			// Also get geolocation from ipapi.co as fallback for missing fields
+			if data.Country == "" {
+				fmt.Printf("[INFO] AbuseIPDB missing Country, fetching from ipapi.co\n")
+				apiData, _ := es.checkIPAPI(log.ClientIP)
+				if apiData != nil && apiData.Country != "" {
 					data.Country = apiData.Country
 				}
-				if data.ASN == "" {
-					data.ASN = apiData.ASN
-				}
-				if data.ISP == "" {
-					data.ISP = apiData.ISP
-				}
-			} else {
-				// Use all ipapi.co data
-				data.ASN = apiData.ASN
-				data.ISP = apiData.ISP
-				data.Country = apiData.Country
-				data.ThreatSource = "ipapi.co"
 			}
 		} else {
 			if err != nil {
-				fmt.Printf("[WARN] ipapi.co failed for IP %s: %v\n", log.ClientIP, err)
+				fmt.Printf("[WARN] AbuseIPDB failed for IP %s: %v - attempting fallback\n", log.ClientIP, err)
 			} else {
-				fmt.Printf("[WARN] ipapi.co returned nil data for IP %s\n", log.ClientIP)
+				fmt.Printf("[WARN] AbuseIPDB returned nil data for IP %s - attempting fallback\n", log.ClientIP)
 			}
-			fmt.Printf("[WARN] All TI sources failed for IP %s - no enrichment data available\n", log.ClientIP)
+
+			// 2. Fallback to ipapi.co for basic geolocation and ASN
+			fmt.Printf("[INFO] Querying ipapi.co (fallback) for IP %s\n", log.ClientIP)
+			apiData, err := es.checkIPAPI(log.ClientIP)
+			if err == nil && apiData != nil {
+				fmt.Printf("[INFO] ipapi.co success for IP %s: ASN=%s, ISP=%s, Country=%s\n",
+					log.ClientIP, apiData.ASN, apiData.ISP, apiData.Country)
+
+				// If we got data from AbuseIPDB, merge it with ipapi.co data
+				if data.IPReputation > 0 {
+					// Already have reputation from AbuseIPDB
+					if data.Country == "" {
+						data.Country = apiData.Country
+					}
+					if data.ASN == "" {
+						data.ASN = apiData.ASN
+					}
+					if data.ISP == "" {
+						data.ISP = apiData.ISP
+					}
+				} else {
+					// Use all ipapi.co data
+					data.ASN = apiData.ASN
+					data.ISP = apiData.ISP
+					data.Country = apiData.Country
+					data.ThreatSource = "ipapi.co"
+				}
+			} else {
+				if err != nil {
+					fmt.Printf("[WARN] ipapi.co failed for IP %s: %v\n", log.ClientIP, err)
+				} else {
+					fmt.Printf("[WARN] ipapi.co returned nil data for IP %s\n", log.ClientIP)
+				}
+				fmt.Printf("[WARN] All TI sources failed for IP %s - no enrichment data available\n", log.ClientIP)
+			}
+		}
+	} else {
+		// For private IPs, only query ipapi.co for geolocation (won't work, but we'll set defaults)
+		fmt.Printf("[INFO] Querying ipapi.co for private IP geolocation %s\n", log.ClientIP)
+		apiData, err := es.checkIPAPI(log.ClientIP)
+		if err == nil && apiData != nil {
+			fmt.Printf("[INFO] ipapi.co success for private IP %s: ASN=%s, ISP=%s, Country=%s\n",
+				log.ClientIP, apiData.ASN, apiData.ISP, apiData.Country)
+			data.ASN = apiData.ASN
+			data.ISP = apiData.ISP
+			data.Country = apiData.Country
+			data.ThreatSource = "ipapi.co"
+		} else {
+			// For private IPs that don't resolve, set sensible defaults
+			fmt.Printf("[WARN] Could not geolocate private IP %s via ipapi.co - setting as internal/private\n", log.ClientIP)
+			data.Country = "PRIVATE"
+			data.ISP = "Internal/Private Network"
+			data.ThreatSource = "internal"
+			// Don't set reputation or malicious flag for private IPs
+			data.ThreatLevel = "low" // Private networks are inherently lower risk unless configured otherwise
 		}
 	}
 
