@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import axios from 'axios'
+import { useAuth } from '@/contexts/AuthContext'
 
 const SetPassword: React.FC = () => {
   const [searchParams] = useSearchParams()
@@ -13,6 +14,7 @@ const SetPassword: React.FC = () => {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const navigate = useNavigate()
+  const { setToken: setAuthToken, setUser, setRequiresTwoFASetup } = useAuth()
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -21,12 +23,28 @@ const SetPassword: React.FC = () => {
     if (password.length < 8) return setError('Password too short')
     if (password !== confirm) return setError('Passwords do not match')
     try {
-      await axios.post('/api/auth/set-password', { token, new_password: password })
-      setSuccess('Password set. Redirecting to setup...')
-      // Mark that user needs to complete 2FA setup on first login
-      localStorage.setItem('needsTwoFASetup', 'true')
-      // Redirect to setup page after password activation
-      setTimeout(() => navigate('/setup'), 1500)
+      const response = await axios.post('/api/auth/set-password', { token, new_password: password })
+      setSuccess('Password set. Redirecting to 2FA setup...')
+
+      // Save token and user from response
+      if (response.data.token) {
+        localStorage.setItem('authToken', response.data.token)
+        setAuthToken(response.data.token)
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`
+      }
+
+      if (response.data.user) {
+        localStorage.setItem('authUser', JSON.stringify(response.data.user))
+        setUser(response.data.user)
+      }
+
+      // Mark that user needs to complete 2FA setup
+      if (response.data.requires_2fa_setup) {
+        setRequiresTwoFASetup(true)
+      }
+
+      // Redirect to 2FA setup page after password activation
+      setTimeout(() => navigate('/setup-2fa'), 1500)
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed')
     }

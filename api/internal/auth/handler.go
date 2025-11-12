@@ -487,13 +487,48 @@ func (h *AuthHandler) SetPasswordWithToken(c *gin.Context) {
 	user.PasswordResetToken = ""
 	user.PasswordResetExpiry = time.Time{}
 	user.Active = true
+	// Mark that 2FA setup is mandatory for new user activation
+	user.MustSetup2FA = true
 
 	if err := h.db.Save(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update password"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Password set successfully"})
+	// Generate token for immediate access to 2FA setup
+	token, err := GenerateToken(user.ID, user.Email, user.Role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	// Log password activation
+	auditLog := models.AuditLog{
+		UserID:       user.ID,
+		UserEmail:    user.Email,
+		Action:       "ACTIVATE_ACCOUNT",
+		Category:     "AUTH",
+		ResourceType: "user",
+		ResourceID:   fmt.Sprintf("%d", user.ID),
+		Description:  "User activated account by setting password",
+		Status:       "success",
+		IPAddress:    c.ClientIP(),
+		CreatedAt:    time.Now(),
+	}
+	h.db.Create(&auditLog)
+
+	c.JSON(http.StatusOK, gin.H{
+		"requires_2fa_setup": true,
+		"token":              token,
+		"email":              user.Email,
+		"message":            "Password set successfully. Please set up 2FA",
+		"user": gin.H{
+			"id":    user.ID,
+			"email": user.Email,
+			"name":  user.Name,
+			"role":  user.Role,
+		},
+	})
 }
 
 // InitiateTwoFASetup initiates 2FA setup for authenticated user
