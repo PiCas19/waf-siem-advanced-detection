@@ -108,7 +108,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     false_positives_delete: false,
     threats_block: true,
     threats_unblock: true,
-    users_view: true,
+    users_view: false,      // ✗ Cannot see Users menu
     users_create: false,
     users_edit: false,
     users_delete: false,
