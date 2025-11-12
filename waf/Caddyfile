@@ -86,7 +86,7 @@
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
-            api_endpoint http://localhost:8081/api/waf/event
+            api_endpoint http://localhost:8081/api
             rules_endpoint http://localhost:8081/api/waf/custom-rules
             blocklist_endpoint http://localhost:8081/api/waf/blocklist
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
