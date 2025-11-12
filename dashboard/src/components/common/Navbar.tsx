@@ -11,6 +11,9 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <div className="flex items-center gap-4">
           <Link to="/" className="text-xl font-bold">WAF Dashboard</Link>
+          {user?.role && hasPermission(user.role as UserRole, 'logs_view') && (
+            <Link to="/logs" className="text-sm text-gray-300 hover:text-white">Logs</Link>
+          )}
           {user?.role && hasPermission(user.role as UserRole, 'users_view') && (
             <Link to="/admin/users" className="text-sm text-gray-300 hover:text-white">Users</Link>
           )}
