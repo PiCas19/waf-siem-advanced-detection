@@ -83,62 +83,38 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 	// Enrich from multiple sources
 	data := &ThreatIntelData{}
 
-	// 1. Try AbuseIPDB only for public IPs (primary source for IP reputation)
+	// 1. Query IP-API for geolocation and basic info for all IPs (public and private)
 	if !isPrivate {
-		fmt.Printf("[INFO] Querying AbuseIPDB for public IP %s\n", log.ClientIP)
-		abuseData, err := es.checkAbuseIPDB(log.ClientIP)
-		if err == nil && abuseData != nil {
-			fmt.Printf("[INFO] AbuseIPDB success for IP %s: reputation=%d, isMalicious=%v, reports=%d, threatLevel=%s\n",
-				log.ClientIP, abuseData.IPReputation, abuseData.IsMalicious, abuseData.AbuseReports, abuseData.ThreatLevel)
-			data = abuseData
-			// Also get geolocation from IP-API as fallback for missing fields
-			if data.Country == "" {
-				fmt.Printf("[INFO] AbuseIPDB missing Country, fetching from ip-api.com\n")
-				geoData, _ := es.checkGeoIP(log.ClientIP)
-				if geoData != nil && geoData.Country != "" {
-					data.Country = geoData.Country
-				}
-			}
-		} else {
-			if err != nil {
-				fmt.Printf("[WARN] AbuseIPDB failed for IP %s: %v - attempting fallback\n", log.ClientIP, err)
-			} else {
-				fmt.Printf("[WARN] AbuseIPDB returned nil data for IP %s - attempting fallback\n", log.ClientIP)
-			}
+		fmt.Printf("[INFO] Querying ip-api.com for public IP %s\n", log.ClientIP)
+	}
 
-			// 2. Fallback to IP-API for basic geolocation and ASN
-			fmt.Printf("[INFO] Querying ip-api.com (fallback) for IP %s\n", log.ClientIP)
-			geoData, err := es.checkGeoIP(log.ClientIP)
-			if err == nil && geoData != nil {
-				fmt.Printf("[INFO] ip-api.com success for IP %s: ASN=%s, ISP=%s, Country=%s\n",
-					log.ClientIP, geoData.ASN, geoData.ISP, geoData.Country)
+	geoData, err := es.checkGeoIP(log.ClientIP)
+	if err == nil && geoData != nil {
+		if !isPrivate {
+			fmt.Printf("[INFO] ip-api.com success for IP %s: ASN=%s, ISP=%s, Country=%s\n",
+				log.ClientIP, geoData.ASN, geoData.ISP, geoData.Country)
+		}
+		data = geoData
 
-				// If we got data from AbuseIPDB, merge it with ip-api data
-				if data.IPReputation > 0 {
-					// Already have reputation from AbuseIPDB
-					if data.Country == "" {
-						data.Country = geoData.Country
-					}
-					if data.ASN == "" {
-						data.ASN = geoData.ASN
-					}
-					if data.ISP == "" {
-						data.ISP = geoData.ISP
-					}
-				} else {
-					// Use all ip-api data
-					data.ASN = geoData.ASN
-					data.ISP = geoData.ISP
-					data.Country = geoData.Country
-					data.ThreatSource = "ip-api.com"
-				}
+		// 2. Try to enhance with reputation data from AlienVault OTX (free, no rate limits)
+		if !isPrivate {
+			fmt.Printf("[INFO] Querying AlienVault OTX for IP reputation %s\n", log.ClientIP)
+			reputationData, err := es.checkAlienVaultOTX(log.ClientIP)
+			if err == nil && reputationData != nil {
+				fmt.Printf("[INFO] AlienVault OTX success for IP %s: reputation=%d, isMalicious=%v, threatLevel=%s\n",
+					log.ClientIP, reputationData.IPReputation, reputationData.IsMalicious, reputationData.ThreatLevel)
+				// Merge reputation data with geolocation data
+				data.IPReputation = reputationData.IPReputation
+				data.IsMalicious = reputationData.IsMalicious
+				data.ThreatLevel = reputationData.ThreatLevel
+				data.AbuseReports = reputationData.AbuseReports
+				data.ThreatSource = "alienvault-otx + ip-api.com"
 			} else {
 				if err != nil {
-					fmt.Printf("[WARN] ip-api.com failed for IP %s: %v\n", log.ClientIP, err)
-				} else {
-					fmt.Printf("[WARN] ip-api.com returned nil data for IP %s\n", log.ClientIP)
+					fmt.Printf("[WARN] AlienVault OTX failed for IP %s: %v - using geolocation only\n", log.ClientIP, err)
 				}
-				fmt.Printf("[WARN] All TI sources failed for IP %s - no enrichment data available\n", log.ClientIP)
+				// If OTX fails, just use geolocation data
+				data.ThreatSource = "ip-api.com"
 			}
 		}
 	} else {
@@ -200,28 +176,29 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 	return nil
 }
 
-// checkAbuseIPDB queries AbuseIPDB for IP reputation
-// Free tier: ~30 requests per day, no API key needed for basic lookups
-func (es *EnrichmentService) checkAbuseIPDB(ip string) (*ThreatIntelData, error) {
-	// AbuseIPDB free API endpoint (no auth required for basic lookups)
-	url := fmt.Sprintf("https://api.abuseipdb.com/api/v2/check?ipAddress=%s&maxAgeInDays=90", ip)
+// checkAlienVaultOTX queries AlienVault OTX for IP reputation
+// Free tier: Unlimited requests, no API key required
+// AlienVault Open Threat Exchange is completely free and has no rate limits
+func (es *EnrichmentService) checkAlienVaultOTX(ip string) (*ThreatIntelData, error) {
+	// AlienVault OTX free API endpoint (no auth required)
+	url := fmt.Sprintf("https://otx.alienvault.com/api/v1/indicators/IPv4/%s/general", ip)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// AbuseIPDB recommends User-Agent
+	// AlienVault recommends User-Agent
 	req.Header.Set("User-Agent", "WAF-SIEM-ThreatIntel/1.0")
 
 	resp, err := es.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("abuseipdb request failed: %w", err)
+		return nil, fmt.Errorf("alienvault otx request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("abuseipdb returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("alienvault otx returned status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -229,27 +206,55 @@ func (es *EnrichmentService) checkAbuseIPDB(ip string) (*ThreatIntelData, error)
 		return nil, err
 	}
 
-	// Parse AbuseIPDB response
-	var abuseResp struct {
-		Data struct {
-			AbuseConfidenceScore int    `json:"abuseConfidenceScore"`
-			CountryCode          string `json:"countryCode"`
-			UsageType            string `json:"usageType"`
-			TotalReports         int    `json:"totalReports"`
-		} `json:"data"`
+	// Log the complete raw JSON response for debugging
+	fmt.Printf("[DEBUG] AlienVault OTX complete JSON response for IP %s:\n%s\n", ip, string(body))
+
+	// Parse AlienVault OTX response
+	var otxResp struct {
+		Indicator       string `json:"indicator"`
+		Type            string `json:"type"`
+		ValidationCount int    `json:"validation_count"` // Number of validations (reputation)
+		ThreatCount     int    `json:"threat_count"`     // Number of threats detected
+		ExoneratedCount int    `json:"exonerated_count"`
+		Pulses          []struct {
+			ID          string `json:"id"`
+			Name        string `json:"name"`
+			Description string `json:"description"`
+		} `json:"pulses"` // Security threats/incidents
 	}
 
-	if err := json.Unmarshal(body, &abuseResp); err != nil {
-		return nil, fmt.Errorf("failed to parse abuseipdb response: %w", err)
+	if err := json.Unmarshal(body, &otxResp); err != nil {
+		return nil, fmt.Errorf("failed to parse alienvault otx response: %w", err)
+	}
+
+	fmt.Printf("[DEBUG] AlienVault OTX parsed for IP %s: validation_count=%d, threat_count=%d, pulses=%d\n",
+		ip, otxResp.ValidationCount, otxResp.ThreatCount, len(otxResp.Pulses))
+
+	// Calculate reputation based on threat count and pulses
+	// threat_count and pulses indicate malicious activity
+	reputation := 0
+	isMalicious := false
+	threatLevel := "none"
+
+	if otxResp.ThreatCount > 0 || len(otxResp.Pulses) > 0 {
+		isMalicious = true
+		// Scale reputation based on threat/pulse count
+		reputation = 20 + (otxResp.ThreatCount * 10) + (len(otxResp.Pulses) * 5)
+		if reputation > 100 {
+			reputation = 100
+		}
+		threatLevel = calculateThreatLevel(reputation)
+
+		fmt.Printf("[INFO] AlienVault OTX detected threats for IP %s: reputation=%d, isMalicious=%v\n",
+			ip, reputation, isMalicious)
 	}
 
 	data := &ThreatIntelData{
-		IPReputation: abuseResp.Data.AbuseConfidenceScore,
-		IsMalicious:  abuseResp.Data.AbuseConfidenceScore > 25,
-		Country:      abuseResp.Data.CountryCode,
-		AbuseReports: abuseResp.Data.TotalReports,
-		ThreatSource: "abuseipdb",
-		ThreatLevel:  calculateThreatLevel(abuseResp.Data.AbuseConfidenceScore),
+		IPReputation: reputation,
+		IsMalicious:  isMalicious,
+		AbuseReports: otxResp.ThreatCount + len(otxResp.Pulses),
+		ThreatSource: "alienvault-otx",
+		ThreatLevel:  threatLevel,
 	}
 
 	return data, nil
