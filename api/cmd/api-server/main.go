@@ -79,6 +79,9 @@ func main() {
 	// Setup routes
 	api.SetupRoutes(r, db)
 
+	// Initialize threat intelligence service with database for blocklist checking
+	api.InitTIService(db)
+
 	// Initialize stats handler with database
 	api.SetStatsDB(db)
 

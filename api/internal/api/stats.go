@@ -32,8 +32,14 @@ var (
 		Recent: make([]websocket.WAFEvent, 0, 5),
 	}
 	// Threat intelligence enrichment service
-	tiService = threatintel.NewEnrichmentService()
+	tiService *threatintel.EnrichmentService
 )
+
+// InitTIService initializes the threat intelligence service with database connection
+func InitTIService(db *gorm.DB) {
+	tiService = threatintel.NewEnrichmentService()
+	tiService.SetDB(db)
+}
 
 // GetSeverityFromThreatType determines severity level based on threat type
 func GetSeverityFromThreatType(threatType string) string {
@@ -113,17 +119,37 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 		if err := db.Create(&log).Error; err != nil {
 			fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)
+			c.JSON(500, gin.H{"error": "failed to save event"})
+			return
+		}
+
+		// Enrich log with threat intelligence synchronously (blocks until enrichment completes or times out)
+		enrichmentStart := time.Now()
+		if err := tiService.EnrichLog(&log); err != nil {
+			fmt.Printf("[WARN] Threat intelligence enrichment failed for IP %s: %v\n", log.ClientIP, err)
 		} else {
-			// Enrich log with threat intelligence asynchronously after saving
-			go func(logID uint) {
-				if err := tiService.EnrichLog(&log); err != nil {
-					fmt.Printf("[WARN] Failed to enrich log with threat intelligence: %v\n", err)
-				}
-				// Update the log with enriched threat intel data
-				if err := db.Model(&models.Log{}).Where("id = ?", logID).Updates(&log).Error; err != nil {
-					fmt.Printf("[WARN] Failed to update log with threat intelligence: %v\n", err)
-				}
-			}(log.ID)
+			fmt.Printf("[INFO] Threat intelligence enrichment completed for IP %s in %v\n", log.ClientIP, time.Since(enrichmentStart))
+		}
+
+		// Update the log with enriched threat intel data using explicit field updates
+		// This prevents GORM from skipping zero values
+		updateData := map[string]interface{}{
+			"enriched_at":     log.EnrichedAt,
+			"ip_reputation":   log.IPReputation,
+			"is_malicious":    log.IsMalicious,
+			"asn":             log.ASN,
+			"isp":             log.ISP,
+			"country":         log.Country,
+			"threat_level":    log.ThreatLevel,
+			"threat_source":   log.ThreatSource,
+			"is_on_blocklist": log.IsOnBlocklist,
+			"blocklist_name":  log.BlocklistName,
+			"abuse_reports":   log.AbuseReports,
+		}
+		if err := db.Model(&models.Log{}).Where("id = ?", log.ID).Updates(updateData).Error; err != nil {
+			fmt.Printf("[ERROR] Failed to update log %d with threat intelligence: %v\n", log.ID, err)
+		} else {
+			fmt.Printf("[INFO] Log %d successfully enriched and updated\n", log.ID)
 		}
 
 		websocket.Broadcast(event)
