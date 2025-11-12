@@ -91,12 +91,12 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 			fmt.Printf("[INFO] AbuseIPDB success for IP %s: reputation=%d, isMalicious=%v, reports=%d, threatLevel=%s\n",
 				log.ClientIP, abuseData.IPReputation, abuseData.IsMalicious, abuseData.AbuseReports, abuseData.ThreatLevel)
 			data = abuseData
-			// Also get geolocation from ipapi.co as fallback for missing fields
+			// Also get geolocation from IP-API as fallback for missing fields
 			if data.Country == "" {
-				fmt.Printf("[INFO] AbuseIPDB missing Country, fetching from ipapi.co\n")
-				apiData, _ := es.checkIPAPI(log.ClientIP)
-				if apiData != nil && apiData.Country != "" {
-					data.Country = apiData.Country
+				fmt.Printf("[INFO] AbuseIPDB missing Country, fetching from ip-api.com\n")
+				geoData, _ := es.checkGeoIP(log.ClientIP)
+				if geoData != nil && geoData.Country != "" {
+					data.Country = geoData.Country
 				}
 			}
 		} else {
@@ -106,55 +106,55 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 				fmt.Printf("[WARN] AbuseIPDB returned nil data for IP %s - attempting fallback\n", log.ClientIP)
 			}
 
-			// 2. Fallback to ipapi.co for basic geolocation and ASN
-			fmt.Printf("[INFO] Querying ipapi.co (fallback) for IP %s\n", log.ClientIP)
-			apiData, err := es.checkIPAPI(log.ClientIP)
-			if err == nil && apiData != nil {
-				fmt.Printf("[INFO] ipapi.co success for IP %s: ASN=%s, ISP=%s, Country=%s\n",
-					log.ClientIP, apiData.ASN, apiData.ISP, apiData.Country)
+			// 2. Fallback to IP-API for basic geolocation and ASN
+			fmt.Printf("[INFO] Querying ip-api.com (fallback) for IP %s\n", log.ClientIP)
+			geoData, err := es.checkGeoIP(log.ClientIP)
+			if err == nil && geoData != nil {
+				fmt.Printf("[INFO] ip-api.com success for IP %s: ASN=%s, ISP=%s, Country=%s\n",
+					log.ClientIP, geoData.ASN, geoData.ISP, geoData.Country)
 
-				// If we got data from AbuseIPDB, merge it with ipapi.co data
+				// If we got data from AbuseIPDB, merge it with ip-api data
 				if data.IPReputation > 0 {
 					// Already have reputation from AbuseIPDB
 					if data.Country == "" {
-						data.Country = apiData.Country
+						data.Country = geoData.Country
 					}
 					if data.ASN == "" {
-						data.ASN = apiData.ASN
+						data.ASN = geoData.ASN
 					}
 					if data.ISP == "" {
-						data.ISP = apiData.ISP
+						data.ISP = geoData.ISP
 					}
 				} else {
-					// Use all ipapi.co data
-					data.ASN = apiData.ASN
-					data.ISP = apiData.ISP
-					data.Country = apiData.Country
-					data.ThreatSource = "ipapi.co"
+					// Use all ip-api data
+					data.ASN = geoData.ASN
+					data.ISP = geoData.ISP
+					data.Country = geoData.Country
+					data.ThreatSource = "ip-api.com"
 				}
 			} else {
 				if err != nil {
-					fmt.Printf("[WARN] ipapi.co failed for IP %s: %v\n", log.ClientIP, err)
+					fmt.Printf("[WARN] ip-api.com failed for IP %s: %v\n", log.ClientIP, err)
 				} else {
-					fmt.Printf("[WARN] ipapi.co returned nil data for IP %s\n", log.ClientIP)
+					fmt.Printf("[WARN] ip-api.com returned nil data for IP %s\n", log.ClientIP)
 				}
 				fmt.Printf("[WARN] All TI sources failed for IP %s - no enrichment data available\n", log.ClientIP)
 			}
 		}
 	} else {
-		// For private IPs, only query ipapi.co for geolocation (won't work, but we'll set defaults)
-		fmt.Printf("[INFO] Querying ipapi.co for private IP geolocation %s\n", log.ClientIP)
-		apiData, err := es.checkIPAPI(log.ClientIP)
-		if err == nil && apiData != nil {
-			fmt.Printf("[INFO] ipapi.co success for private IP %s: ASN=%s, ISP=%s, Country=%s\n",
-				log.ClientIP, apiData.ASN, apiData.ISP, apiData.Country)
-			data.ASN = apiData.ASN
-			data.ISP = apiData.ISP
-			data.Country = apiData.Country
-			data.ThreatSource = "ipapi.co"
+		// For private IPs, only query IP-API for geolocation (won't work, but we'll set defaults)
+		fmt.Printf("[INFO] Querying ip-api.com for private IP geolocation %s\n", log.ClientIP)
+		geoData, err := es.checkGeoIP(log.ClientIP)
+		if err == nil && geoData != nil {
+			fmt.Printf("[INFO] ip-api.com success for private IP %s: ASN=%s, ISP=%s, Country=%s\n",
+				log.ClientIP, geoData.ASN, geoData.ISP, geoData.Country)
+			data.ASN = geoData.ASN
+			data.ISP = geoData.ISP
+			data.Country = geoData.Country
+			data.ThreatSource = "ip-api.com"
 		} else {
 			// For private IPs that don't resolve, set sensible defaults
-			fmt.Printf("[WARN] Could not geolocate private IP %s via ipapi.co - setting as internal/private\n", log.ClientIP)
+			fmt.Printf("[WARN] Could not geolocate private IP %s via ip-api.com - setting as internal/private\n", log.ClientIP)
 			data.Country = "PRIVATE"
 			data.ISP = "Internal/Private Network"
 			data.ThreatSource = "internal"
@@ -255,19 +255,29 @@ func (es *EnrichmentService) checkAbuseIPDB(ip string) (*ThreatIntelData, error)
 	return data, nil
 }
 
-// checkIPAPI queries ipapi.co for geolocation and ASN info
-// Free tier: 30,000 requests/month, no API key required
-func (es *EnrichmentService) checkIPAPI(ip string) (*ThreatIntelData, error) {
-	url := fmt.Sprintf("https://ipapi.co/%s/json/", ip)
+// checkGeoIP queries IP-API.com for geolocation and ASN info
+// Free tier: 45 requests/minute, no API key required
+// More reliable than ipapi.co with better rate limits
+func (es *EnrichmentService) checkGeoIP(ip string) (*ThreatIntelData, error) {
+	// IP-API.com endpoint - simple query endpoint for free tier
+	url := fmt.Sprintf("http://ip-api.com/json/%s", ip)
 
-	resp, err := es.client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("ipapi request failed: %w", err)
+		return nil, err
+	}
+
+	// Add User-Agent to comply with IP-API.com guidelines
+	req.Header.Set("User-Agent", "WAF-SIEM-ThreatIntel/1.0")
+
+	resp, err := es.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("ip-api request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ipapi returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("ip-api returned status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -276,31 +286,43 @@ func (es *EnrichmentService) checkIPAPI(ip string) (*ThreatIntelData, error) {
 	}
 
 	// Log the complete raw JSON response for debugging
-	fmt.Printf("[DEBUG] ipapi.co complete JSON response for IP %s:\n%s\n", ip, string(body))
+	fmt.Printf("[DEBUG] ip-api.com complete JSON response for IP %s:\n%s\n", ip, string(body))
 
-	// ipapi.co returns many fields, we only extract what we need
+	// IP-API.com response structure
 	var apiResp struct {
-		Org        string `json:"org"`          // e.g., "AS1234 Company Name"
-		Country    string `json:"country_code"` // e.g., "CH"
-		CountryName string `json:"country_name"` // e.g., "Switzerland"
-		ISP        string `json:"isp"`          // e.g., "ISP Name"
-		CityName   string `json:"city"`         // e.g., "Zurich"
-		RegionName string `json:"region_name"` // e.g., "Zurich"
+		Status      string `json:"status"`       // "success" or "fail"
+		Message     string `json:"message"`      // Error message if status is fail
+		Country     string `json:"country"`      // Country name (e.g., "Switzerland")
+		CountryCode string `json:"countryCode"` // ISO country code (e.g., "CH")
+		Region      string `json:"region"`      // Region/State name
+		RegionName  string `json:"regionName"`  // Region/State name
+		City        string `json:"city"`        // City name
+		ISP         string `json:"isp"`         // ISP name
+		Org         string `json:"org"`         // Organization/Company
+		AS          string `json:"as"`          // ASN in format "AS12345 Company"
+		Timezone    string `json:"timezone"`    // Timezone
+		Lat         float64 `json:"lat"`        // Latitude
+		Lon         float64 `json:"lon"`        // Longitude
 	}
 
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, fmt.Errorf("failed to parse ipapi response: %w", err)
+		return nil, fmt.Errorf("failed to parse ip-api response: %w", err)
+	}
+
+	// Check if the query was successful
+	if apiResp.Status != "success" {
+		return nil, fmt.Errorf("ip-api query failed: %s", apiResp.Message)
 	}
 
 	// Log what we received for debugging
-	fmt.Printf("[DEBUG] ipapi.co parsed response for IP %s: org=%s, country=%s, isp=%s, city=%s\n",
-		ip, apiResp.Org, apiResp.Country, apiResp.ISP, apiResp.CityName)
+	fmt.Printf("[DEBUG] ip-api.com parsed response for IP %s: country=%s, countryCode=%s, isp=%s, org=%s, as=%s, city=%s\n",
+		ip, apiResp.Country, apiResp.CountryCode, apiResp.ISP, apiResp.Org, apiResp.AS, apiResp.City)
 
 	data := &ThreatIntelData{
-		ASN:          parseASN(apiResp.Org),
+		Country:      apiResp.CountryCode, // Use country code (CH, US, etc.)
 		ISP:          apiResp.ISP,
-		Country:      apiResp.Country, // Use country code (CH, US, etc.)
-		ThreatSource: "ipapi.co",
+		ASN:          parseASN(apiResp.AS), // IP-API returns AS field directly
+		ThreatSource: "ip-api.com",
 	}
 
 	return data, nil
