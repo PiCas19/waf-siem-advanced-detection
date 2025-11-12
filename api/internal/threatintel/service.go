@@ -275,20 +275,28 @@ func (es *EnrichmentService) checkIPAPI(ip string) (*ThreatIntelData, error) {
 		return nil, err
 	}
 
+	// ipapi.co returns many fields, we only extract what we need
 	var apiResp struct {
-		Org     string `json:"org"`
-		Country string `json:"country_code"`
-		ISP     string `json:"isp"`
+		Org        string `json:"org"`          // e.g., "AS1234 Company Name"
+		Country    string `json:"country_code"` // e.g., "CH"
+		CountryName string `json:"country_name"` // e.g., "Switzerland"
+		ISP        string `json:"isp"`          // e.g., "ISP Name"
+		CityName   string `json:"city"`         // e.g., "Zurich"
+		RegionName string `json:"region_name"` // e.g., "Zurich"
 	}
 
 	if err := json.Unmarshal(body, &apiResp); err != nil {
 		return nil, fmt.Errorf("failed to parse ipapi response: %w", err)
 	}
 
+	// Log what we received for debugging
+	fmt.Printf("[DEBUG] ipapi.co raw response for IP %s: org=%s, country=%s, isp=%s, city=%s\n",
+		ip, apiResp.Org, apiResp.Country, apiResp.ISP, apiResp.CityName)
+
 	data := &ThreatIntelData{
 		ASN:          parseASN(apiResp.Org),
 		ISP:          apiResp.ISP,
-		Country:      apiResp.Country,
+		Country:      apiResp.Country, // Use country code (CH, US, etc.)
 		ThreatSource: "ipapi.co",
 	}
 
