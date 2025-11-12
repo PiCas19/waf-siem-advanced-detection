@@ -211,6 +211,8 @@ func (es *EnrichmentService) checkAlienVaultOTX(ip string) (*ThreatIntelData, er
 
 	// Parse AlienVault OTX response
 	var otxResp struct {
+		Status          string `json:"status"`           // "success" or "fail"
+		Message         string `json:"message"`          // Error message if fail
 		Indicator       string `json:"indicator"`
 		Type            string `json:"type"`
 		ValidationCount int    `json:"validation_count"` // Number of validations (reputation)
@@ -225,6 +227,18 @@ func (es *EnrichmentService) checkAlienVaultOTX(ip string) (*ThreatIntelData, er
 
 	if err := json.Unmarshal(body, &otxResp); err != nil {
 		return nil, fmt.Errorf("failed to parse alienvault otx response: %w", err)
+	}
+
+	// Check if the IP is in a reserved range (OTX returns "fail" status for these)
+	if otxResp.Status == "fail" && otxResp.Message == "reserved range" {
+		fmt.Printf("[INFO] IP %s is in a reserved range (carrier-grade NAT, special use, etc) - treating as safe\n", ip)
+		// Return neutral data for reserved range IPs
+		return &ThreatIntelData{
+			IPReputation: 0,
+			IsMalicious:  false,
+			ThreatSource: "alienvault-otx",
+			ThreatLevel:  "none",
+		}, nil
 	}
 
 	fmt.Printf("[DEBUG] AlienVault OTX parsed for IP %s: validation_count=%d, threat_count=%d, pulses=%d\n",
