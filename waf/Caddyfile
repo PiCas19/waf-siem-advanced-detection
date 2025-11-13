@@ -90,6 +90,25 @@
             rules_endpoint http://localhost:8081/api/waf/custom-rules
             blocklist_endpoint http://localhost:8081/api/waf/blocklist
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
+
+            # ============================================
+            # ENTERPRISE-GRADE IP DETECTION
+            # ============================================
+
+            # HMAC Signature Validation for X-Public-IP
+            # Prevents spoofing of self-reported IPs from Tailscale clients
+            enable_hmac_signature_validation true
+            hmac_shared_secret "change-this-to-your-production-secret-key-minimum-32-characters"
+
+            # Tailscale Network Detection
+            # Automatically recognizes Tailscale IPs (100.64.0.0/10)
+            # and validates them with HMAC signatures
+            enable_tailscale_detection true
+            tailscale_networks 100.64.0.0/10
+
+            # Trusted Proxies for X-Forwarded-For validation
+            # Add your reverse proxy IPs here
+            trusted_proxies 127.0.0.1 ::1
         }
         
         root * /var/www/html
@@ -195,6 +214,25 @@
             block_mode true
             api_endpoint http://localhost:8081/api
             rules_endpoint http://localhost:8081/api/waf/custom-rules
+
+            # ============================================
+            # ENTERPRISE-GRADE IP DETECTION (LAN HTTPS)
+            # ============================================
+
+            # HMAC Signature Validation
+            enable_hmac_signature_validation true
+            hmac_shared_secret "change-this-to-your-production-secret-key-minimum-32-characters"
+
+            # DMZ Network Detection for internal reverse proxy
+            enable_dmz_detection true
+            dmz_networks 172.16.0.0/12 10.0.0.0/8
+
+            # Tailscale Detection for VPN clients
+            enable_tailscale_detection true
+            tailscale_networks 100.64.0.0/10
+
+            # Trusted Proxies (localhost, internal networks)
+            trusted_proxies 127.0.0.1 ::1 172.16.0.0/12 10.0.0.0/8
         }
 
         root * /var/www/html
@@ -296,6 +334,25 @@ http://172.16.216.10 {
             block_mode true
             api_endpoint http://localhost:8081/api
             rules_endpoint http://localhost:8081/api/waf/custom-rules
+
+            # ============================================
+            # ENTERPRISE-GRADE IP DETECTION (LAN HTTP)
+            # ============================================
+
+            # HMAC Signature Validation
+            enable_hmac_signature_validation true
+            hmac_shared_secret "change-this-to-your-production-secret-key-minimum-32-characters"
+
+            # DMZ Network Detection for internal reverse proxy
+            enable_dmz_detection true
+            dmz_networks 172.16.0.0/12 10.0.0.0/8
+
+            # Tailscale Detection for VPN clients
+            enable_tailscale_detection true
+            tailscale_networks 100.64.0.0/10
+
+            # Trusted Proxies (localhost, internal networks)
+            trusted_proxies 127.0.0.1 ::1 172.16.0.0/12 10.0.0.0/8
         }
 
         root * /var/www/html
