@@ -369,6 +369,8 @@ const StatsPage: React.FC = () => {
             blockedBy: log.blocked_by || '', // "auto", "manual", or ""
             user_agent: log.user_agent,
             description: log.description || log.threat_type,
+            // IP Trust Score field
+            ip_trust_score: log.ip_trust_score || undefined,
             // Threat Intelligence fields
             ip_reputation: log.ip_reputation || 0,
             is_malicious: log.is_malicious || false,
