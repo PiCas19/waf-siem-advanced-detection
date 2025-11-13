@@ -56,7 +56,14 @@ func main() {
 
 	// Create Gin router
 	r := gin.Default()
-	
+
+	// Set explicit trusted proxies (disable "trust all" warning)
+	// Configure trusted proxies based on your network architecture:
+	// - 127.0.0.1, ::1: localhost (always safe)
+	// - 192.168.216.0/24: Your internal LAN
+	// - 172.16.216.0/24: Your DMZ
+	r.SetTrustedProxies([]string{"127.0.0.1", "::1", "192.168.216.0/24", "172.16.216.0/24"})
+
 	// CORS middleware
 	r.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
