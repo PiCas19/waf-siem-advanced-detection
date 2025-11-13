@@ -219,19 +219,8 @@
             # ENTERPRISE-GRADE IP DETECTION (LAN HTTPS)
             # ============================================
 
-            # HMAC Signature Validation
-            enable_hmac_signature_validation true
-            hmac_shared_secret "change-this-to-your-production-secret-key-minimum-32-characters"
-
-            # DMZ Network Detection for internal reverse proxy
-            enable_dmz_detection true
-            dmz_networks 172.16.0.0/12 10.0.0.0/8
-
-            # Tailscale Detection for VPN clients
-            enable_tailscale_detection true
-            tailscale_networks 100.64.0.0/10
-
-            # Trusted Proxies (localhost, internal networks)
+            # Trusted Proxies for internal LAN connections
+            # No HMAC/Tailscale needed for LAN IPs
             trusted_proxies 127.0.0.1 ::1 172.16.0.0/12 10.0.0.0/8
         }
 
@@ -339,19 +328,8 @@ http://172.16.216.10 {
             # ENTERPRISE-GRADE IP DETECTION (LAN HTTP)
             # ============================================
 
-            # HMAC Signature Validation
-            enable_hmac_signature_validation true
-            hmac_shared_secret "change-this-to-your-production-secret-key-minimum-32-characters"
-
-            # DMZ Network Detection for internal reverse proxy
-            enable_dmz_detection true
-            dmz_networks 172.16.0.0/12 10.0.0.0/8
-
-            # Tailscale Detection for VPN clients
-            enable_tailscale_detection true
-            tailscale_networks 100.64.0.0/10
-
-            # Trusted Proxies (localhost, internal networks)
+            # Trusted Proxies for internal LAN connections
+            # No HMAC/Tailscale needed for LAN IPs
             trusted_proxies 127.0.0.1 ::1 172.16.0.0/12 10.0.0.0/8
         }
 
