@@ -31,7 +31,8 @@ interface WAFEvent {
   threat_type?: string;
   created_at?: string;
   url?: string;
-  // Threat Intelligence fields
+  // IP Trust & Threat Intelligence fields
+  ip_trust_score?: number; // IP Trust Score (0-100): 0-25=untrusted, 25-50=low, 50-75=neutral, 75-100=trusted
   ip_reputation?: number;
   is_malicious?: boolean;
   asn?: string;
@@ -1555,6 +1556,7 @@ const StatsPage: React.FC = () => {
                         )}
                       </div>
                     </th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">Trust Level</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">IP Rep</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-medium w-16">ASN</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">Status</th>
@@ -1590,6 +1592,22 @@ const StatsPage: React.FC = () => {
                             }`}>
                               {alert.threat_level.charAt(0).toUpperCase() + alert.threat_level.slice(1)}
                             </span>
+                          ) : (
+                            <span className="text-gray-500 text-xs">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {alert.ip_trust_score !== undefined && alert.ip_trust_score !== null ? (
+                            <div className="flex items-center gap-1">
+                              <span className={`text-xs font-medium px-2 py-1 rounded ${
+                                alert.ip_trust_score >= 75 ? 'bg-green-500/20 text-green-400' :
+                                alert.ip_trust_score >= 50 ? 'bg-yellow-500/20 text-yellow-400' :
+                                alert.ip_trust_score >= 25 ? 'bg-orange-500/20 text-orange-400' :
+                                'bg-red-500/20 text-red-400'
+                              }`}>
+                                {alert.ip_trust_score}
+                              </span>
+                            </div>
                           ) : (
                             <span className="text-gray-500 text-xs">-</span>
                           )}
