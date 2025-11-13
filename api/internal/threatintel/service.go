@@ -2,7 +2,6 @@ package threatintel
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -13,44 +12,33 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	// API timeouts
-	httpTimeout = 5 * time.Second
+const httpTimeout = 5 * time.Second
 
-	// AbuseIPDB free tier allows ~30 requests per day
-	// AlienVault OTX free tier has no rate limit but is slower
-	// We'll use AbuseIPDB as primary with fallback to ipapi.co for ASN/ISP
-)
-
-// EnrichmentService provides threat intelligence enrichment with thread-safe caching
 type EnrichmentService struct {
 	client    *http.Client
 	cache     map[string]*CachedEnrichment
-	cacheLock sync.RWMutex // Protects concurrent access to cache map
+	cacheLock sync.RWMutex
 	db        *gorm.DB
 }
 
-// CachedEnrichment stores cached threat intel data
 type CachedEnrichment struct {
 	Data      *ThreatIntelData
 	ExpiresAt time.Time
 }
 
-// ThreatIntelData contains all enriched threat intelligence
 type ThreatIntelData struct {
-	IPReputation int
-	IsMalicious  bool
-	ASN          string
-	ISP          string
-	Country      string
-	ThreatLevel  string
-	ThreatSource string
+	IPReputation  int
+	IsMalicious   bool
+	ASN           string
+	ISP           string
+	Country       string
+	ThreatLevel   string
+	ThreatSource  string
 	IsOnBlocklist bool
 	BlocklistName string
-	AbuseReports int
+	AbuseReports  int
 }
 
-// NewEnrichmentService creates a new threat intelligence service
 func NewEnrichmentService() *EnrichmentService {
 	return &EnrichmentService{
 		client: &http.Client{
@@ -60,203 +48,123 @@ func NewEnrichmentService() *EnrichmentService {
 	}
 }
 
-// SetDB sets the database connection for blocklist checking
 func (es *EnrichmentService) SetDB(db *gorm.DB) {
 	es.db = db
 }
 
-// getFromCache retrieves a cached enrichment entry in a thread-safe manner
 func (es *EnrichmentService) getFromCache(key string) (*CachedEnrichment, bool) {
 	es.cacheLock.RLock()
 	defer es.cacheLock.RUnlock()
-
 	cached, exists := es.cache[key]
 	return cached, exists
 }
 
-// putInCache stores a cached enrichment entry in a thread-safe manner
 func (es *EnrichmentService) putInCache(key string, cached *CachedEnrichment) {
 	es.cacheLock.Lock()
 	defer es.cacheLock.Unlock()
-
 	es.cache[key] = cached
 }
 
-// EnrichLog enriches a Log entry with threat intelligence data
 func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 	isPrivate := isPrivateIP(log.ClientIP)
 	isReserved := isReservedRange(log.ClientIP)
-	isTailscaleVPN := log.ClientIPVPNReport // Is this a self-reported VPN/Tailscale IP?
+	isTailscaleVPN := log.ClientIPVPNReport
 
 	if isReserved {
-		fmt.Printf("[INFO] IP %s is in reserved range (CGN - 100.64.0.0/10)\n", log.ClientIP)
 		if isTailscaleVPN {
-			fmt.Printf("[INFO] This is a Tailscale VPN client (self-reported via X-Public-IP)\n")
-			// For Tailscale/VPN clients, the ClientIP is their Tailscale internal IP
-			// but they reported their public IP, so we should use the reported source
-			// The log should show both: Tailscale internal IP + indication it's from VPN
-			isPrivate = false // Treat as non-private for enrichment (it's from VPN client)
+			isPrivate = false
 		} else {
-			fmt.Printf("[WARN] IP %s is in reserved range (CGN/NAT) - cannot be geolocated directly\n", log.ClientIP)
 			isPrivate = true
 		}
 	}
 
-	if isPrivate {
-		fmt.Printf("[INFO] Private/Reserved IP detected: %s - will enrich with geolocation only (no abuse score)\n", log.ClientIP)
-	} else if isTailscaleVPN {
-		fmt.Printf("[INFO] Tailscale/VPN client detected: %s - will enrich as low-risk (VPN source)\n", log.ClientIP)
-	}
-
-	// Determine which IP to use for caching (public IP for Tailscale, private IP otherwise)
 	cacheKey := log.ClientIP
 	if isTailscaleVPN && log.ClientIPPublic != "" {
 		cacheKey = log.ClientIPPublic
 	}
 
-	// Check cache first (thread-safe)
 	if cached, exists := es.getFromCache(cacheKey); exists && time.Now().Before(cached.ExpiresAt) {
-		fmt.Printf("[INFO] Using cached TI data for IP %s (expires in %v)\n", cacheKey, time.Until(cached.ExpiresAt))
 		applyThreatIntel(log, cached.Data)
 		return nil
 	}
 
-	fmt.Printf("[INFO] Fetching fresh TI data for IP %s\n", log.ClientIP)
-
-	// Enrich from multiple sources
 	data := &ThreatIntelData{}
-
-	// Special handling: For Tailscale/VPN clients, geolocate the public IP instead of the private IP
 	ipToGeolocate := log.ClientIP
 	if isTailscaleVPN && log.ClientIPPublic != "" {
-		fmt.Printf("[INFO] Using Tailscale public IP for geolocation: %s (instead of internal IP %s)\n", log.ClientIPPublic, log.ClientIP)
 		ipToGeolocate = log.ClientIPPublic
-		isPrivate = false // Public IP is not private, so we can query external APIs
+		isPrivate = false
 	}
 
-	// 1. Query IP-API for geolocation and basic info for all IPs (public and private)
 	if !isPrivate {
-		fmt.Printf("[INFO] Querying ip-api.com for public IP %s\n", ipToGeolocate)
-	}
-
-	geoData, err := es.checkGeoIP(ipToGeolocate)
-	if err == nil && geoData != nil {
-		if !isPrivate {
-			fmt.Printf("[INFO] ip-api.com success for IP %s: ASN=%s, ISP=%s, Country=%s\n",
-				ipToGeolocate, geoData.ASN, geoData.ISP, geoData.Country)
-		}
-		data = geoData
-
-		// 2. Try to enhance with reputation data from AlienVault OTX (free, no rate limits)
-		if !isPrivate {
-			fmt.Printf("[INFO] Querying AlienVault OTX for IP reputation %s\n", ipToGeolocate)
-			reputationData, err := es.checkAlienVaultOTX(ipToGeolocate)
-			if err == nil && reputationData != nil {
-				fmt.Printf("[INFO] AlienVault OTX success for IP %s: reputation=%d, isMalicious=%v, threatLevel=%s\n",
-					ipToGeolocate, reputationData.IPReputation, reputationData.IsMalicious, reputationData.ThreatLevel)
-				// Merge reputation data with geolocation data
-				data.IPReputation = reputationData.IPReputation
-				data.IsMalicious = reputationData.IsMalicious
-				data.ThreatLevel = reputationData.ThreatLevel
-				data.AbuseReports = reputationData.AbuseReports
-				data.ThreatSource = "alienvault-otx + ip-api.com"
-			} else {
-				if err != nil {
-					fmt.Printf("[WARN] AlienVault OTX failed for IP %s: %v - using geolocation only\n", log.ClientIP, err)
+		geoData, err := es.checkGeoIP(ipToGeolocate)
+		if err == nil && geoData != nil {
+			data = geoData
+			if !isPrivate {
+				reputationData, err := es.checkAlienVaultOTX(ipToGeolocate)
+				if err == nil && reputationData != nil {
+					data.IPReputation = reputationData.IPReputation
+					data.IsMalicious = reputationData.IsMalicious
+					data.ThreatLevel = reputationData.ThreatLevel
+					data.AbuseReports = reputationData.AbuseReports
+					data.ThreatSource = "alienvault-otx + ip-api.com"
+				} else {
+					data.ThreatSource = "ip-api.com"
 				}
-				// If OTX fails, just use geolocation data
-				data.ThreatSource = "ip-api.com"
+			}
+		} else {
+			if isTailscaleVPN && log.ClientIPPublic != "" {
+				data.Country = "VPN/TAILSCALE"
+				data.ISP = "Tailscale VPN Network"
+				data.ThreatSource = "tailscale-vpn"
+				data.ThreatLevel = "low"
+			} else if isTailscaleVPN {
+				data.Country = "VPN/TAILSCALE"
+				data.ISP = "Tailscale VPN Network"
+				data.ThreatSource = "tailscale-vpn"
+				data.ThreatLevel = "low"
+			} else {
+				data.Country = "PRIVATE"
+				data.ISP = "Internal/Private Network"
+				data.ThreatSource = "internal"
+				data.ThreatLevel = "low"
 			}
 		}
-	} else {
-		// For private IPs that don't resolve, set sensible defaults
-		fmt.Printf("[WARN] Could not geolocate IP %s via ip-api.com - setting as internal/private or VPN marking\n", ipToGeolocate)
-
-		// Special handling for Tailscale/VPN clients with reserved IPs
-		if isTailscaleVPN && log.ClientIPPublic != "" {
-			// Already tried to geolocate the public IP above - if we're here, it failed
-			// Use default Tailscale marking
-			fmt.Printf("[WARN] Could not geolocate Tailscale public IP %s - using default VPN marking\n", log.ClientIPPublic)
-			data.Country = "VPN/TAILSCALE"
-			data.ISP = "Tailscale VPN Network"
-			data.ThreatSource = "tailscale-vpn"
-			data.ThreatLevel = "low"
-		} else if isTailscaleVPN {
-			// Tailscale VPN but no public IP reported - use default marking
-			fmt.Printf("[INFO] Tailscale VPN client detected but no public IP reported - using default VPN marking\n")
-			data.Country = "VPN/TAILSCALE"
-			data.ISP = "Tailscale VPN Network"
-			data.ThreatSource = "tailscale-vpn"
-			data.ThreatLevel = "low"
-		} else {
-			data.Country = "PRIVATE"
-			data.ISP = "Internal/Private Network"
-			data.ThreatSource = "internal"
-			data.ThreatLevel = "low" // Private networks are inherently lower risk unless configured otherwise
-		}
-		// Don't set reputation or malicious flag for private IPs/VPN
 	}
 
-	// Check blocklist if database is available
 	if es.db != nil {
-		fmt.Printf("[INFO] Checking blocklist for IP %s with threat %s\n", log.ClientIP, log.ThreatType)
 		var blockedIP models.BlockedIP
 		now := time.Now()
-
-		// Check if IP is blocked for this specific threat or globally
 		err := es.db.Where("ip_address = ? AND (description = ? OR description = ?) AND (permanent = ? OR expires_at > ?)",
 			log.ClientIP, log.ThreatType, "GLOBAL", true, now).First(&blockedIP).Error
-
 		if err == nil {
 			data.IsOnBlocklist = true
 			data.BlocklistName = blockedIP.Description
-			fmt.Printf("[INFO] IP %s is blocked: %s (expires: %v, permanent: %v)\n",
-				log.ClientIP, blockedIP.Description, blockedIP.ExpiresAt, blockedIP.Permanent)
-		} else if err != gorm.ErrRecordNotFound {
-			fmt.Printf("[WARN] Error checking blocklist for IP %s: %v\n", log.ClientIP, err)
-		} else {
-			fmt.Printf("[INFO] IP %s is not on blocklist\n", log.ClientIP)
 		}
-	} else {
-		fmt.Printf("[WARN] Database not initialized in enrichment service - cannot check blocklist\n")
 	}
 
-	// Cache the result (24 hour cache) using the same key as lookup (thread-safe)
 	es.putInCache(cacheKey, &CachedEnrichment{
 		Data:      data,
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 	})
-	fmt.Printf("[INFO] Cached TI data for IP %s (24h TTL)\n", cacheKey)
 
-	// Apply enrichment to log
 	applyThreatIntel(log, data)
-
 	return nil
 }
 
-// checkAlienVaultOTX queries AlienVault OTX for IP reputation
-// Free tier: Unlimited requests, no API key required
-// AlienVault Open Threat Exchange is completely free and has no rate limits
 func (es *EnrichmentService) checkAlienVaultOTX(ip string) (*ThreatIntelData, error) {
-	// AlienVault OTX free API endpoint (no auth required)
-	url := fmt.Sprintf("https://otx.alienvault.com/api/v1/indicators/IPv4/%s/general", ip)
-
+	url := "https://otx.alienvault.com/api/v1/indicators/IPv4/" + ip + "/general"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-
-	// AlienVault recommends User-Agent
 	req.Header.Set("User-Agent", "WAF-SIEM-ThreatIntel/1.0")
-
 	resp, err := es.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("alienvault otx request failed: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("alienvault otx returned status %d", resp.StatusCode)
+		return nil, err
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -264,33 +172,23 @@ func (es *EnrichmentService) checkAlienVaultOTX(ip string) (*ThreatIntelData, er
 		return nil, err
 	}
 
-	// Log the complete raw JSON response for debugging
-	fmt.Printf("[DEBUG] AlienVault OTX complete JSON response for IP %s:\n%s\n", ip, string(body))
-
-	// Parse AlienVault OTX response
 	var otxResp struct {
-		Status          string `json:"status"`           // "success" or "fail"
-		Message         string `json:"message"`          // Error message if fail
-		Indicator       string `json:"indicator"`
-		Type            string `json:"type"`
-		ValidationCount int    `json:"validation_count"` // Number of validations (reputation)
-		ThreatCount     int    `json:"threat_count"`     // Number of threats detected
-		ExoneratedCount int    `json:"exonerated_count"`
+		Status          string `json:"status"`
+		Message         string `json:"message"`
+		ValidationCount int    `json:"validation_count"`
+		ThreatCount     int    `json:"threat_count"`
 		Pulses          []struct {
 			ID          string `json:"id"`
 			Name        string `json:"name"`
 			Description string `json:"description"`
-		} `json:"pulses"` // Security threats/incidents
+		} `json:"pulses"`
 	}
 
 	if err := json.Unmarshal(body, &otxResp); err != nil {
-		return nil, fmt.Errorf("failed to parse alienvault otx response: %w", err)
+		return nil, err
 	}
 
-	// Check if the IP is in a reserved range (OTX returns "fail" status for these)
 	if otxResp.Status == "fail" && otxResp.Message == "reserved range" {
-		fmt.Printf("[INFO] IP %s is in a reserved range (carrier-grade NAT, special use, etc) - treating as safe\n", ip)
-		// Return neutral data for reserved range IPs
 		return &ThreatIntelData{
 			IPReputation: 0,
 			IsMalicious:  false,
@@ -299,26 +197,17 @@ func (es *EnrichmentService) checkAlienVaultOTX(ip string) (*ThreatIntelData, er
 		}, nil
 	}
 
-	fmt.Printf("[DEBUG] AlienVault OTX parsed for IP %s: validation_count=%d, threat_count=%d, pulses=%d\n",
-		ip, otxResp.ValidationCount, otxResp.ThreatCount, len(otxResp.Pulses))
-
-	// Calculate reputation based on threat count and pulses
-	// threat_count and pulses indicate malicious activity
 	reputation := 0
 	isMalicious := false
 	threatLevel := "none"
 
 	if otxResp.ThreatCount > 0 || len(otxResp.Pulses) > 0 {
 		isMalicious = true
-		// Scale reputation based on threat/pulse count
 		reputation = 20 + (otxResp.ThreatCount * 10) + (len(otxResp.Pulses) * 5)
 		if reputation > 100 {
 			reputation = 100
 		}
 		threatLevel = calculateThreatLevel(reputation)
-
-		fmt.Printf("[INFO] AlienVault OTX detected threats for IP %s: reputation=%d, isMalicious=%v\n",
-			ip, reputation, isMalicious)
 	}
 
 	data := &ThreatIntelData{
@@ -328,33 +217,23 @@ func (es *EnrichmentService) checkAlienVaultOTX(ip string) (*ThreatIntelData, er
 		ThreatSource: "alienvault-otx",
 		ThreatLevel:  threatLevel,
 	}
-
 	return data, nil
 }
 
-// checkGeoIP queries IP-API.com for geolocation and ASN info
-// Free tier: 45 requests/minute, no API key required
-// More reliable than ipapi.co with better rate limits
 func (es *EnrichmentService) checkGeoIP(ip string) (*ThreatIntelData, error) {
-	// IP-API.com endpoint - simple query endpoint for free tier
-	url := fmt.Sprintf("http://ip-api.com/json/%s", ip)
-
+	url := "http://ip-api.com/json/" + ip
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-
-	// Add User-Agent to comply with IP-API.com guidelines
 	req.Header.Set("User-Agent", "WAF-SIEM-ThreatIntel/1.0")
-
 	resp, err := es.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("ip-api request failed: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ip-api returned status %d", resp.StatusCode)
+		return nil, err
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -362,98 +241,63 @@ func (es *EnrichmentService) checkGeoIP(ip string) (*ThreatIntelData, error) {
 		return nil, err
 	}
 
-	// Log the complete raw JSON response for debugging
-	fmt.Printf("[DEBUG] ip-api.com complete JSON response for IP %s:\n%s\n", ip, string(body))
-
-	// IP-API.com response structure
 	var apiResp struct {
-		Status      string `json:"status"`       // "success" or "fail"
-		Message     string `json:"message"`      // Error message if status is fail
-		Country     string `json:"country"`      // Country name (e.g., "Switzerland")
-		CountryCode string `json:"countryCode"` // ISO country code (e.g., "CH")
-		Region      string `json:"region"`      // Region/State name
-		RegionName  string `json:"regionName"`  // Region/State name
-		City        string `json:"city"`        // City name
-		ISP         string `json:"isp"`         // ISP name
-		Org         string `json:"org"`         // Organization/Company
-		AS          string `json:"as"`          // ASN in format "AS12345 Company"
-		Timezone    string `json:"timezone"`    // Timezone
-		Lat         float64 `json:"lat"`        // Latitude
-		Lon         float64 `json:"lon"`        // Longitude
+		Status      string `json:"status"`
+		Message     string `json:"message"`
+		Country     string `json:"country"`
+		CountryCode string `json:"countryCode"`
+		ISP         string `json:"isp"`
+		AS          string `json:"as"`
 	}
 
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return nil, fmt.Errorf("failed to parse ip-api response: %w", err)
+		return nil, err
 	}
 
-	// Check if the query was successful
 	if apiResp.Status != "success" {
-		return nil, fmt.Errorf("ip-api query failed: %s", apiResp.Message)
+		return nil, err
 	}
-
-	// Log what we received for debugging
-	fmt.Printf("[DEBUG] ip-api.com parsed response for IP %s: country=%s, countryCode=%s, isp=%s, org=%s, as=%s, city=%s\n",
-		ip, apiResp.Country, apiResp.CountryCode, apiResp.ISP, apiResp.Org, apiResp.AS, apiResp.City)
 
 	data := &ThreatIntelData{
-		Country:      apiResp.CountryCode, // Use country code (CH, US, etc.)
+		Country:      apiResp.CountryCode,
 		ISP:          apiResp.ISP,
-		ASN:          parseASN(apiResp.AS), // IP-API returns AS field directly
+		ASN:          parseASN(apiResp.AS),
 		ThreatSource: "ip-api.com",
 	}
-
 	return data, nil
 }
 
-// isPrivateIP checks if an IP address is private/internal
 func isPrivateIP(ipStr string) bool {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return true
 	}
-
 	return ip.IsPrivate() || ip.IsLoopback()
 }
 
-// isReservedRange checks if an IP is in a reserved range (like carrier-grade NAT)
-// Reserved ranges include:
-// - 100.64.0.0/10 (Carrier-Grade NAT - RFC 6598)
-// - Other special ranges that AlienVault OTX rejects
 func isReservedRange(ipStr string) bool {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return false
 	}
-
-	// Carrier-Grade NAT range (100.64.0.0/10)
-	cgn := net.IPNet{
-		IP:   net.ParseIP("100.64.0.0"),
-		Mask: net.CIDRMask(10, 32),
-	}
+	cgn := net.IPNet{IP: net.ParseIP("100.64.0.0"), Mask: net.CIDRMask(10, 32)}
 	if cgn.Contains(ip) {
 		return true
 	}
-
-	// Other reserved ranges
 	if ip.IsPrivate() || ip.IsLoopback() || ip.IsMulticast() {
 		return true
 	}
-
 	return false
 }
 
-// parseASN extracts ASN from organization string (e.g., "AS12345 Company Name")
 func parseASN(org string) string {
 	if len(org) < 2 {
 		return ""
 	}
-
-	// Check if it starts with AS
 	if org[0:2] == "AS" {
-		// Extract the number part
 		for i, ch := range org {
 			if ch < '0' || ch > '9' {
-				if i > 2 { // Found the end of the number
+				if i > 2 {
 					return org[0:i]
 				}
 				break
@@ -463,7 +307,6 @@ func parseASN(org string) string {
 	return org
 }
 
-// calculateThreatLevel determines threat level based on abuse confidence score
 func calculateThreatLevel(score int) string {
 	switch {
 	case score >= 75:
@@ -479,12 +322,10 @@ func calculateThreatLevel(score int) string {
 	}
 }
 
-// applyThreatIntel applies enriched threat data to a log entry
 func applyThreatIntel(log *models.Log, data *ThreatIntelData) {
 	if data == nil {
 		return
 	}
-
 	now := time.Now()
 	log.EnrichedAt = &now
 
