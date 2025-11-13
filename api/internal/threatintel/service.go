@@ -89,9 +89,15 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 		fmt.Printf("[INFO] Tailscale/VPN client detected: %s - will enrich as low-risk (VPN source)\n", log.ClientIP)
 	}
 
+	// Determine which IP to use for caching (public IP for Tailscale, private IP otherwise)
+	cacheKey := log.ClientIP
+	if isTailscaleVPN && log.ClientIPPublic != "" {
+		cacheKey = log.ClientIPPublic
+	}
+
 	// Check cache first
-	if cached, exists := es.cache[log.ClientIP]; exists && time.Now().Before(cached.ExpiresAt) {
-		fmt.Printf("[INFO] Using cached TI data for IP %s (expires in %v)\n", log.ClientIP, time.Until(cached.ExpiresAt))
+	if cached, exists := es.cache[cacheKey]; exists && time.Now().Before(cached.ExpiresAt) {
+		fmt.Printf("[INFO] Using cached TI data for IP %s (expires in %v)\n", cacheKey, time.Until(cached.ExpiresAt))
 		applyThreatIntel(log, cached.Data)
 		return nil
 	}
@@ -101,26 +107,34 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 	// Enrich from multiple sources
 	data := &ThreatIntelData{}
 
-	// 1. Query IP-API for geolocation and basic info for all IPs (public and private)
-	if !isPrivate {
-		fmt.Printf("[INFO] Querying ip-api.com for public IP %s\n", log.ClientIP)
+	// Special handling: For Tailscale/VPN clients, geolocate the public IP instead of the private IP
+	ipToGeolocate := log.ClientIP
+	if isTailscaleVPN && log.ClientIPPublic != "" {
+		fmt.Printf("[INFO] Using Tailscale public IP for geolocation: %s (instead of internal IP %s)\n", log.ClientIPPublic, log.ClientIP)
+		ipToGeolocate = log.ClientIPPublic
+		isPrivate = false // Public IP is not private, so we can query external APIs
 	}
 
-	geoData, err := es.checkGeoIP(log.ClientIP)
+	// 1. Query IP-API for geolocation and basic info for all IPs (public and private)
+	if !isPrivate {
+		fmt.Printf("[INFO] Querying ip-api.com for public IP %s\n", ipToGeolocate)
+	}
+
+	geoData, err := es.checkGeoIP(ipToGeolocate)
 	if err == nil && geoData != nil {
 		if !isPrivate {
 			fmt.Printf("[INFO] ip-api.com success for IP %s: ASN=%s, ISP=%s, Country=%s\n",
-				log.ClientIP, geoData.ASN, geoData.ISP, geoData.Country)
+				ipToGeolocate, geoData.ASN, geoData.ISP, geoData.Country)
 		}
 		data = geoData
 
 		// 2. Try to enhance with reputation data from AlienVault OTX (free, no rate limits)
 		if !isPrivate {
-			fmt.Printf("[INFO] Querying AlienVault OTX for IP reputation %s\n", log.ClientIP)
-			reputationData, err := es.checkAlienVaultOTX(log.ClientIP)
+			fmt.Printf("[INFO] Querying AlienVault OTX for IP reputation %s\n", ipToGeolocate)
+			reputationData, err := es.checkAlienVaultOTX(ipToGeolocate)
 			if err == nil && reputationData != nil {
 				fmt.Printf("[INFO] AlienVault OTX success for IP %s: reputation=%d, isMalicious=%v, threatLevel=%s\n",
-					log.ClientIP, reputationData.IPReputation, reputationData.IsMalicious, reputationData.ThreatLevel)
+					ipToGeolocate, reputationData.IPReputation, reputationData.IsMalicious, reputationData.ThreatLevel)
 				// Merge reputation data with geolocation data
 				data.IPReputation = reputationData.IPReputation
 				data.IsMalicious = reputationData.IsMalicious
@@ -136,68 +150,32 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 			}
 		}
 	} else {
-		// For private IPs, only query IP-API for geolocation (won't work, but we'll set defaults)
-		fmt.Printf("[INFO] Querying ip-api.com for private IP geolocation %s\n", log.ClientIP)
-		geoData, err := es.checkGeoIP(log.ClientIP)
-		if err == nil && geoData != nil {
-			fmt.Printf("[INFO] ip-api.com success for private IP %s: ASN=%s, ISP=%s, Country=%s\n",
-				log.ClientIP, geoData.ASN, geoData.ISP, geoData.Country)
-			data.ASN = geoData.ASN
-			data.ISP = geoData.ISP
-			data.Country = geoData.Country
-			data.ThreatSource = "ip-api.com"
+		// For private IPs that don't resolve, set sensible defaults
+		fmt.Printf("[WARN] Could not geolocate IP %s via ip-api.com - setting as internal/private or VPN marking\n", ipToGeolocate)
+
+		// Special handling for Tailscale/VPN clients with reserved IPs
+		if isTailscaleVPN && log.ClientIPPublic != "" {
+			// Already tried to geolocate the public IP above - if we're here, it failed
+			// Use default Tailscale marking
+			fmt.Printf("[WARN] Could not geolocate Tailscale public IP %s - using default VPN marking\n", log.ClientIPPublic)
+			data.Country = "VPN/TAILSCALE"
+			data.ISP = "Tailscale VPN Network"
+			data.ThreatSource = "tailscale-vpn"
+			data.ThreatLevel = "low"
+		} else if isTailscaleVPN {
+			// Tailscale VPN but no public IP reported - use default marking
+			fmt.Printf("[INFO] Tailscale VPN client detected but no public IP reported - using default VPN marking\n")
+			data.Country = "VPN/TAILSCALE"
+			data.ISP = "Tailscale VPN Network"
+			data.ThreatSource = "tailscale-vpn"
+			data.ThreatLevel = "low"
 		} else {
-			// For private IPs that don't resolve, set sensible defaults
-			fmt.Printf("[WARN] Could not geolocate private IP %s via ip-api.com - setting as internal/private\n", log.ClientIP)
-
-			// Special handling for Tailscale/VPN clients with reserved IPs
-			if isTailscaleVPN && log.ClientIPPublic != "" {
-				// Try to geolocate the public IP reported by the Tailscale client
-				fmt.Printf("[INFO] Tailscale VPN client detected - attempting to geolocate reported public IP: %s\n", log.ClientIPPublic)
-				publicGeoData, err := es.checkGeoIP(log.ClientIPPublic)
-				if err == nil && publicGeoData != nil {
-					fmt.Printf("[INFO] Successfully geolocated Tailscale public IP %s: Country=%s, ISP=%s, ASN=%s\n",
-						log.ClientIPPublic, publicGeoData.Country, publicGeoData.ISP, publicGeoData.ASN)
-					// Use the public IP's geolocation data
-					data.Country = publicGeoData.Country
-					data.ISP = publicGeoData.ISP
-					data.ASN = publicGeoData.ASN
-					data.ThreatSource = "ip-api.com (Tailscale public IP)"
-					data.ThreatLevel = "low" // Still marked as low risk due to VPN
-
-					// Try to get reputation data for the public IP
-					reputationData, err := es.checkAlienVaultOTX(log.ClientIPPublic)
-					if err == nil && reputationData != nil {
-						fmt.Printf("[INFO] AlienVault OTX for Tailscale public IP %s: reputation=%d, isMalicious=%v\n",
-							log.ClientIPPublic, reputationData.IPReputation, reputationData.IsMalicious)
-						data.IPReputation = reputationData.IPReputation
-						data.IsMalicious = reputationData.IsMalicious
-						data.AbuseReports = reputationData.AbuseReports
-						data.ThreatSource = "alienvault-otx + ip-api.com (Tailscale public IP)"
-					}
-				} else {
-					// If public IP geolocation also fails, use default Tailscale marking
-					fmt.Printf("[WARN] Could not geolocate Tailscale public IP %s - using default VPN marking\n", log.ClientIPPublic)
-					data.Country = "VPN/TAILSCALE"
-					data.ISP = "Tailscale VPN Network"
-					data.ThreatSource = "tailscale-vpn"
-					data.ThreatLevel = "low"
-				}
-			} else if isTailscaleVPN {
-				// Tailscale VPN but no public IP reported - use default marking
-				fmt.Printf("[INFO] Tailscale VPN client detected but no public IP reported - using default VPN marking\n")
-				data.Country = "VPN/TAILSCALE"
-				data.ISP = "Tailscale VPN Network"
-				data.ThreatSource = "tailscale-vpn"
-				data.ThreatLevel = "low"
-			} else {
-				data.Country = "PRIVATE"
-				data.ISP = "Internal/Private Network"
-				data.ThreatSource = "internal"
-				data.ThreatLevel = "low" // Private networks are inherently lower risk unless configured otherwise
-			}
-			// Don't set reputation or malicious flag for private IPs/VPN
+			data.Country = "PRIVATE"
+			data.ISP = "Internal/Private Network"
+			data.ThreatSource = "internal"
+			data.ThreatLevel = "low" // Private networks are inherently lower risk unless configured otherwise
 		}
+		// Don't set reputation or malicious flag for private IPs/VPN
 	}
 
 	// Check blocklist if database is available
@@ -224,12 +202,12 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 		fmt.Printf("[WARN] Database not initialized in enrichment service - cannot check blocklist\n")
 	}
 
-	// Cache the result (24 hour cache)
-	es.cache[log.ClientIP] = &CachedEnrichment{
+	// Cache the result (24 hour cache) using the same key as lookup
+	es.cache[cacheKey] = &CachedEnrichment{
 		Data:      data,
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
-	fmt.Printf("[INFO] Cached TI data for IP %s (24h TTL)\n", log.ClientIP)
+	fmt.Printf("[INFO] Cached TI data for IP %s (24h TTL)\n", cacheKey)
 
 	// Apply enrichment to log
 	applyThreatIntel(log, data)
