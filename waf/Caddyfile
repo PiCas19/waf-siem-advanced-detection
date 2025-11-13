@@ -313,7 +313,7 @@ http://172.16.216.10 {
     
     handle /vite.svg {
         root * /var/www/html
-        file_server
+        file_server 
     }
     
     # Resto con WAF
