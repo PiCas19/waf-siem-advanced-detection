@@ -197,51 +197,53 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 			ClientIPTrusted:   event.IPTrusted,
 			ClientIPVPNReport: event.IPVPNReport,
 			ClientIPPublic:    publicIP, // Store the public IP from X-Public-IP header if available
-		}
+		IPTrustScore:      event.IPTrustScore, // Store the trust score calculated by WAF
+	}
 
-		// Log important IP metadata
-		if log.ClientIPVPNReport {
-			fmt.Printf("[INFO] *** TAILSCALE/VPN CLIENT DETECTED *** Internal IP=%s, Public IP=%s, Source=%s, Trusted=%v\n",
-				log.ClientIP, log.ClientIPPublic, log.ClientIPSource, log.ClientIPTrusted)
-		}
-		if err := db.Create(&log).Error; err != nil {
-			fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)
-			c.JSON(500, gin.H{"error": "failed to save event"})
-			return
-		}
+	// Log important IP metadata
+	if log.ClientIPVPNReport {
+		fmt.Printf("[INFO] *** TAILSCALE/VPN CLIENT DETECTED *** Internal IP=%s, Public IP=%s, Source=%s, Trusted=%v\n",
+			log.ClientIP, log.ClientIPPublic, log.ClientIPSource, log.ClientIPTrusted)
+	}
+	if err := db.Create(&log).Error; err != nil {
+		fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)
+		c.JSON(500, gin.H{"error": "failed to save event"})
+		return
+	}
 
-		// Enrich log with threat intelligence synchronously (blocks until enrichment completes or times out)
-		enrichmentStart := time.Now()
-		if err := tiService.EnrichLog(&log); err != nil {
-			fmt.Printf("[WARN] Threat intelligence enrichment failed for IP %s: %v\n", log.ClientIP, err)
-		} else {
-			fmt.Printf("[INFO] Threat intelligence enrichment completed for IP %s in %v\n", log.ClientIP, time.Since(enrichmentStart))
-		}
+	// Enrich log with threat intelligence synchronously (blocks until enrichment completes or times out)
+	enrichmentStart := time.Now()
+	if err := tiService.EnrichLog(&log); err != nil {
+		fmt.Printf("[WARN] Threat intelligence enrichment failed for IP %s: %v\n", log.ClientIP, err)
+	} else {
+		fmt.Printf("[INFO] Threat intelligence enrichment completed for IP %s in %v\n", log.ClientIP, time.Since(enrichmentStart))
+	}
 
-		// Update the log with enriched threat intel data using explicit field updates
-		// This prevents GORM from skipping zero values
-		updateData := map[string]interface{}{
-			"enriched_at":     log.EnrichedAt,
-			"ip_reputation":   log.IPReputation,
-			"is_malicious":    log.IsMalicious,
-			"asn":             log.ASN,
-			"isp":             log.ISP,
-			"country":         log.Country,
-			"threat_level":    log.ThreatLevel,
-			"threat_source":   log.ThreatSource,
-			"is_on_blocklist": log.IsOnBlocklist,
-			"blocklist_name":  log.BlocklistName,
-			"abuse_reports":   log.AbuseReports,
-		}
-		if err := db.Model(&models.Log{}).Where("id = ?", log.ID).Updates(updateData).Error; err != nil {
-			fmt.Printf("[ERROR] Failed to update log %d with threat intelligence: %v\n", log.ID, err)
-		} else {
-			fmt.Printf("[INFO] Log %d successfully enriched and updated\n", log.ID)
-		}
+	// Update the log with enriched threat intel data using explicit field updates
+	// This prevents GORM from skipping zero values
+	updateData := map[string]interface{}{
+		"enriched_at":     log.EnrichedAt,
+		"ip_reputation":   log.IPReputation,
+		"is_malicious":    log.IsMalicious,
+		"asn":             log.ASN,
+		"isp":             log.ISP,
+		"country":         log.Country,
+		"threat_level":    log.ThreatLevel,
+		"threat_source":   log.ThreatSource,
+		"is_on_blocklist": log.IsOnBlocklist,
+		"blocklist_name":  log.BlocklistName,
+		"abuse_reports":   log.AbuseReports,
+		"ip_trust_score":  log.IPTrustScore, // Persist the trust score to database
+	}
+	if err := db.Model(&models.Log{}).Where("id = ?", log.ID).Updates(updateData).Error; err != nil {
+		fmt.Printf("[ERROR] Failed to update log %d with threat intelligence: %v\n", log.ID, err)
+	} else {
+		fmt.Printf("[INFO] Log %d successfully enriched and updated\n", log.ID)
+	}
 
-		websocket.Broadcast(event)
+	websocket.Broadcast(event)
 
-		c.JSON(200, gin.H{"status": "event_received"})
+	c.JSON(200, gin.H{"status": "event_received"})
 	}
 }
 

@@ -289,7 +289,21 @@ type EnhancedClientIPInfo struct {
 }
 
 // ComputeTrustScore calcola un trust score per l'IP (0-100)
-// Basato su: source type, signature validation, whitelist status, ecc.
+// Basato su: source type, signature validation, whitelist status, network classification, ecc.
+//
+// Score ranges interpretation:
+// - 0-25:   Untrusted (blocklist candidates, require CAPTCHA)
+// - 25-50:  Low confidence (rate-limited, monitored)
+// - 50-75:  Neutral (standard handling)
+// - 75-100: Trusted (whitelisted, enterprise networks, verified VPN)
+//
+// Scoring logic:
+// 1. Start with base score (50 = neutral)
+// 2. Apply source-based bonuses (direct connection, proxy, Tailscale)
+// 3. Apply signature validation bonuses/penalties
+// 4. Apply network classification bonuses (DMZ, Tailscale, whitelist)
+// 5. Apply spoofing penalties for suspicious patterns
+// 6. Clamp result between 0-100
 func ComputeTrustScore(
 	info *ClientIPInfo,
 	headerSigValid bool,
@@ -299,42 +313,70 @@ func ComputeTrustScore(
 ) int {
 	score := 50 // Base score: neutral
 
-	// Aumenta se è IP pubblico diretto (meno spoofabile)
+	// ===== SOURCE TYPE SCORING =====
+	// Direct public IP connection (highest confidence)
 	if info.IsPublicIP && info.Source == SourceRemoteAddr {
 		score += 20
 	}
 
-	// Aumenta se viene da proxy trusted
+	// Trusted proxy chain (X-Forwarded-For / X-Real-IP from known proxies)
 	if info.IsTrusted && (info.Source == SourceXForwardedFor || info.Source == SourceXRealIP) {
 		score += 15
 	}
 
-	// Aumenta se Tailscale con firma valida
-	if isTailscale && headerSigValid {
-		score += 20
-	}
-
-	// Aumenta se DMZ
+	// ===== ENTERPRISE NETWORK SCORING =====
+	// DMZ networks are internal, managed infrastructure (typically trusted)
 	if isDMZ {
-		score += 10
+		score += 12
 	}
 
-	// Aumenta se in whitelist
+	// Tailscale VPN clients:
+	// - If HMAC-signed: +25 (high confidence, cryptographically verified)
+	// - If unsigned: +5 (medium confidence, self-reported but unverified)
+	// NOTE: Tailscale clients report their Tailscale internal IP (100.64.0.0/10)
+	// This is NOT a spoofing risk - it's the correct identification mechanism
+	if isTailscale {
+		if headerSigValid {
+			score += 25 // HMAC-verified Tailscale client: very trustworthy
+		} else {
+			score += 5 // Self-reported Tailscale without signature: moderate risk
+		}
+	}
+
+	// Private/internal network IPs (when legitimately extracted from trusted sources)
+	// These are lower risk than untrusted external IPs
+	// BUT: Only trust if coming from trusted proxies or direct connection
+	if info.IsPrivateIP && (info.Source == SourceXForwardedFor || info.Source == SourceXRealIP || info.Source == SourceRemoteAddr) {
+		score += 8 // Internal networks are generally lower-risk
+	}
+
+	// ===== WHITELIST BONUS =====
 	if isWhitelisted {
-		score += 10
+		score += 15 // Pre-approved sources
 	}
 
-	// Penalizza se X-Public-IP senza firma
+	// ===== SIGNATURE VALIDATION SCORING =====
+	// X-Public-IP header with valid HMAC signature
+	if info.Source == SourceXPublicIP && headerSigValid {
+		score += 20 // Cryptographically verified client-reported IP
+	}
+
+	// ===== SPOOFING DETECTION PENALTIES =====
+	// X-Public-IP header WITHOUT signature (potential spoofing)
+	// Severity depends on whether signature validation is enabled
 	if info.Source == SourceXPublicIP && !headerSigValid {
-		score -= 15
+		score -= 10 // Penalty for unverified client-reported IP
 	}
 
-	// Penalizza IP privati sospetti
-	if info.IsPrivateIP && info.Source == SourceXPublicIP {
-		score -= 20
+	// Private IP claiming to be public via X-Public-IP (suspicious)
+	// BUT: NOT penalizing Tailscale internal IPs because they legitimately
+	// use internal IPs as their identifier (100.64.0.0/10 is their network)
+	// ONLY penalize if it's NOT Tailscale
+	if info.IsPrivateIP && info.Source == SourceXPublicIP && !isTailscale {
+		score -= 15 // Clear spoofing attempt: private IP claiming to be public
 	}
 
-	// Clamp tra 0 e 100
+	// ===== TRUST CLAMPING & RETURN =====
 	if score < 0 {
 		score = 0
 	}
