@@ -33,6 +33,11 @@ type WAFEvent struct {
 	Payload     string `json:"payload"`     // Detected malicious payload
 	Blocked     bool   `json:"blocked"`
 	BlockedBy   string `json:"blocked_by"`
+
+	// IP Source Metadata (from WAF)
+	IPSource   string `json:"ip_source,omitempty"`    // How IP was extracted: x-public-ip, x-forwarded-for, x-real-ip, remote-addr
+	IPTrusted  bool   `json:"ip_trusted,omitempty"`   // Whether the IP source is from a trusted source
+	IPVPNReport bool  `json:"ip_vpn_reported,omitempty"` // Whether this is a self-reported IP from Tailscale/VPN
 }
 
 func init() {
