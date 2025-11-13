@@ -1546,7 +1546,7 @@ const StatsPage: React.FC = () => {
                       className="text-left py-3 px-4 text-gray-400 font-medium cursor-pointer hover:text-gray-300 transition w-24"
                     >
                       <div className="flex items-center gap-2">
-                        TI Level
+                        Threat Level
                         {allAlertsSortColumn === 'threat_level' && (
                           allAlertsSortOrder === 'asc' ? (
                             <ArrowUp size={14} />
@@ -1556,7 +1556,7 @@ const StatsPage: React.FC = () => {
                         )}
                       </div>
                     </th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">Trust Level</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">Trust Score</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">IP Rep</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-medium w-16">ASN</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-medium w-20">Status</th>
@@ -1632,7 +1632,7 @@ const StatsPage: React.FC = () => {
                           )}
                         </td>
                         <td className="py-3 px-4 text-gray-300 text-xs">
-                          {alert.asn || '-'}
+                          {alert.asn || 'internal'}
                         </td>
                         <td className="py-3 px-4">
                           {alert.blockedBy === 'auto' ? (
