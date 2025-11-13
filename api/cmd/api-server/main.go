@@ -54,6 +54,9 @@ func main() {
 		log.Println("[WARN] MAXMIND_LICENSE_KEY not set. Using fallback IP ranges. To use MaxMind, set MAXMIND_LICENSE_KEY environment variable.")
 	}
 
+	// Set Gin to release mode to disable debug warnings
+	gin.SetMode(gin.ReleaseMode)
+
 	// Create Gin router with explicit configuration
 	// Disable "trust all proxies" by creating custom engine
 	engine := gin.New()
