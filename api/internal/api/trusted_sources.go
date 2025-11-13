@@ -3,7 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
@@ -125,7 +125,7 @@ func (h *TrustedSourceHandler) GetTrustedSource(c echo.Context) error {
 // @Router /waf/sources [post]
 func (h *TrustedSourceHandler) CreateTrustedSource(c echo.Context) error {
 	var req TrustedSourceRequest
-	if err := c.BindAndValidate(&req); err != nil {
+	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": fmt.Sprintf("Invalid request: %v", err),
 		})
@@ -175,7 +175,7 @@ func (h *TrustedSourceHandler) UpdateTrustedSource(c echo.Context) error {
 	id := c.Param("id")
 
 	var req TrustedSourceRequest
-	if err := c.BindAndValidate(&req); err != nil {
+	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": fmt.Sprintf("Invalid request: %v", err),
 		})
@@ -258,7 +258,7 @@ func (h *TrustedSourceHandler) VerifyTrustedSource(c echo.Context) error {
 	}
 
 	// Marca come verified
-	now := gorm.NowFunc()
+	now := time.Now()
 	source.LastVerifiedAt = &now
 	source.VerificationStatus = "verified"
 
@@ -341,7 +341,7 @@ func (h *TrustedSourceHandler) ListHMACKeys(c echo.Context) error {
 // @Router /waf/hmac-keys [post]
 func (h *TrustedSourceHandler) CreateHMACKey(c echo.Context) error {
 	var req HMACKeyRequest
-	if err := c.BindAndValidate(&req); err != nil {
+	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
 			"error": fmt.Sprintf("Invalid request: %v", err),
 		})
