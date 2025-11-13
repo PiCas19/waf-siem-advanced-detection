@@ -82,7 +82,7 @@ func (h *TrustedSourceHandler) ListTrustedSources(c echo.Context) error {
 
 	if err := query.Find(&sources).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to fetch trusted sources: %v", err),
+			"error": "Failed to fetch trusted sources",
 		})
 	}
 
@@ -109,7 +109,7 @@ func (h *TrustedSourceHandler) GetTrustedSource(c echo.Context) error {
 			})
 		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Database error: %v", err),
+			"error": "Database error", err),
 		})
 	}
 
@@ -126,7 +126,7 @@ func (h *TrustedSourceHandler) CreateTrustedSource(c echo.Context) error {
 	var req TrustedSourceRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("Invalid request: %v", err),
+			"error": "Invalid request", err),
 		})
 	}
 
@@ -156,7 +156,7 @@ func (h *TrustedSourceHandler) CreateTrustedSource(c echo.Context) error {
 
 	if err := h.db.Create(&source).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to create source: %v", err),
+			"error": "Failed to create source", err),
 		})
 	}
 
@@ -176,7 +176,7 @@ func (h *TrustedSourceHandler) UpdateTrustedSource(c echo.Context) error {
 	var req TrustedSourceRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("Invalid request: %v", err),
+			"error": "Invalid request", err),
 		})
 	}
 
@@ -188,7 +188,7 @@ func (h *TrustedSourceHandler) UpdateTrustedSource(c echo.Context) error {
 			})
 		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Database error: %v", err),
+			"error": "Database error", err),
 		})
 	}
 
@@ -210,7 +210,7 @@ func (h *TrustedSourceHandler) UpdateTrustedSource(c echo.Context) error {
 
 	if err := h.db.Save(&source).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to update source: %v", err),
+			"error": "Failed to update source", err),
 		})
 	}
 
@@ -228,7 +228,7 @@ func (h *TrustedSourceHandler) DeleteTrustedSource(c echo.Context) error {
 
 	if err := h.db.Delete(&models.TrustedSource{}, "id = ?", id).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to delete source: %v", err),
+			"error": "Failed to delete source", err),
 		})
 	}
 
@@ -252,7 +252,7 @@ func (h *TrustedSourceHandler) VerifyTrustedSource(c echo.Context) error {
 			})
 		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Database error: %v", err),
+			"error": "Database error", err),
 		})
 	}
 
@@ -263,7 +263,7 @@ func (h *TrustedSourceHandler) VerifyTrustedSource(c echo.Context) error {
 
 	if err := h.db.Save(&source).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to verify source: %v", err),
+			"error": "Failed to verify source", err),
 		})
 	}
 
@@ -322,7 +322,7 @@ func (h *TrustedSourceHandler) ListHMACKeys(c echo.Context) error {
 
 	if err := h.db.Find(&keys).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to fetch HMAC keys: %v", err),
+			"error": "Failed to fetch HMAC keys", err),
 		})
 	}
 
@@ -342,7 +342,7 @@ func (h *TrustedSourceHandler) CreateHMACKey(c echo.Context) error {
 	var req HMACKeyRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": fmt.Sprintf("Invalid request: %v", err),
+			"error": "Invalid request", err),
 		})
 	}
 
@@ -356,7 +356,7 @@ func (h *TrustedSourceHandler) CreateHMACKey(c echo.Context) error {
 
 	if err := h.db.Create(&key).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to create HMAC key: %v", err),
+			"error": "Failed to create HMAC key", err),
 		})
 	}
 
@@ -374,7 +374,7 @@ func (h *TrustedSourceHandler) DeleteHMACKey(c echo.Context) error {
 
 	if err := h.db.Delete(&models.HMACKey{}, "id = ?", id).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to delete HMAC key: %v", err),
+			"error": "Failed to delete HMAC key", err),
 		})
 	}
 
@@ -398,7 +398,7 @@ func (h *TrustedSourceHandler) RotateHMACKey(c echo.Context) error {
 			})
 		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Database error: %v", err),
+			"error": "Database error", err),
 		})
 	}
 
@@ -406,7 +406,7 @@ func (h *TrustedSourceHandler) RotateHMACKey(c echo.Context) error {
 	key.IsActive = false
 	if err := h.db.Save(&key).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to deactivate old key: %v", err),
+			"error": "Failed to deactivate old key", err),
 		})
 	}
 
@@ -421,7 +421,7 @@ func (h *TrustedSourceHandler) RotateHMACKey(c echo.Context) error {
 
 	if err := h.db.Create(&newKey).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to create new key: %v", err),
+			"error": "Failed to create new key", err),
 		})
 	}
 
