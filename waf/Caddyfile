@@ -34,10 +34,8 @@
                 dial_timeout 2s
                 keepalive 30s
             }
-            # Tell Gin it's coming from a trusted proxy
-            header_up X-Forwarded-For {http.request.remote}
-            header_up X-Forwarded-Proto {http.request.proto}
-            header_up X-Real-IP {http.request.remote}
+            # Caddy tells backend it's a trusted proxy
+            trusted_proxies 127.0.0.1 ::1
         }
     }
 
@@ -55,10 +53,8 @@
                 dial_timeout 2s
                 keepalive 30s
             }
-            # Tell Gin it's coming from a trusted proxy
-            header_up X-Forwarded-For {http.request.remote}
-            header_up X-Forwarded-Proto {http.request.proto}
-            header_up X-Real-IP {http.request.remote}
+            # Caddy tells backend it's a trusted proxy
+            trusted_proxies 127.0.0.1 ::1
         }
     }
     
@@ -194,40 +190,38 @@
                 dial_timeout 2s
                 keepalive 30s
             }
-            # Tell Gin it's coming from a trusted proxy
-            header_up X-Forwarded-For {http.request.remote}
-            header_up X-Forwarded-Proto {http.request.proto}
-            header_up X-Real-IP {http.request.remote}
+            # Caddy tells backend it's a trusted proxy
+            trusted_proxies 127.0.0.1 ::1
         }
     }
-    
+
     # File statici
     handle /assets/* {
         root * /var/www/html
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-    
+
     handle /favicon.ico {
         root * /var/www/html
         file_server
     }
-    
+
     handle /manifest.json {
         root * /var/www/html
         file_server
     }
-    
+
     handle /robots.txt {
         root * /var/www/html
         file_server
     }
-    
+
     handle /vite.svg {
         root * /var/www/html
         file_server
     }
-    
+
     # Resto con WAF
     handle {
         waf {
@@ -295,10 +289,8 @@ http://172.16.216.10 {
                 dial_timeout 2s
                 keepalive 30s
             }
-            # Tell Gin it's coming from a trusted proxy
-            header_up X-Forwarded-For {http.request.remote}
-            header_up X-Forwarded-Proto {http.request.proto}
-            header_up X-Real-IP {http.request.remote}
+            # Caddy tells backend it's a trusted proxy
+            trusted_proxies 127.0.0.1 ::1
         }
     }
 
@@ -316,10 +308,8 @@ http://172.16.216.10 {
                 dial_timeout 2s
                 keepalive 30s
             }
-            # Tell Gin it's coming from a trusted proxy
-            header_up X-Forwarded-For {http.request.remote}
-            header_up X-Forwarded-Proto {http.request.proto}
-            header_up X-Real-IP {http.request.remote}
+            # Caddy tells backend it's a trusted proxy
+            trusted_proxies 127.0.0.1 ::1
         }
     }
     
