@@ -92,7 +92,7 @@
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
 
             # ============================================
-            # ENTERPRISE-GRADE IP DETECTION
+            # ENTERPRISE-GRADE IP DETECTION (WAN - TAILSCALE)
             # ============================================
 
             # HMAC Signature Validation for X-Public-IP
@@ -102,12 +102,17 @@
 
             # Tailscale Network Detection
             # Automatically recognizes Tailscale IPs (100.64.0.0/10)
-            # and validates them with HMAC signatures
+            # Your MacBook: 100.115.217.37 will be detected as Tailscale
             enable_tailscale_detection true
             tailscale_networks 100.64.0.0/10
 
+            # DMZ Network Detection
+            # Detects traffic from DMZ (172.16.216.0/24)
+            enable_dmz_detection true
+            dmz_networks 172.16.216.0/24
+
             # Trusted Proxies for X-Forwarded-For validation
-            # Add your reverse proxy IPs here
+            # WAN: Only localhost (strict, no internal proxies)
             trusted_proxies 127.0.0.1 ::1
         }
         
@@ -219,9 +224,14 @@
             # ENTERPRISE-GRADE IP DETECTION (LAN HTTPS)
             # ============================================
 
+            # DMZ Network Detection
+            # Detects traffic from DMZ (172.16.216.0/24)
+            enable_dmz_detection true
+            dmz_networks 172.16.216.0/24
+
             # Trusted Proxies for internal LAN connections
-            # No HMAC/Tailscale needed for LAN IPs
-            trusted_proxies 127.0.0.1 ::1 172.16.0.0/12 10.0.0.0/8
+            # LAN: 192.168.216.0/24, DMZ: 172.16.216.0/24
+            trusted_proxies 127.0.0.1 ::1 192.168.216.0/24 172.16.216.0/24
         }
 
         root * /var/www/html
@@ -328,9 +338,14 @@ http://172.16.216.10 {
             # ENTERPRISE-GRADE IP DETECTION (LAN HTTP)
             # ============================================
 
+            # DMZ Network Detection
+            # Detects traffic from DMZ (172.16.216.0/24)
+            enable_dmz_detection true
+            dmz_networks 172.16.216.0/24
+
             # Trusted Proxies for internal LAN connections
-            # No HMAC/Tailscale needed for LAN IPs
-            trusted_proxies 127.0.0.1 ::1 172.16.0.0/12 10.0.0.0/8
+            # LAN: 192.168.216.0/24, DMZ: 172.16.216.0/24
+            trusted_proxies 127.0.0.1 ::1 192.168.216.0/24 172.16.216.0/24
         }
 
         root * /var/www/html
