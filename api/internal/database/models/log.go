@@ -19,6 +19,11 @@ type Log struct {
 	// BlockedBy indicates how the threat was blocked: "auto" (by rule), "manual" (by operator), or "" (not blocked)
 	BlockedBy   string `gorm:"default:''" json:"blocked_by"`
 
+	// IP Source Metadata (from WAF)
+	ClientIPSource    string `gorm:"default:''" json:"client_ip_source"`       // How the IP was extracted: x-public-ip, x-forwarded-for, x-real-ip, remote-addr
+	ClientIPTrusted   bool   `json:"client_ip_trusted"`                        // Whether the IP source is from a trusted source (proxy, Tailscale, etc)
+	ClientIPVPNReport bool   `json:"client_ip_vpn_report"`                     // Whether this is a self-reported IP from Tailscale/VPN client
+
 	// Threat Intelligence fields
 	IPReputation     *int    `json:"ip_reputation,omitempty"`         // IP reputation score (0-100, higher = more suspicious)
 	IsMalicious      bool    `json:"is_malicious"`                    // Whether IP is known to be malicious

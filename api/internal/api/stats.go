@@ -43,9 +43,24 @@ func InitTIService(db *gorm.DB) {
 }
 
 // extractRealClientIP extracts the real client IP from proxy headers
-// Checks in order: X-Forwarded-For, CF-Connecting-IP, X-Real-IP, X-Client-IP
+// Checks in order of priority:
+// 1. X-Public-IP: Client self-reported public IP (Tailscale/VPN)
+// 2. X-Forwarded-For: Comma-separated proxy chain (takes first)
+// 3. CF-Connecting-IP: Cloudflare header
+// 4. X-Real-IP: Nginx/Apache proxy header
+// 5. X-Client-IP: Generic proxy header
 // Returns empty string if no header found
 func extractRealClientIP(c *gin.Context) string {
+	// X-Public-IP: Client self-reported public IP (Tailscale/VPN client)
+	// Highest priority - means client explicitly sent their public IP
+	if xPublicIP := c.GetHeader("X-Public-IP"); xPublicIP != "" {
+		xPublicIP = strings.TrimSpace(xPublicIP)
+		if xPublicIP != "" {
+			fmt.Printf("[DEBUG] X-Public-IP header found (Tailscale/VPN): %s\n", xPublicIP)
+			return xPublicIP
+		}
+	}
+
 	// X-Forwarded-For: 203.0.113.45, 198.51.100.10 (comma-separated, first is client)
 	if xForwardedFor := c.GetHeader("X-Forwarded-For"); xForwardedFor != "" {
 		// Take the first IP (the actual client)
@@ -61,20 +76,29 @@ func extractRealClientIP(c *gin.Context) string {
 
 	// CF-Connecting-IP: Cloudflare header
 	if cfIP := c.GetHeader("CF-Connecting-IP"); cfIP != "" {
-		fmt.Printf("[DEBUG] CF-Connecting-IP header found: %s\n", cfIP)
-		return cfIP
+		cfIP = strings.TrimSpace(cfIP)
+		if cfIP != "" {
+			fmt.Printf("[DEBUG] CF-Connecting-IP header found: %s\n", cfIP)
+			return cfIP
+		}
 	}
 
 	// X-Real-IP: Nginx, Apache proxy header
 	if xRealIP := c.GetHeader("X-Real-IP"); xRealIP != "" {
-		fmt.Printf("[DEBUG] X-Real-IP header found: %s\n", xRealIP)
-		return xRealIP
+		xRealIP = strings.TrimSpace(xRealIP)
+		if xRealIP != "" {
+			fmt.Printf("[DEBUG] X-Real-IP header found: %s\n", xRealIP)
+			return xRealIP
+		}
 	}
 
 	// X-Client-IP: Generic proxy header
 	if xClientIP := c.GetHeader("X-Client-IP"); xClientIP != "" {
-		fmt.Printf("[DEBUG] X-Client-IP header found: %s\n", xClientIP)
-		return xClientIP
+		xClientIP = strings.TrimSpace(xClientIP)
+		if xClientIP != "" {
+			fmt.Printf("[DEBUG] X-Client-IP header found: %s\n", xClientIP)
+			return xClientIP
+		}
 	}
 
 	return ""
@@ -163,6 +187,9 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 			Blocked:     event.Blocked,
 			BlockedBy:   event.BlockedBy,
 			Severity:    GetSeverityFromThreatType(event.Threat),
+			// IP source metadata from WAF
+			// These fields track how the IP was extracted by the WAF (X-Public-IP, X-Forwarded-For, etc)
+			// Can be populated from WAF event if available, otherwise will be enriched later
 		}
 		if err := db.Create(&log).Error; err != nil {
 			fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)
