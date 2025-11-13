@@ -56,10 +56,26 @@ type Middleware struct {
 	WhitelistEndpoint  string   `json:"whitelist_endpoint,omitempty"`  // API endpoint to fetch whitelist
 	TrustedProxies     []string `json:"trusted_proxies,omitempty"`     // List of trusted proxy IPs/CIDR ranges
 
+	// Enterprise-grade IP detection configuration
+	EnableHMACSignatureValidation bool   `json:"enable_hmac_signature_validation,omitempty"` // Enable HMAC header validation
+	HMACSharedSecret              string `json:"hmac_shared_secret,omitempty"`               // Shared secret for HMAC signing
+	TrustedSourcesPolicyEndpoint   string `json:"trusted_sources_endpoint,omitempty"`        // API endpoint to fetch trusted sources policy
+	EnableDMZDetection            bool   `json:"enable_dmz_detection,omitempty"`            // Enable DMZ IP detection
+	DMZNetworks                   []string `json:"dmz_networks,omitempty"`                   // CIDR ranges for DMZ
+	EnableTailscaleDetection      bool   `json:"enable_tailscale_detection,omitempty"`      // Enable Tailscale IP detection
+	TailscaleNetworks             []string `json:"tailscale_networks,omitempty"`            // CIDR ranges for Tailscale
+
 	detector       *detector.Detector
 	logger         *logger.Logger
 	httpClient     *http.Client
 	stopRuleReload chan bool // Channel to stop rule reloading goroutine
+
+	// Enterprise: Trusted source management
+	trustedSourceManager *ipextract.GlobalTrustedSourceManager
+	sourcePolicy        *ipextract.TrustedSourcePolicy
+	headerSigConfig     *ipextract.HeaderSignatureConfig
+	dmzConfig           *ipextract.DMZDetectionConfig
+	tailscaleConfig     *ipextract.TailscaleDetectionConfig
 
 	// Cache for recently processed requests to prevent duplicate logging of retries
 	// Key: MD5 fingerprint of (IP + method + path + threat + payload)
@@ -112,6 +128,43 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	// Initialize HTTP client for sending events to API
 	m.httpClient = &http.Client{
 		Timeout: 5 * time.Second,
+	}
+
+	// Initialize enterprise-grade IP detection
+	m.trustedSourceManager = ipextract.NewGlobalTrustedSourceManager()
+	m.sourcePolicy = ipextract.CreateDefaultPolicy()
+	m.trustedSourceManager.AddPolicy(m.sourcePolicy)
+
+	// Configure HMAC signature validation
+	m.headerSigConfig = ipextract.DefaultHeaderSignatureConfig()
+	if m.EnableHMACSignatureValidation && m.HMACSharedSecret != "" {
+		m.headerSigConfig.Enabled = true
+		m.headerSigConfig.SharedSecret = m.HMACSharedSecret
+		m.headerSigConfig.RequireSignature = true
+		fmt.Printf("[INFO] WAF: HMAC signature validation enabled\n")
+	}
+
+	// Configure DMZ detection
+	m.dmzConfig = &ipextract.DMZDetectionConfig{
+		Enabled:     m.EnableDMZDetection,
+		DMZNetworks: m.DMZNetworks,
+	}
+	if m.EnableDMZDetection {
+		fmt.Printf("[INFO] WAF: DMZ detection enabled with %d networks\n", len(m.DMZNetworks))
+	}
+
+	// Configure Tailscale detection
+	m.tailscaleConfig = &ipextract.TailscaleDetectionConfig{
+		Enabled:               m.EnableTailscaleDetection,
+		TailscaleNetworks:     m.TailscaleNetworks,
+		VerifyHeaderSignature: m.EnableHMACSignatureValidation,
+	}
+	if m.EnableTailscaleDetection {
+		fmt.Printf("[INFO] WAF: Tailscale detection enabled with %d networks\n", len(m.TailscaleNetworks))
+		if m.TailscaleNetworks == nil || len(m.TailscaleNetworks) == 0 {
+			// Use default Tailscale network if not specified
+			m.tailscaleConfig.TailscaleNetworks = []string{"100.64.0.0/10"}
+		}
 	}
 
 	// Initialize processed requests cache
@@ -284,7 +337,17 @@ func (m *Middleware) markAsProcessed(fingerprint string) {
 
 // ServeHTTP implements the middleware handler
 func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	clientIP := getClientIP(r)
+	// Use enterprise-grade IP detection with policy validation
+	enhancedIPInfo := ipextract.ExtractClientIPWithPolicy(
+		r,
+		r.RemoteAddr,
+		m.trustedSourceManager,
+		m.headerSigConfig,
+		m.dmzConfig,
+		m.tailscaleConfig,
+	)
+
+	clientIP := enhancedIPInfo.IP
 
 	// FIRST: Check whitelist - if whitelisted, skip all checks and allow request
 	if m.isIPWhitelisted(clientIP) {
@@ -344,9 +407,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 				m.logger.Log(entry)
 			}
 
-			// Send event to API backend
+			// Send event to API backend with enhanced IP info
 			if m.APIEndpoint != "" {
-				go m.sendEventToAPI(r, clientIP, threat)
+				go m.sendEventToAPI(r, clientIP, threat, enhancedIPInfo)
 			}
 		}
 
@@ -649,7 +712,7 @@ func (m *Middleware) blockRequest(w http.ResponseWriter, threat *detector.Threat
 }
 
 // sendEventToAPI sends a threat event to the backend API
-func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *detector.Threat) {
+func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *detector.Threat, enhancedIPInfo *ipextract.EnhancedClientIPInfo) {
 	// Determine if the request is actually blocked:
 	// 1. Default rules always block (IsDefault: true)
 	// 2. Custom rules block if action is "block"
@@ -690,6 +753,15 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 		"timestamp":        time.Now().Format(time.RFC3339),
 		"blocked":          blocked,
 		"blocked_by":       blockedBy,
+
+		// Enterprise-grade IP detection details
+		"ip_source_type":           enhancedIPInfo.SourceType,
+		"ip_classification":        enhancedIPInfo.SourceClassification,
+		"ip_header_signature_valid": enhancedIPInfo.HeaderSignatureValid,
+		"ip_is_dmz":                 enhancedIPInfo.DMZIP,
+		"ip_is_tailscale":           enhancedIPInfo.TailscaleIP,
+		"ip_trust_score":            enhancedIPInfo.TrustScore,
+		"ip_validation_details":     enhancedIPInfo.ValidationDetails,
 	}
 
 	jsonData, err := json.Marshal(eventPayload)
@@ -782,6 +854,43 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				// Parse multiple trusted proxy IPs/CIDR ranges
 				for d.NextArg() {
 					m.TrustedProxies = append(m.TrustedProxies, d.Val())
+				}
+			// Enterprise-grade IP detection
+			case "enable_hmac_signature_validation":
+				var mode string
+				if !d.Args(&mode) {
+					return d.ArgErr()
+				}
+				m.EnableHMACSignatureValidation = mode == "true"
+			case "hmac_shared_secret":
+				if !d.Args(&m.HMACSharedSecret) {
+					return d.ArgErr()
+				}
+			case "trusted_sources_endpoint":
+				if !d.Args(&m.TrustedSourcesPolicyEndpoint) {
+					return d.ArgErr()
+				}
+			case "enable_dmz_detection":
+				var mode string
+				if !d.Args(&mode) {
+					return d.ArgErr()
+				}
+				m.EnableDMZDetection = mode == "true"
+			case "dmz_networks":
+				// Parse multiple DMZ network CIDR ranges
+				for d.NextArg() {
+					m.DMZNetworks = append(m.DMZNetworks, d.Val())
+				}
+			case "enable_tailscale_detection":
+				var mode string
+				if !d.Args(&mode) {
+					return d.ArgErr()
+				}
+				m.EnableTailscaleDetection = mode == "true"
+			case "tailscale_networks":
+				// Parse multiple Tailscale network CIDR ranges
+				for d.NextArg() {
+					m.TailscaleNetworks = append(m.TailscaleNetworks, d.Val())
 				}
 			default:
 				return d.Errf("unknown subdirective: %s", d.Val())

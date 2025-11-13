@@ -2,7 +2,9 @@ package ipextract
 
 import (
 	"net"
+	"net/http"
 	"strings"
+	"time"
 )
 
 // ClientIPSource represents the source from which the client IP was extracted
@@ -292,3 +294,94 @@ func GetIPType(ip string) string {
 
 	return "public"
 }
+
+// ExtractClientIPWithPolicy estrae l'IP del client applicando una policy di trusted sources
+// Questo è il metodo enterprise-grade che integra signature validation + source policy
+func ExtractClientIPWithPolicy(
+	r *http.Request,
+	remoteAddr string,
+	manager *GlobalTrustedSourceManager,
+	sigConfig *HeaderSignatureConfig,
+	dmzConfig *DMZDetectionConfig,
+	tsConfig *TailscaleDetectionConfig,
+) *EnhancedClientIPInfo {
+	// Prima estrai l'IP usando la logica standard
+	basicInfo := ExtractClientIPFromHeaders(
+		r.Header.Get("X-Public-IP"),
+		r.Header.Get("X-Forwarded-For"),
+		r.Header.Get("X-Real-IP"),
+		remoteAddr,
+	)
+
+	// Estrai source IP
+	sourceIP := extractIPFromRemoteAddr(remoteAddr)
+
+	// Valida la firma se X-Public-IP è presente
+	headerSigValid := false
+	if r.Header.Get("X-Public-IP") != "" && sigConfig.Enabled {
+		result := ValidateHeaderSignature(r, sigConfig, sourceIP)
+		headerSigValid = result.IsValid
+	}
+
+	// Controlla se è DMZ
+	isDMZ := IsDMZIP(basicInfo.IP, dmzConfig)
+
+	// Controlla se è Tailscale
+	isTailscale := IsTailscaleIP(basicInfo.IP, tsConfig)
+
+	// Determina il source type
+	sourceType := "unknown"
+	if isDMZ {
+		sourceType = "dmz"
+	} else if isTailscale {
+		sourceType = "tailscale"
+	} else if basicInfo.IsPublicIP {
+		sourceType = "public"
+	} else if basicInfo.IsPrivateIP {
+		sourceType = "private"
+	}
+
+	// Calcola trust score
+	isWhitelisted := false // Questo verrà impostato dal middleware
+	trustScore := ComputeTrustScore(basicInfo, headerSigValid, isDMZ, isTailscale, isWhitelisted)
+
+	// Determina classificazione
+	classification := "untrusted"
+	if manager != nil && manager.IsTrusted(sourceIP) {
+		classification = "trusted"
+	} else if trustScore >= 75 {
+		classification = "trusted"
+	} else if trustScore >= 50 {
+		classification = "neutral"
+	}
+
+	enhanced := &EnhancedClientIPInfo{
+		ClientIPInfo:         basicInfo,
+		SourceType:           sourceType,
+		SourceClassification: classification,
+		HeaderSignatureValid: headerSigValid,
+		DMZIP:                isDMZ,
+		TailscaleIP:          isTailscale,
+		TrustScore:           trustScore,
+		ValidationTimestamp:  time.Now(),
+	}
+
+	// Aggiungi dettagli di validazione
+	if basicInfo.Source == SourceXPublicIP {
+		enhanced.ValidationDetails = "Client-reported public IP"
+		if headerSigValid {
+			enhanced.ValidationDetails += " [HMAC signed]"
+		} else if sigConfig.Enabled {
+			enhanced.ValidationDetails += " [SIGNATURE INVALID]"
+		}
+	}
+
+	return enhanced
+}
+
+// Aggiungi import per http e time se non presenti
+// (già presenti nel package, ma documentiamo qui per chiarezza)
+// import (
+//     "net/http"
+//     "time"
+// )
