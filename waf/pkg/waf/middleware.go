@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/detector"
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/logger"
+	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/ipextract"
 )
 
 func init() {
@@ -47,13 +47,14 @@ type WhitelistEntry struct {
 
 // Middleware implements WAF functionality for Caddy
 type Middleware struct {
-	RulesFile          string `json:"rules_file,omitempty"`
-	LogFile            string `json:"log_file,omitempty"`
-	BlockMode          bool   `json:"block_mode,omitempty"`
-	APIEndpoint        string `json:"api_endpoint,omitempty"`
-	RulesEndpoint      string `json:"rules_endpoint,omitempty"`      // API endpoint to fetch custom rules
-	BlocklistEndpoint  string `json:"blocklist_endpoint,omitempty"`  // API endpoint to fetch blocklist
-	WhitelistEndpoint  string `json:"whitelist_endpoint,omitempty"`  // API endpoint to fetch whitelist
+	RulesFile          string   `json:"rules_file,omitempty"`
+	LogFile            string   `json:"log_file,omitempty"`
+	BlockMode          bool     `json:"block_mode,omitempty"`
+	APIEndpoint        string   `json:"api_endpoint,omitempty"`
+	RulesEndpoint      string   `json:"rules_endpoint,omitempty"`      // API endpoint to fetch custom rules
+	BlocklistEndpoint  string   `json:"blocklist_endpoint,omitempty"`  // API endpoint to fetch blocklist
+	WhitelistEndpoint  string   `json:"whitelist_endpoint,omitempty"`  // API endpoint to fetch whitelist
+	TrustedProxies     []string `json:"trusted_proxies,omitempty"`     // List of trusted proxy IPs/CIDR ranges
 
 	detector       *detector.Detector
 	logger         *logger.Logger
@@ -100,6 +101,12 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 			return fmt.Errorf("failed to initialize logger: %v", err)
 		}
 		m.logger = l
+	}
+
+	// Configure trusted proxies for IP extraction
+	if len(m.TrustedProxies) > 0 {
+		ipextract.SetTrustedProxies(m.TrustedProxies)
+		fmt.Printf("[INFO] WAF: Configured %d trusted proxies for IP extraction\n", len(m.TrustedProxies))
 	}
 
 	// Initialize HTTP client for sending events to API
@@ -319,17 +326,20 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			// Mark this request as processed
 			m.markAsProcessed(fingerprint)
 
-			// Log the threat
+			// Log the threat with detailed IP source information
 			if m.logger != nil {
 				entry := logger.LogEntry{
-					ThreatType:  threat.Type,
-					Severity:    threat.Severity,
-					Description: threat.Description,
-					ClientIP:    clientIP,
-					Method:      r.Method,
-					URL:         r.URL.String(),
-					UserAgent:   r.UserAgent(),
-					Payload:     threat.Payload,
+					ThreatType:        threat.Type,
+					Severity:          threat.Severity,
+					Description:       threat.Description,
+					ClientIP:          threat.ClientIP,
+					ClientIPSource:    string(threat.ClientIPSource),
+					ClientIPTrusted:   threat.ClientIPTrusted,
+					ClientIPVPNReport: threat.ClientIPVPNReport,
+					Method:            r.Method,
+					URL:               r.URL.String(),
+					UserAgent:         r.UserAgent(),
+					Payload:           threat.Payload,
 				}
 				m.logger.Log(entry)
 			}
@@ -666,17 +676,20 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 	}
 
 	eventPayload := map[string]interface{}{
-		"ip":          clientIP,
-		"threat":      threat.Type,
-		"description": threat.Description, // Rule name/description for per-rule blocking
-		"method":      r.Method,
-		"path":        r.URL.Path,
-		"query":       r.URL.RawQuery,
-		"user_agent":  r.UserAgent(),
-		"payload":     threat.Payload,
-		"timestamp":   time.Now().Format(time.RFC3339),
-		"blocked":     blocked,
-		"blocked_by":  blockedBy,
+		"ip":               clientIP,
+		"ip_source":        string(threat.ClientIPSource),    // How the IP was extracted: x-public-ip, x-forwarded-for, x-real-ip, remote-addr
+		"ip_trusted":       threat.ClientIPTrusted,           // Whether the IP source is trusted
+		"ip_vpn_reported":  threat.ClientIPVPNReport,         // Whether this is a self-reported IP from Tailscale/VPN
+		"threat":           threat.Type,
+		"description":      threat.Description,               // Rule name/description for per-rule blocking
+		"method":           r.Method,
+		"path":             r.URL.Path,
+		"query":            r.URL.RawQuery,
+		"user_agent":       r.UserAgent(),
+		"payload":          threat.Payload,
+		"timestamp":        time.Now().Format(time.RFC3339),
+		"blocked":          blocked,
+		"blocked_by":       blockedBy,
 	}
 
 	jsonData, err := json.Marshal(eventPayload)
@@ -709,22 +722,25 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 	}
 }
 
-// getClientIP extracts the real client IP from the request
+// getClientIP extracts the real client IP from the request using robust extraction logic
+// Priority: X-Public-IP (Tailscale/VPN) > X-Forwarded-For (trusted proxy) > X-Real-IP (trusted proxy) > RemoteAddr
 func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		ips := strings.Split(xff, ",")
-		return strings.TrimSpace(ips[0])
-	}
+	return ipextract.ExtractClientIPSimple(
+		r.Header.Get("X-Public-IP"),
+		r.Header.Get("X-Forwarded-For"),
+		r.Header.Get("X-Real-IP"),
+		r.RemoteAddr,
+	)
+}
 
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-
-	// Fallback to RemoteAddr
-	ip := strings.Split(r.RemoteAddr, ":")[0]
-	return ip
+// getClientIPInfo extracts detailed client IP information from the request
+func getClientIPInfo(r *http.Request) *ipextract.ClientIPInfo {
+	return ipextract.ExtractClientIPFromHeaders(
+		r.Header.Get("X-Public-IP"),
+		r.Header.Get("X-Forwarded-For"),
+		r.Header.Get("X-Real-IP"),
+		r.RemoteAddr,
+	)
 }
 
 // UnmarshalCaddyfile implements caddyfile.Unmarshaler
@@ -761,6 +777,11 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			case "whitelist_endpoint":
 				if !d.Args(&m.WhitelistEndpoint) {
 					return d.ArgErr()
+				}
+			case "trusted_proxies":
+				// Parse multiple trusted proxy IPs/CIDR ranges
+				for d.NextArg() {
+					m.TrustedProxies = append(m.TrustedProxies, d.Val())
 				}
 			default:
 				return d.Errf("unknown subdirective: %s", d.Val())
