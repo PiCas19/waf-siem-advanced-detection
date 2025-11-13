@@ -22,17 +22,30 @@ ThreatSource|internal
 
 **Problem**: Doesn't indicate this is from a Tailscale VPN client!
 
-### Improved Log Output (✅ After Fix)
+### Improved Log Output (✅ After V1 Fix)
 ```
-IP|100.115.217.37|ClientIPVPNReport|true|ClientIPSource|x-public-ip
+IP|100.115.217.37|ClientIPVPNReport|true|ClientIPSource|x-public-ip|ClientIPPublic|203.0.113.42
 Threat|Detected|Blocked
-Country|VPN/TAILSCALE
-ISP|Tailscale VPN Network
+Country|VPN/TAILSCALE (or real country if public IP geolocated)
+ISP|Tailscale VPN Network (or real ISP from public IP)
 ThreatLevel|low
-ThreatSource|tailscale-vpn
+ThreatSource|tailscale-vpn (or ip-api.com for real geolocation)
 ```
 
 **Better**: Clearly identifies Tailscale VPN client!
+
+### Enhanced Log Output (✅ After V2 Fix - Real Geolocation)
+```
+IP|100.115.217.37|ClientIPVPNReport|true|ClientIPSource|x-public-ip|ClientIPPublic|203.0.113.42
+Threat|Detected|Blocked
+Country|IT
+ISP|Vodafone Italia
+ASN|AS3352
+ThreatLevel|low
+ThreatSource|ip-api.com (Tailscale public IP)
+```
+
+**Best**: Shows the REAL country/ISP from the public IP while still flagging it as low-risk VPN!
 
 ## 🔍 How It Works
 
@@ -59,8 +72,25 @@ API receives with VPN flag set
 **TI Service Logic** (`threatintel/service.go`):
 
 ```go
-if isReserved && isTailscaleVPN {
-    // This is a Tailscale client with reserved IP
+if isReserved && isTailscaleVPN && log.ClientIPPublic != "" {
+    // This is a Tailscale client - try to geolocate the reported public IP
+    publicGeoData := geolocate(log.ClientIPPublic)  // Use ip-api.com
+    if publicGeoData != nil {
+        // Use real geolocation from public IP
+        data.Country = publicGeoData.Country     // e.g., "IT"
+        data.ISP = publicGeoData.ISP             // e.g., "Vodafone Italia"
+        data.ThreatSource = "ip-api.com (Tailscale public IP)"
+        data.ThreatLevel = "low"  // Still low-risk because it's from VPN
+
+        // Also check reputation of the public IP
+        reputation := checkAlienVaultOTX(log.ClientIPPublic)
+        if reputation != nil {
+            data.IsMalicious = reputation.IsMalicious
+            data.IPReputation = reputation.IPReputation
+        }
+    }
+} else if isReserved && isTailscaleVPN {
+    // Tailscale client but no public IP reported - use default
     data.Country = "VPN/TAILSCALE"
     data.ISP = "Tailscale VPN Network"
     data.ThreatSource = "tailscale-vpn"
@@ -72,8 +102,11 @@ if isReserved && isTailscaleVPN {
 
 When a Tailscale client is detected:
 ```
-[INFO] *** TAILSCALE/VPN CLIENT DETECTED *** IP=100.115.217.37, Source=x-public-ip, Trusted=true
-[INFO] Tailscale VPN client with reserved IP - marking as 'Tailscale-VPN' for clarity
+[INFO] *** TAILSCALE/VPN CLIENT DETECTED *** Internal IP=100.115.217.37, Public IP=203.0.113.42, Source=x-public-ip, Trusted=true
+[INFO] X-Public-IP (Tailscale/VPN client public IP): 203.0.113.42
+[INFO] Tailscale VPN client detected - attempting to geolocate reported public IP: 203.0.113.42
+[INFO] Successfully geolocated Tailscale public IP 203.0.113.42: Country=IT, ISP=Vodafone Italia, ASN=AS3352
+[INFO] AlienVault OTX for Tailscale public IP 203.0.113.42: reputation=15, isMalicious=false
 ```
 
 ## 📋 Database Fields
@@ -84,6 +117,7 @@ When a Tailscale client is detected:
 ClientIPSource: "x-public-ip"     // How the IP was extracted
 ClientIPTrusted: true             // Is it from a trusted source?
 ClientIPVPNReport: true           // Self-reported from Tailscale/VPN?
+ClientIPPublic: "203.0.113.42"    // The public IP reported by Tailscale client
 ```
 
 ### Threat Intelligence Fields
@@ -275,23 +309,34 @@ API Event Handler
   │   - client_ip: 100.115.217.37 (RemoteAddr at API)
   │   - client_ip_vpn_report: true
   │   - client_ip_source: "x-public-ip"
+  │   - client_ip_public: "203.0.113.42" ← IMPORTANT: Save the public IP!
   └─ Trigger TI enrichment
     ↓
 TI Service
   ├─ Detect: isReserved(100.115.217.37) = true
-  ├─ Detect: isTailscaleVPN = true (from Log flag)
-  ├─ Set: country = "VPN/TAILSCALE"
-  ├─ Set: isp = "Tailscale VPN Network"
-  ├─ Set: threat_source = "tailscale-vpn"
+  ├─ Detect: isTailscaleVPN = true (from Log.ClientIPVPNReport flag)
+  ├─ Geolocate: client_ip_public = "203.0.113.42" ← Use this IP!
+  ├─ Query ip-api.com for public IP:
+  │   ├─ country: "IT"
+  │   ├─ isp: "Vodafone Italia"
+  │   └─ asn: "AS3352"
+  ├─ Query AlienVault OTX for public IP reputation
+  │   ├─ reputation: 15 (low risk)
+  │   └─ isMalicious: false
+  ├─ Set: country = "IT" (actual country!)
+  ├─ Set: isp = "Vodafone Italia" (actual ISP!)
+  ├─ Set: threat_source = "ip-api.com (Tailscale public IP)"
   └─ Set: threat_level = "low"
     ↓
 Database (Updated Log Record)
   ├─ client_ip: 100.115.217.37
+  ├─ client_ip_public: 203.0.113.42 ← Stored for reference
   ├─ client_ip_vpn_report: true
-  ├─ country: VPN/TAILSCALE
-  ├─ isp: Tailscale VPN Network
-  ├─ threat_source: tailscale-vpn
-  ├─ threat_level: low
+  ├─ country: IT ← Real country from geolocation
+  ├─ isp: Vodafone Italia ← Real ISP from geolocation
+  ├─ threat_source: ip-api.com (Tailscale public IP)
+  ├─ threat_level: low ← Still low-risk due to VPN encryption
+  ├─ ip_reputation: 15 ← Reputation of public IP
   └─ blocklist_status: checked
     ↓
 Dashboard
@@ -303,19 +348,23 @@ Dashboard
 | Aspect | Detail |
 |--------|--------|
 | **Detection** | X-Public-IP header + reserved IP range |
-| **Display** | Country="VPN/TAILSCALE", ISP="Tailscale VPN Network" |
-| **Threat Level** | LOW (inherently safe, encrypted) |
-| **Reputation** | Not applicable (no public reputation) |
-| **Logging** | Prominent "TAILSCALE/VPN CLIENT DETECTED" log |
+| **Public IP Geolocation** | YES - We geolocate the reported public IP via ip-api.com |
+| **Display** | Country=Real Country (e.g., "IT"), ISP=Real ISP (e.g., "Vodafone Italia") |
+| **VPN Identification** | ClientIPVPNReport=true, ClientIPSource="x-public-ip", ClientIPPublic=stored |
+| **Threat Level** | LOW (inherently safe, encrypted, even if attack from real location) |
+| **Reputation** | From AlienVault OTX on the public IP |
+| **Logging** | Prominent "TAILSCALE/VPN CLIENT DETECTED" with both internal & public IPs |
 | **Risk** | Attack type still assessed normally |
-| **Action** | Log by default (can be customized) |
+| **Action** | Log by default (can be customized per country/ISP) |
 
 ## 🎯 Key Takeaway
 
-Tailscale clients using reserved IP 100.64.0.0/10 are now properly identified as "VPN/TAILSCALE" in the threat intelligence data, making threat analysis much clearer and preventing confusion with other internal/private networks.
+Tailscale clients now show the **real country and ISP of origin** (from their public IP) while still being clearly marked as low-risk VPN traffic. This combines accurate threat intelligence with proper VPN identification, giving security analysts both the "what" (attack type/threat) and the "where" (real geographic origin) in a single, unified view.
 
 ---
 
-**Status**: ✅ Implemented and tested
+**Status**: ✅ Implemented and tested (V2: Real geolocation of public IPs)
 **Branch**: feature/waf-advanced-capabilities
-**Latest Commit**: 5b0d7f4
+**Latest Commits**:
+- 833bcab: feat: Geolocate Tailscale/VPN client public IPs instead of internal IPs
+- 5b0d7f4: fix: Improve Tailscale/VPN IP detection and logging (V1)
