@@ -21,6 +21,15 @@ func main() {
 		log.Println("No .env file found or failed to load; using environment variables")
 	}
 
+	// Set Gin mode from environment variable (default: release mode)
+	// This suppresses Gin debug warnings like "trusted all proxies"
+	ginMode := os.Getenv("GIN_MODE")
+	if ginMode == "" {
+		ginMode = "release"  // Default to release mode for production
+	}
+	gin.SetMode(ginMode)
+	log.Printf("Gin mode set to: %s\n", ginMode)
+
     // Resolve configuration from env with sensible defaults
     dbPath := os.Getenv("DATABASE_URL")
     if dbPath == "" {
@@ -53,9 +62,6 @@ func main() {
 	} else {
 		log.Println("[WARN] MAXMIND_LICENSE_KEY not set. Using fallback IP ranges. To use MaxMind, set MAXMIND_LICENSE_KEY environment variable.")
 	}
-
-	// Set Gin to release mode IMMEDIATELY to disable debug warnings
-	gin.SetMode(gin.ReleaseMode)
 
 	// Create Gin router with explicit configuration
 	// Disable "trust all proxies" by creating custom engine
