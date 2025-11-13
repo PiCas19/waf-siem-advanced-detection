@@ -189,7 +189,15 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 			Severity:    GetSeverityFromThreatType(event.Threat),
 			// IP source metadata from WAF
 			// These fields track how the IP was extracted by the WAF (X-Public-IP, X-Forwarded-For, etc)
-			// Can be populated from WAF event if available, otherwise will be enriched later
+			ClientIPSource:    event.IPSource,
+			ClientIPTrusted:   event.IPTrusted,
+			ClientIPVPNReport: event.IPVPNReport,
+		}
+
+		// Log important IP metadata
+		if log.ClientIPVPNReport {
+			fmt.Printf("[INFO] *** TAILSCALE/VPN CLIENT DETECTED *** IP=%s, Source=%s, Trusted=%v\n",
+				log.ClientIP, log.ClientIPSource, log.ClientIPTrusted)
 		}
 		if err := db.Create(&log).Error; err != nil {
 			fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)
