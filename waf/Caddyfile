@@ -51,6 +51,10 @@
                 dial_timeout 2s
                 keepalive 30s
             }
+            # Tell Gin it's coming from a trusted proxy
+            header_up X-Forwarded-For {http.request.remote}
+            header_up X-Forwarded-Proto {http.request.proto}
+            header_up X-Real-IP {http.request.remote}
         }
     }
     
@@ -182,6 +186,10 @@
                 dial_timeout 2s
                 keepalive 30s
             }
+            # Tell Gin it's coming from a trusted proxy
+            header_up X-Forwarded-For {http.request.remote}
+            header_up X-Forwarded-Proto {http.request.proto}
+            header_up X-Real-IP {http.request.remote}
         }
     }
     
@@ -296,6 +304,10 @@ http://172.16.216.10 {
                 dial_timeout 2s
                 keepalive 30s
             }
+            # Tell Gin it's coming from a trusted proxy
+            header_up X-Forwarded-For {http.request.remote}
+            header_up X-Forwarded-Proto {http.request.proto}
+            header_up X-Real-IP {http.request.remote}
         }
     }
     
