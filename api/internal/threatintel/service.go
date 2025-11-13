@@ -67,16 +67,26 @@ func (es *EnrichmentService) SetDB(db *gorm.DB) {
 func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 	isPrivate := isPrivateIP(log.ClientIP)
 	isReserved := isReservedRange(log.ClientIP)
+	isTailscaleVPN := log.ClientIPVPNReport // Is this a self-reported VPN/Tailscale IP?
 
 	if isReserved {
-		fmt.Printf("[WARN] IP %s is in reserved range (CGN/NAT) - cannot be geolocated directly\n", log.ClientIP)
-		// For reserved range IPs, we can't do much since they're behind NAT
-		// Just mark as internal and continue
-		isPrivate = true
+		fmt.Printf("[INFO] IP %s is in reserved range (CGN - 100.64.0.0/10)\n", log.ClientIP)
+		if isTailscaleVPN {
+			fmt.Printf("[INFO] This is a Tailscale VPN client (self-reported via X-Public-IP)\n")
+			// For Tailscale/VPN clients, the ClientIP is their Tailscale internal IP
+			// but they reported their public IP, so we should use the reported source
+			// The log should show both: Tailscale internal IP + indication it's from VPN
+			isPrivate = false // Treat as non-private for enrichment (it's from VPN client)
+		} else {
+			fmt.Printf("[WARN] IP %s is in reserved range (CGN/NAT) - cannot be geolocated directly\n", log.ClientIP)
+			isPrivate = true
+		}
 	}
 
 	if isPrivate {
 		fmt.Printf("[INFO] Private/Reserved IP detected: %s - will enrich with geolocation only (no abuse score)\n", log.ClientIP)
+	} else if isTailscaleVPN {
+		fmt.Printf("[INFO] Tailscale/VPN client detected: %s - will enrich as low-risk (VPN source)\n", log.ClientIP)
 	}
 
 	// Check cache first
@@ -139,11 +149,21 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 		} else {
 			// For private IPs that don't resolve, set sensible defaults
 			fmt.Printf("[WARN] Could not geolocate private IP %s via ip-api.com - setting as internal/private\n", log.ClientIP)
-			data.Country = "PRIVATE"
-			data.ISP = "Internal/Private Network"
-			data.ThreatSource = "internal"
-			// Don't set reputation or malicious flag for private IPs
-			data.ThreatLevel = "low" // Private networks are inherently lower risk unless configured otherwise
+
+			// Special handling for Tailscale/VPN clients with reserved IPs
+			if isTailscaleVPN {
+				fmt.Printf("[INFO] Tailscale VPN client with reserved IP - marking as 'Tailscale-VPN' for clarity\n")
+				data.Country = "VPN/TAILSCALE"
+				data.ISP = "Tailscale VPN Network"
+				data.ThreatSource = "tailscale-vpn"
+				data.ThreatLevel = "low" // VPN clients are low risk
+			} else {
+				data.Country = "PRIVATE"
+				data.ISP = "Internal/Private Network"
+				data.ThreatSource = "internal"
+				data.ThreatLevel = "low" // Private networks are inherently lower risk unless configured otherwise
+			}
+			// Don't set reputation or malicious flag for private IPs/VPN
 		}
 	}
 
