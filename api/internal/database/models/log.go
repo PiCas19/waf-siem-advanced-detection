@@ -24,6 +24,7 @@ type Log struct {
 	ClientIPTrusted   bool   `json:"client_ip_trusted"`                        // Whether the IP source is from a trusted source (proxy, Tailscale, etc)
 	ClientIPVPNReport bool   `json:"client_ip_vpn_report"`                     // Whether this is a self-reported IP from Tailscale/VPN client
 	ClientIPPublic    string `gorm:"default:''" json:"client_ip_public"`       // The public IP reported by Tailscale/VPN client (from X-Public-IP header)
+	IPTrustScore      *int   `json:"ip_trust_score,omitempty"`                 // IP Trust Score (0-100): 0-25=untrusted, 25-50=low, 50-75=neutral, 75-100=trusted
 
 	// Threat Intelligence fields
 	IPReputation     *int    `json:"ip_reputation,omitempty"`         // IP reputation score (0-100, higher = more suspicious)

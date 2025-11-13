@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
@@ -21,11 +22,12 @@ const (
 	// We'll use AbuseIPDB as primary with fallback to ipapi.co for ASN/ISP
 )
 
-// EnrichmentService provides threat intelligence enrichment
+// EnrichmentService provides threat intelligence enrichment with thread-safe caching
 type EnrichmentService struct {
-	client *http.Client
-	cache  map[string]*CachedEnrichment
-	db     *gorm.DB
+	client    *http.Client
+	cache     map[string]*CachedEnrichment
+	cacheLock sync.RWMutex // Protects concurrent access to cache map
+	db        *gorm.DB
 }
 
 // CachedEnrichment stores cached threat intel data
@@ -63,6 +65,23 @@ func (es *EnrichmentService) SetDB(db *gorm.DB) {
 	es.db = db
 }
 
+// getFromCache retrieves a cached enrichment entry in a thread-safe manner
+func (es *EnrichmentService) getFromCache(key string) (*CachedEnrichment, bool) {
+	es.cacheLock.RLock()
+	defer es.cacheLock.RUnlock()
+
+	cached, exists := es.cache[key]
+	return cached, exists
+}
+
+// putInCache stores a cached enrichment entry in a thread-safe manner
+func (es *EnrichmentService) putInCache(key string, cached *CachedEnrichment) {
+	es.cacheLock.Lock()
+	defer es.cacheLock.Unlock()
+
+	es.cache[key] = cached
+}
+
 // EnrichLog enriches a Log entry with threat intelligence data
 func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 	isPrivate := isPrivateIP(log.ClientIP)
@@ -95,8 +114,8 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 		cacheKey = log.ClientIPPublic
 	}
 
-	// Check cache first
-	if cached, exists := es.cache[cacheKey]; exists && time.Now().Before(cached.ExpiresAt) {
+	// Check cache first (thread-safe)
+	if cached, exists := es.getFromCache(cacheKey); exists && time.Now().Before(cached.ExpiresAt) {
 		fmt.Printf("[INFO] Using cached TI data for IP %s (expires in %v)\n", cacheKey, time.Until(cached.ExpiresAt))
 		applyThreatIntel(log, cached.Data)
 		return nil
@@ -202,11 +221,11 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 		fmt.Printf("[WARN] Database not initialized in enrichment service - cannot check blocklist\n")
 	}
 
-	// Cache the result (24 hour cache) using the same key as lookup
-	es.cache[cacheKey] = &CachedEnrichment{
+	// Cache the result (24 hour cache) using the same key as lookup (thread-safe)
+	es.putInCache(cacheKey, &CachedEnrichment{
 		Data:      data,
 		ExpiresAt: time.Now().Add(24 * time.Hour),
-	}
+	})
 	fmt.Printf("[INFO] Cached TI data for IP %s (24h TTL)\n", cacheKey)
 
 	// Apply enrichment to log
