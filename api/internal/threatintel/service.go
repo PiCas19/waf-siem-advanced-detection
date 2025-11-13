@@ -151,12 +151,45 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 			fmt.Printf("[WARN] Could not geolocate private IP %s via ip-api.com - setting as internal/private\n", log.ClientIP)
 
 			// Special handling for Tailscale/VPN clients with reserved IPs
-			if isTailscaleVPN {
-				fmt.Printf("[INFO] Tailscale VPN client with reserved IP - marking as 'Tailscale-VPN' for clarity\n")
+			if isTailscaleVPN && log.ClientIPPublic != "" {
+				// Try to geolocate the public IP reported by the Tailscale client
+				fmt.Printf("[INFO] Tailscale VPN client detected - attempting to geolocate reported public IP: %s\n", log.ClientIPPublic)
+				publicGeoData, err := es.checkGeoIP(log.ClientIPPublic)
+				if err == nil && publicGeoData != nil {
+					fmt.Printf("[INFO] Successfully geolocated Tailscale public IP %s: Country=%s, ISP=%s, ASN=%s\n",
+						log.ClientIPPublic, publicGeoData.Country, publicGeoData.ISP, publicGeoData.ASN)
+					// Use the public IP's geolocation data
+					data.Country = publicGeoData.Country
+					data.ISP = publicGeoData.ISP
+					data.ASN = publicGeoData.ASN
+					data.ThreatSource = "ip-api.com (Tailscale public IP)"
+					data.ThreatLevel = "low" // Still marked as low risk due to VPN
+
+					// Try to get reputation data for the public IP
+					reputationData, err := es.checkAlienVaultOTX(log.ClientIPPublic)
+					if err == nil && reputationData != nil {
+						fmt.Printf("[INFO] AlienVault OTX for Tailscale public IP %s: reputation=%d, isMalicious=%v\n",
+							log.ClientIPPublic, reputationData.IPReputation, reputationData.IsMalicious)
+						data.IPReputation = reputationData.IPReputation
+						data.IsMalicious = reputationData.IsMalicious
+						data.AbuseReports = reputationData.AbuseReports
+						data.ThreatSource = "alienvault-otx + ip-api.com (Tailscale public IP)"
+					}
+				} else {
+					// If public IP geolocation also fails, use default Tailscale marking
+					fmt.Printf("[WARN] Could not geolocate Tailscale public IP %s - using default VPN marking\n", log.ClientIPPublic)
+					data.Country = "VPN/TAILSCALE"
+					data.ISP = "Tailscale VPN Network"
+					data.ThreatSource = "tailscale-vpn"
+					data.ThreatLevel = "low"
+				}
+			} else if isTailscaleVPN {
+				// Tailscale VPN but no public IP reported - use default marking
+				fmt.Printf("[INFO] Tailscale VPN client detected but no public IP reported - using default VPN marking\n")
 				data.Country = "VPN/TAILSCALE"
 				data.ISP = "Tailscale VPN Network"
 				data.ThreatSource = "tailscale-vpn"
-				data.ThreatLevel = "low" // VPN clients are low risk
+				data.ThreatLevel = "low"
 			} else {
 				data.Country = "PRIVATE"
 				data.ISP = "Internal/Private Network"

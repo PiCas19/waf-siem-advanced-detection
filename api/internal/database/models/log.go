@@ -23,6 +23,7 @@ type Log struct {
 	ClientIPSource    string `gorm:"default:''" json:"client_ip_source"`       // How the IP was extracted: x-public-ip, x-forwarded-for, x-real-ip, remote-addr
 	ClientIPTrusted   bool   `json:"client_ip_trusted"`                        // Whether the IP source is from a trusted source (proxy, Tailscale, etc)
 	ClientIPVPNReport bool   `json:"client_ip_vpn_report"`                     // Whether this is a self-reported IP from Tailscale/VPN client
+	ClientIPPublic    string `gorm:"default:''" json:"client_ip_public"`       // The public IP reported by Tailscale/VPN client (from X-Public-IP header)
 
 	// Threat Intelligence fields
 	IPReputation     *int    `json:"ip_reputation,omitempty"`         // IP reputation score (0-100, higher = more suspicious)
