@@ -109,7 +109,7 @@ func (h *TrustedSourceHandler) GetTrustedSource(c echo.Context) error {
 			})
 		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Database error", err),
+			"error": "Database error",
 		})
 	}
 
@@ -126,7 +126,7 @@ func (h *TrustedSourceHandler) CreateTrustedSource(c echo.Context) error {
 	var req TrustedSourceRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid request", err),
+			"error": "Invalid request",
 		})
 	}
 
@@ -156,7 +156,7 @@ func (h *TrustedSourceHandler) CreateTrustedSource(c echo.Context) error {
 
 	if err := h.db.Create(&source).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to create source", err),
+			"error": "Failed to create source",
 		})
 	}
 
@@ -176,7 +176,7 @@ func (h *TrustedSourceHandler) UpdateTrustedSource(c echo.Context) error {
 	var req TrustedSourceRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid request", err),
+			"error": "Invalid request",
 		})
 	}
 
@@ -188,7 +188,7 @@ func (h *TrustedSourceHandler) UpdateTrustedSource(c echo.Context) error {
 			})
 		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Database error", err),
+			"error": "Database error",
 		})
 	}
 
@@ -210,7 +210,7 @@ func (h *TrustedSourceHandler) UpdateTrustedSource(c echo.Context) error {
 
 	if err := h.db.Save(&source).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to update source", err),
+			"error": "Failed to update source",
 		})
 	}
 
@@ -228,7 +228,7 @@ func (h *TrustedSourceHandler) DeleteTrustedSource(c echo.Context) error {
 
 	if err := h.db.Delete(&models.TrustedSource{}, "id = ?", id).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to delete source", err),
+			"error": "Failed to delete source",
 		})
 	}
 
@@ -252,7 +252,7 @@ func (h *TrustedSourceHandler) VerifyTrustedSource(c echo.Context) error {
 			})
 		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Database error", err),
+			"error": "Database error",
 		})
 	}
 
@@ -263,7 +263,7 @@ func (h *TrustedSourceHandler) VerifyTrustedSource(c echo.Context) error {
 
 	if err := h.db.Save(&source).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to verify source", err),
+			"error": "Failed to verify source",
 		})
 	}
 
@@ -322,7 +322,7 @@ func (h *TrustedSourceHandler) ListHMACKeys(c echo.Context) error {
 
 	if err := h.db.Find(&keys).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to fetch HMAC keys", err),
+			"error": "Failed to fetch HMAC keys",
 		})
 	}
 
@@ -342,7 +342,7 @@ func (h *TrustedSourceHandler) CreateHMACKey(c echo.Context) error {
 	var req HMACKeyRequest
 	if err := c.Bind(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{
-			"error": "Invalid request", err),
+			"error": "Invalid request",
 		})
 	}
 
@@ -356,7 +356,7 @@ func (h *TrustedSourceHandler) CreateHMACKey(c echo.Context) error {
 
 	if err := h.db.Create(&key).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to create HMAC key", err),
+			"error": "Failed to create HMAC key",
 		})
 	}
 
@@ -374,7 +374,7 @@ func (h *TrustedSourceHandler) DeleteHMACKey(c echo.Context) error {
 
 	if err := h.db.Delete(&models.HMACKey{}, "id = ?", id).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to delete HMAC key", err),
+			"error": "Failed to delete HMAC key",
 		})
 	}
 
@@ -398,7 +398,7 @@ func (h *TrustedSourceHandler) RotateHMACKey(c echo.Context) error {
 			})
 		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Database error", err),
+			"error": "Database error",
 		})
 	}
 
@@ -406,7 +406,7 @@ func (h *TrustedSourceHandler) RotateHMACKey(c echo.Context) error {
 	key.IsActive = false
 	if err := h.db.Save(&key).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to deactivate old key", err),
+			"error": "Failed to deactivate old key",
 		})
 	}
 
@@ -421,7 +421,7 @@ func (h *TrustedSourceHandler) RotateHMACKey(c echo.Context) error {
 
 	if err := h.db.Create(&newKey).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": "Failed to create new key", err),
+			"error": "Failed to create new key",
 		})
 	}
 
