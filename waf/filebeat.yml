@@ -1,0 +1,48 @@
+###########################
+# Filebeat for Caddy + WAF
+###########################
+
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/caddy/waf_*.log
+      - /var/log/caddy/access_*.log
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      app: caddy-waf
+      environment: production
+    fields_under_root: true
+    multiline.pattern: '^{'
+    multiline.negate: true
+    multiline.match: after
+
+# ================================
+# Elasticsearch output (direct)
+# ================================
+output.elasticsearch:
+  hosts: ["https://172.16.216.20:9200"]    # <— IP o dominio del tuo cluster
+  username: "elastic"
+  password: "changeme"
+  ssl.verification_mode: none              # metti "full" se hai CA valida
+  index: "caddy-waf-%{+yyyy.MM.dd}"
+
+# ================================
+# Template e ILM (facoltativo)
+# ================================
+setup.template.enabled: true
+setup.template.name: "caddy-waf"
+setup.template.pattern: "caddy-waf-*"
+setup.ilm.enabled: false
+
+# ================================
+# Logging locale di Filebeat
+# ================================
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
