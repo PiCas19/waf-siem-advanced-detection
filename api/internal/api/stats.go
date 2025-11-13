@@ -279,15 +279,19 @@ func WAFStatsHandler(c *gin.Context) {
 		recentEvents := make([]websocket.WAFEvent, 0, len(recentLogs))
 		for _, log := range recentLogs {
 			recentEvents = append(recentEvents, websocket.WAFEvent{
-				IP:        log.ClientIP,
-				Threat:    log.ThreatType,
-				Payload:   log.Payload,
-				Blocked:   log.Blocked,
-				BlockedBy: log.BlockedBy,
-				Timestamp: log.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-				Method:    log.Method,
-				Path:      log.URL,
-				UA:        log.UserAgent,
+				IP:           log.ClientIP,
+				Threat:       log.ThreatType,
+				Payload:      log.Payload,
+				Blocked:      log.Blocked,
+				BlockedBy:    log.BlockedBy,
+				Timestamp:    log.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+				Method:       log.Method,
+				Path:         log.URL,
+				UA:           log.UserAgent,
+				IPReputation: log.IPReputation,
+				Country:      log.Country,
+				ASN:          log.ASN,
+				IPTrustScore: log.IPTrustScore,
 			})
 		}
 

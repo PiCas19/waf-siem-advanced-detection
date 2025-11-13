@@ -39,6 +39,11 @@ type WAFEvent struct {
 	IPTrusted     bool   `json:"ip_trusted,omitempty"`      // Whether the IP source is from a trusted source
 	IPVPNReport   bool   `json:"ip_vpn_reported,omitempty"` // Whether this is a self-reported IP from Tailscale/VPN
 	IPTrustScore  *int   `json:"ip_trust_score,omitempty"`  // IP Trust Score (0-100): 0-25=untrusted, 25-50=low, 50-75=neutral, 75-100=trusted
+
+	// IP Reputation & Geolocation (from threat intelligence enrichment)
+	IPReputation *int   `json:"ip_reputation,omitempty"` // IP Reputation (0-100%): 0=trusted, 100=malicious
+	Country      string `json:"country,omitempty"`       // Country code or name from GeoIP
+	ASN          string `json:"asn,omitempty"`           // Autonomous System Number (network owner)
 }
 
 func init() {
