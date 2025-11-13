@@ -2,42 +2,93 @@
 # Filebeat for Caddy + WAF
 ###########################
 
+# ================================
+# INPUT: Caddy + WAF JSON logs
+# ================================
 filebeat.inputs:
   - type: log
     enabled: true
+    id: caddy-waf-input
+
+    # Percorsi dei log di Caddy e del WAF
     paths:
       - /var/log/caddy/waf_*.log
       - /var/log/caddy/access_*.log
+
+    # Parsing JSON nativo
     json.keys_under_root: true
     json.add_error_key: true
+
+    # Campi personalizzati per il SIEM
     fields:
       app: caddy-waf
       environment: production
     fields_under_root: true
+
+    # Gestione multilinea per log complessi
     multiline.pattern: '^{'
     multiline.negate: true
     multiline.match: after
 
-# ================================
-# Elasticsearch output (direct)
-# ================================
-output.elasticsearch:
-  hosts: ["https://172.16.216.20:9200"]    # <— IP o dominio del tuo cluster
-  username: "elastic"
-  password: "changeme"
-  ssl.verification_mode: none              # metti "full" se hai CA valida
-  index: "caddy-waf-%{+yyyy.MM.dd}"
+    # Ottimizzazioni di lettura
+    ignore_older: 24h        # ignora log più vecchi di 24 ore
+    scan_frequency: 10s      # controlla nuovi file ogni 10 secondi
+    close_inactive: 5m       # chiude file inattivi dopo 5 minuti
 
 # ================================
-# Template e ILM (facoltativo)
+# MODULI FILEBEAT (disabilitati)
+# ================================
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+# ================================
+# TEMPLATE e ILM (gestione indici)
 # ================================
 setup.template.enabled: true
 setup.template.name: "caddy-waf"
 setup.template.pattern: "caddy-waf-*"
+
+# Attiva ILM se il tuo cluster Elasticsearch lo supporta
 setup.ilm.enabled: false
+# setup.ilm.rollover_alias: "caddy-waf"
+# setup.ilm.pattern: "{now/d}-000001"
 
 # ================================
-# Logging locale di Filebeat
+# OUTPUT: Elasticsearch (SIEM)
+# ================================
+output.elasticsearch:
+  hosts: ["https://172.16.216.20:9200"]   # IP o dominio del tuo cluster
+  username: "elastic"
+  password: "changeme"
+
+  # SSL: disattiva solo in ambienti interni o di test
+  ssl.verification_mode: none              # usa "full" se hai CA valida
+
+  # Nome indice dinamico (giornaliero)
+  index: "caddy-waf-%{+yyyy.MM.dd}"
+
+  # Ottimizza throughput e latenze
+  worker: 2
+  bulk_max_size: 4096
+  compression_level: 3
+
+# ================================
+# PROCESSORS
+# ================================
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
+  - timestamp:
+      field: "@timestamp"
+      layouts:
+        - ISO8601
+
+# ================================
+# LOGGING LOCALE DI FILEBEAT
 # ================================
 logging.level: info
 logging.to_files: true
