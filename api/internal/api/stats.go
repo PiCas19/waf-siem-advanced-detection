@@ -50,14 +50,14 @@ func InitTIService(db *gorm.DB) {
 // 4. X-Real-IP: Nginx/Apache proxy header
 // 5. X-Client-IP: Generic proxy header
 // Returns empty string if no header found
-func extractRealClientIP(c *gin.Context) string {
+func extractRealClientIP(c *gin.Context) (string, string, bool) {
 	// X-Public-IP: Client self-reported public IP (Tailscale/VPN client)
 	// Highest priority - means client explicitly sent their public IP
 	if xPublicIP := c.GetHeader("X-Public-IP"); xPublicIP != "" {
 		xPublicIP = strings.TrimSpace(xPublicIP)
 		if xPublicIP != "" {
 			fmt.Printf("[DEBUG] X-Public-IP header found (Tailscale/VPN): %s\n", xPublicIP)
-			return xPublicIP
+			return xPublicIP, xPublicIP, true // Return: IP, publicIP, isXPublicIP
 		}
 	}
 
@@ -69,7 +69,7 @@ func extractRealClientIP(c *gin.Context) string {
 			realIP := strings.TrimSpace(ips[0])
 			if realIP != "" {
 				fmt.Printf("[DEBUG] X-Forwarded-For header found: %s\n", xForwardedFor)
-				return realIP
+				return realIP, "", false // Return: IP, publicIP (empty), isXPublicIP (false)
 			}
 		}
 	}
@@ -79,7 +79,7 @@ func extractRealClientIP(c *gin.Context) string {
 		cfIP = strings.TrimSpace(cfIP)
 		if cfIP != "" {
 			fmt.Printf("[DEBUG] CF-Connecting-IP header found: %s\n", cfIP)
-			return cfIP
+			return cfIP, "", false
 		}
 	}
 
@@ -88,7 +88,7 @@ func extractRealClientIP(c *gin.Context) string {
 		xRealIP = strings.TrimSpace(xRealIP)
 		if xRealIP != "" {
 			fmt.Printf("[DEBUG] X-Real-IP header found: %s\n", xRealIP)
-			return xRealIP
+			return xRealIP, "", false
 		}
 	}
 
@@ -97,11 +97,11 @@ func extractRealClientIP(c *gin.Context) string {
 		xClientIP = strings.TrimSpace(xClientIP)
 		if xClientIP != "" {
 			fmt.Printf("[DEBUG] X-Client-IP header found: %s\n", xClientIP)
-			return xClientIP
+			return xClientIP, "", false
 		}
 	}
 
-	return ""
+	return "", "", false // Return empty strings and false if no header found
 }
 
 // GetSeverityFromThreatType determines severity level based on threat type
@@ -144,7 +144,8 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// Extract real client IP from proxy headers if available
-		realIP := extractRealClientIP(c)
+		// Also extracts the public IP if this is from a Tailscale/VPN client (X-Public-IP header)
+		realIP, publicIP, isXPublicIP := extractRealClientIP(c)
 		if realIP != event.IP && realIP != "" {
 			fmt.Printf("[INFO] Real client IP detected from headers: %s (WAF reported: %s)\n", realIP, event.IP)
 			// Update event IP to the real one
@@ -152,6 +153,9 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		fmt.Printf("[INFO] Received WAF event: IP=%s, Threat=%s, Method=%s, Path=%s\n", event.IP, event.Threat, event.Method, event.Path)
+		if isXPublicIP && publicIP != "" {
+			fmt.Printf("[INFO] X-Public-IP (Tailscale/VPN client public IP): %s\n", publicIP)
+		}
 
 		event.Timestamp = time.Now().Format("2006-01-02T15:04:05Z07:00")
 
@@ -192,12 +196,13 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 			ClientIPSource:    event.IPSource,
 			ClientIPTrusted:   event.IPTrusted,
 			ClientIPVPNReport: event.IPVPNReport,
+			ClientIPPublic:    publicIP, // Store the public IP from X-Public-IP header if available
 		}
 
 		// Log important IP metadata
 		if log.ClientIPVPNReport {
-			fmt.Printf("[INFO] *** TAILSCALE/VPN CLIENT DETECTED *** IP=%s, Source=%s, Trusted=%v\n",
-				log.ClientIP, log.ClientIPSource, log.ClientIPTrusted)
+			fmt.Printf("[INFO] *** TAILSCALE/VPN CLIENT DETECTED *** Internal IP=%s, Public IP=%s, Source=%s, Trusted=%v\n",
+				log.ClientIP, log.ClientIPPublic, log.ClientIPSource, log.ClientIPTrusted)
 		}
 		if err := db.Create(&log).Error; err != nil {
 			fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)

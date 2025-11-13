@@ -19,5 +19,16 @@ func RunMigrations(db *gorm.DB) error {
 		log.Println("[MIGRATION] ✅ Successfully added must_setup_2fa column")
 	}
 
+	// Migration: Add ClientIPPublic column to logs table (for storing public IP from Tailscale/VPN clients)
+	if !db.Migrator().HasColumn("logs", "client_ip_public") {
+		log.Println("[MIGRATION] Adding client_ip_public column to logs table...")
+		// Use raw SQL to add the column with default empty string
+		if err := db.Exec("ALTER TABLE logs ADD COLUMN client_ip_public TEXT DEFAULT ''").Error; err != nil {
+			log.Printf("[ERROR] Failed to add client_ip_public column: %v\n", err)
+			return err
+		}
+		log.Println("[MIGRATION] ✅ Successfully added client_ip_public column")
+	}
+
 	return nil
 }
