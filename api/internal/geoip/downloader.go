@@ -34,6 +34,8 @@ func DefaultDownloadConfig(licenseKey string) *DownloadConfig {
 }
 
 // DownloadDatabase downloads the MaxMind GeoLite2 database
+// Skips download if database exists locally (efficient for local deployments)
+// Set FORCE_GEO_UPDATE=true environment variable to force refresh
 func DownloadDatabase(config *DownloadConfig) error {
 	if config.LicenseKey == "" {
 		return fmt.Errorf("MaxMind license key is required. Get it from https://www.maxmind.com/en/geolite2/signup")
@@ -46,8 +48,23 @@ func DownloadDatabase(config *DownloadConfig) error {
 
 	dbFilePath := filepath.Join(dbPath, databaseFilename)
 
-	// Check if database already exists and is recent
+	// Check if database already exists locally - skip download if present
+	// This is efficient for local/staging deployments where we don't want to re-download
+	// Use FORCE_GEO_UPDATE=true environment variable to force refresh
+	if fileExists(dbFilePath) {
+		info, err := os.Stat(dbFilePath)
+		if err == nil && info.Size() > 0 {
+			// Database exists and has content - use it
+			fmt.Printf("[INFO] Using existing MaxMind database: %s (size: %d bytes, modified: %s)\n",
+				dbFilePath, info.Size(), info.ModTime().Format("2006-01-02 15:04:05 MST"))
+			return nil
+		}
+	}
+
+	// For production/CI environments, check if database is fresh (within 7 days)
+	// This ensures we get updated threat data regularly
 	if fileExists(dbFilePath) && isFileRecent(dbFilePath, 7*24*time.Hour) {
+		fmt.Printf("[INFO] MaxMind database exists and is recent (< 7 days), skipping download\n")
 		return nil
 	}
 

@@ -54,10 +54,12 @@ func main() {
 	// Initialize MaxMind GeoIP database
 	licenseKey := os.Getenv("MAXMIND_LICENSE_KEY")
 	if licenseKey != "" {
-		log.Println("[INFO] MaxMind license key found, attempting to download/update database...")
+		log.Println("[INFO] MaxMind license key found, checking for existing database...")
 		config := geoip.DefaultDownloadConfig(licenseKey)
 		if err := geoip.DownloadDatabase(config); err != nil {
-			log.Printf("[WARN] Failed to download MaxMind database: %v. Will use fallback IP ranges.\n", err)
+			log.Printf("[WARN] Failed to download/initialize MaxMind database: %v. Will use fallback IP ranges.\n", err)
+		} else {
+			log.Println("[INFO] MaxMind GeoIP database ready")
 		}
 	} else {
 		log.Println("[WARN] MAXMIND_LICENSE_KEY not set. Using fallback IP ranges. To use MaxMind, set MAXMIND_LICENSE_KEY environment variable.")
