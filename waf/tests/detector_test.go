@@ -1,8 +1,11 @@
 package tests
 
 import (
-	"caddy-waf-project/waf/internal/detector"
+	"net/http"
+	"net/url"
 	"testing"
+
+	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/detector"
 )
 
 func TestXSSDetection(t *testing.T) {

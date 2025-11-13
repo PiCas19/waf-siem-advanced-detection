@@ -4,6 +4,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/ipextract"
 )
 
 type Threat struct {
@@ -11,6 +13,9 @@ type Threat struct {
 	Description        string
 	Severity           string
 	ClientIP           string
+	ClientIPSource     ipextract.ClientIPSource // Source of the IP extraction (x-public-ip, x-forwarded-for, x-real-ip, remote-addr)
+	ClientIPTrusted    bool                     // Whether the IP source is trusted
+	ClientIPVPNReport  bool                     // Whether this is a Tailscale/VPN self-reported IP
 	Payload            string
 	IsDefault          bool   // Indicates if this threat was detected by a default rule (always blocks)
 	Action             string // "log" or "block" - action to take for custom rules
@@ -102,51 +107,69 @@ func (d *Detector) Inspect(r *http.Request) *Threat {
 }
 
 func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
-	// Extract client IP
-	clientIP := r.RemoteAddr
-	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-		clientIP = forwarded
+	// Extract client IP using robust multi-source extraction
+	// Priority: X-Public-IP (Tailscale/VPN) > X-Forwarded-For (trusted proxy) > X-Real-IP (trusted proxy) > RemoteAddr
+	ipInfo := ipextract.ExtractClientIPFromHeaders(
+		r.Header.Get("X-Public-IP"),
+		r.Header.Get("X-Forwarded-For"),
+		r.Header.Get("X-Real-IP"),
+		r.RemoteAddr,
+	)
+
+	// Helper function to create threat with IP info
+	createThreat := func(threatType, desc, severity string) *Threat {
+		return &Threat{
+			Type:              threatType,
+			Description:       desc,
+			Severity:          severity,
+			ClientIP:          ipInfo.IP,
+			ClientIPSource:    ipInfo.Source,
+			ClientIPTrusted:   ipInfo.IsTrusted,
+			ClientIPVPNReport: ipInfo.IsVPNTailscale,
+			Payload:           value,
+			IsDefault:         true,
+		}
 	}
 
 	// Check default detectors first
 	if detected, desc := d.xss.Detect(value); detected {
-		return &Threat{Type: "XSS", Description: desc, Severity: "HIGH", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("XSS", desc, "HIGH")
 	}
 	if detected, desc := d.sqli.Detect(value); detected {
-		return &Threat{Type: "SQL_INJECTION", Description: desc, Severity: "CRITICAL", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("SQL_INJECTION", desc, "CRITICAL")
 	}
 	if detected, desc := d.nosql.Detect(value); detected {
-		return &Threat{Type: "NOSQL_INJECTION", Description: desc, Severity: "CRITICAL", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("NOSQL_INJECTION", desc, "CRITICAL")
 	}
 	if detected, desc := d.lfi.Detect(value); detected {
-		return &Threat{Type: "LFI", Description: desc, Severity: "HIGH", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("LFI", desc, "HIGH")
 	}
 	if detected, desc := d.pathTraversal.Detect(value); detected {
-		return &Threat{Type: "PATH_TRAVERSAL", Description: desc, Severity: "HIGH", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("PATH_TRAVERSAL", desc, "HIGH")
 	}
 	if detected, desc := d.rfi.Detect(value); detected {
-		return &Threat{Type: "RFI", Description: desc, Severity: "CRITICAL", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("RFI", desc, "CRITICAL")
 	}
 	if detected, desc := d.ssrf.Detect(value); detected {
-		return &Threat{Type: "SSRF", Description: desc, Severity: "CRITICAL", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("SSRF", desc, "CRITICAL")
 	}
 	if detected, desc := d.cmdInj.Detect(value); detected {
-		return &Threat{Type: "COMMAND_INJECTION", Description: desc, Severity: "CRITICAL", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("COMMAND_INJECTION", desc, "CRITICAL")
 	}
 	if detected, desc := d.xxe.Detect(value); detected {
-		return &Threat{Type: "XXE", Description: desc, Severity: "CRITICAL", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("XXE", desc, "CRITICAL")
 	}
 	if detected, desc := d.ldap.Detect(value); detected {
-		return &Threat{Type: "LDAP_INJECTION", Description: desc, Severity: "HIGH", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("LDAP_INJECTION", desc, "HIGH")
 	}
 	if detected, desc := d.ssti.Detect(value); detected {
-		return &Threat{Type: "SSTI", Description: desc, Severity: "CRITICAL", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("SSTI", desc, "CRITICAL")
 	}
 	if detected, desc := d.respSplit.Detect(value); detected {
-		return &Threat{Type: "HTTP_RESPONSE_SPLITTING", Description: desc, Severity: "HIGH", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("HTTP_RESPONSE_SPLITTING", desc, "HIGH")
 	}
 	if detected, desc := d.protoPollution.Detect(value); detected {
-		return &Threat{Type: "PROTOTYPE_POLLUTION", Description: desc, Severity: "HIGH", Payload: value, IsDefault: true, ClientIP: clientIP}
+		return createThreat("PROTOTYPE_POLLUTION", desc, "HIGH")
 	}
 
 	// Check custom rules
@@ -167,6 +190,10 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 			Type:              customRule.Type,
 			Description:       customRule.Name,
 			Severity:          customRule.Severity,
+			ClientIP:          ipInfo.IP,
+			ClientIPSource:    ipInfo.Source,
+			ClientIPTrusted:   ipInfo.IsTrusted,
+			ClientIPVPNReport: ipInfo.IsVPNTailscale,
 			Payload:           value,
 			IsDefault:         false, // Mark as custom rule
 			Action:            customRule.Action, // "log" or "block"
@@ -176,7 +203,6 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 			DropEnabled:       customRule.DropEnabled,
 			RedirectEnabled:   customRule.RedirectEnabled,
 			ChallengeEnabled:  customRule.ChallengeEnabled,
-			ClientIP:          clientIP,
 		}
 	}
 
