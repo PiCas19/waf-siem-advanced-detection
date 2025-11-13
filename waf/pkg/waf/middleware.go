@@ -122,7 +122,6 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	// Configure trusted proxies for IP extraction
 	if len(m.TrustedProxies) > 0 {
 		ipextract.SetTrustedProxies(m.TrustedProxies)
-		fmt.Printf("[INFO] WAF: Configured %d trusted proxies for IP extraction\n", len(m.TrustedProxies))
 	}
 
 	// Initialize HTTP client for sending events to API
@@ -141,16 +140,12 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		m.headerSigConfig.Enabled = true
 		m.headerSigConfig.SharedSecret = m.HMACSharedSecret
 		m.headerSigConfig.RequireSignature = true
-		fmt.Printf("[INFO] WAF: HMAC signature validation enabled\n")
 	}
 
 	// Configure DMZ detection
 	m.dmzConfig = &ipextract.DMZDetectionConfig{
 		Enabled:     m.EnableDMZDetection,
 		DMZNetworks: m.DMZNetworks,
-	}
-	if m.EnableDMZDetection {
-		fmt.Printf("[INFO] WAF: DMZ detection enabled with %d networks\n", len(m.DMZNetworks))
 	}
 
 	// Configure Tailscale detection
@@ -159,12 +154,9 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		TailscaleNetworks:     m.TailscaleNetworks,
 		VerifyHeaderSignature: m.EnableHMACSignatureValidation,
 	}
-	if m.EnableTailscaleDetection {
-		fmt.Printf("[INFO] WAF: Tailscale detection enabled with %d networks\n", len(m.TailscaleNetworks))
-		if m.TailscaleNetworks == nil || len(m.TailscaleNetworks) == 0 {
-			// Use default Tailscale network if not specified
-			m.tailscaleConfig.TailscaleNetworks = []string{"100.64.0.0/10"}
-		}
+	if m.TailscaleNetworks == nil || len(m.TailscaleNetworks) == 0 {
+		// Use default Tailscale network if not specified
+		m.tailscaleConfig.TailscaleNetworks = []string{"100.64.0.0/10"}
 	}
 
 	// Initialize processed requests cache
@@ -177,7 +169,6 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	// Load initial custom rules from API endpoint
 	if m.RulesEndpoint != "" {
 		if err := m.loadCustomRulesFromAPI(); err != nil {
-			fmt.Printf("[WARN] Failed to load custom rules from API: %v\n", err)
 			// Don't fail if custom rules can't be loaded, WAF should still work with default rules
 		}
 
@@ -189,10 +180,10 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	// Load initial blocklist/whitelist from API endpoint
 	if m.APIEndpoint != "" {
 		if err := m.loadBlocklistFromAPI(); err != nil {
-			fmt.Printf("[WARN] WAF: Failed to load blocklist from API: %v\n", err)
+			// Silent fail - WAF continues with empty blocklist
 		}
 		if err := m.loadWhitelistFromAPI(); err != nil {
-			fmt.Printf("[WARN] WAF: Failed to load whitelist from API: %v\n", err)
+			// Silent fail - WAF continues with empty whitelist
 		}
 
 		// Start background goroutine to periodically reload blocklist/whitelist from API
@@ -270,7 +261,6 @@ func (m *Middleware) loadCustomRulesFromAPI() error {
 		return fmt.Errorf("failed to update custom rules in detector: %v", err)
 	}
 
-	fmt.Printf("[INFO] WAF: Loaded %d custom rules from API\n", len(customRules))
 	return nil
 }
 
@@ -279,17 +269,12 @@ func (m *Middleware) reloadRulesBackground() {
 	ticker := time.NewTicker(60 * time.Second) // Reload every 60 seconds
 	defer ticker.Stop()
 
-	fmt.Printf("[INFO] WAF: Started background rule reloading from API (every 60 seconds)\n")
-
 	for {
 		select {
 		case <-m.stopRuleReload:
-			fmt.Printf("[INFO] WAF: Stopped background rule reloading\n")
 			return
 		case <-ticker.C:
-			if err := m.loadCustomRulesFromAPI(); err != nil {
-				fmt.Printf("[WARN] WAF: Failed to reload custom rules from API: %v\n", err)
-			}
+			_ = m.loadCustomRulesFromAPI() // Ignore errors, continue operation
 		}
 	}
 }
@@ -766,15 +751,11 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 
 	jsonData, err := json.Marshal(eventPayload)
 	if err != nil {
-		fmt.Printf("[ERROR] WAF: Error marshaling event: %v\n", err)
 		return
 	}
 
-	fmt.Printf("[INFO] WAF: Sending event to %s/waf/event: %s\n", m.APIEndpoint, string(jsonData))
-
 	req, err := http.NewRequest("POST", m.APIEndpoint+"/waf/event", bytes.NewBuffer(jsonData))
 	if err != nil {
-		fmt.Printf("[ERROR] WAF: Error creating request: %v\n", err)
 		return
 	}
 
@@ -782,16 +763,9 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 
 	resp, err := m.httpClient.Do(req)
 	if err != nil {
-		fmt.Printf("[ERROR] WAF: Error sending event to API: %v\n", err)
 		return
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("[ERROR] WAF: API returned non-OK status: %d\n", resp.StatusCode)
-	} else {
-		fmt.Printf("[INFO] WAF: Event sent successfully (HTTP %d)\n", resp.StatusCode)
-	}
 }
 
 // getClientIP extracts the real client IP from the request using robust extraction logic
@@ -947,7 +921,6 @@ func (m *Middleware) loadBlocklistFromAPI() error {
 	m.blocklistLastUpdate = time.Now()
 	m.blocklistLock.Unlock()
 
-	fmt.Printf("[INFO] WAF: Loaded %d blocklist entries from API\n", len(data.BlockedIPs))
 	return nil
 }
 
@@ -987,7 +960,6 @@ func (m *Middleware) loadWhitelistFromAPI() error {
 	m.whitelistLastUpdate = time.Now()
 	m.whitelistLock.Unlock()
 
-	fmt.Printf("[INFO] WAF: Loaded %d whitelist entries from API\n", len(data.WhitelistedIPs))
 	return nil
 }
 
@@ -996,20 +968,13 @@ func (m *Middleware) reloadListsBackground() {
 	ticker := time.NewTicker(30 * time.Second) // Reload every 30 seconds
 	defer ticker.Stop()
 
-	fmt.Printf("[INFO] WAF: Started background list reloading from API (every 30 seconds)\n")
-
 	for {
 		select {
 		case <-m.stopListReload:
-			fmt.Printf("[INFO] WAF: Stopped background list reloading\n")
 			return
 		case <-ticker.C:
-			if err := m.loadBlocklistFromAPI(); err != nil {
-				fmt.Printf("[WARN] WAF: Failed to reload blocklist from API: %v\n", err)
-			}
-			if err := m.loadWhitelistFromAPI(); err != nil {
-				fmt.Printf("[WARN] WAF: Failed to reload whitelist from API: %v\n", err)
-			}
+			_ = m.loadBlocklistFromAPI()   // Ignore errors, continue operation
+			_ = m.loadWhitelistFromAPI()   // Ignore errors, continue operation
 		}
 	}
 }
