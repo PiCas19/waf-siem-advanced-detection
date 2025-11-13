@@ -54,21 +54,23 @@ func main() {
 		log.Println("[WARN] MAXMIND_LICENSE_KEY not set. Using fallback IP ranges. To use MaxMind, set MAXMIND_LICENSE_KEY environment variable.")
 	}
 
-	// Set Gin to release mode to disable debug warnings
+	// Set Gin to release mode IMMEDIATELY to disable debug warnings
 	gin.SetMode(gin.ReleaseMode)
 
 	// Create Gin router with explicit configuration
 	// Disable "trust all proxies" by creating custom engine
 	engine := gin.New()
-	engine.Use(gin.Logger())
-	engine.Use(gin.Recovery())
 
-	// Set explicit trusted proxies (disable "trust all" warning)
+	// Set explicit trusted proxies BEFORE adding any middleware
 	// Configure trusted proxies based on your network architecture:
 	// - 127.0.0.1, ::1: localhost (always safe)
 	// - 192.168.216.0/24: Your internal LAN
 	// - 172.16.216.0/24: Your DMZ
 	engine.SetTrustedProxies([]string{"127.0.0.1", "::1", "192.168.216.0/24", "172.16.216.0/24"})
+
+	// Add middleware after setting trusted proxies
+	engine.Use(gin.Logger())
+	engine.Use(gin.Recovery())
 
 	r := engine
 
