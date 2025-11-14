@@ -27,6 +27,8 @@ type LogEntry struct {
 	URL               string    `json:"url"`
 	UserAgent         string    `json:"user_agent"`
 	Payload           string    `json:"payload"`
+	Blocked           bool      `json:"blocked"`             // Whether the request was blocked
+	BlockedBy         string    `json:"blocked_by"`          // How it was blocked: "auto" (rule), "manual" (operator), or ""
 }
 
 // NewLogger creates a new logger instance

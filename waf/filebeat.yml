@@ -10,29 +10,70 @@ path.logs: /var/log/filebeat
 # INPUT: Caddy + WAF JSON logs
 # ================================
 filebeat.inputs:
+  # ==========================================
+  # INPUT 1: WAF Threat Logs (waf_*.log)
+  # ==========================================
   - type: filestream
-    id: caddy-waf-input
+    id: caddy-waf-threats
     enabled: true
-
-    # Paths to Caddy and WAF logs
+    
+    # WAF threat logs only
     paths:
-      - /var/log/caddy/waf_*.log
-      - /var/log/caddy/access_*.log
-
-    # Native JSON parsing
-    json.keys_under_root: true
-    json.add_error_key: true
-
-    # Custom fields for the SIEM
+      - /var/log/caddy/waf_wan.log
+      - /var/log/caddy/waf_lan.log
+    
+    # Parser JSON per filestream (CORRETTO)
+    parsers:
+      - ndjson:
+          target: ""
+          add_error_key: true
+          overwrite_keys: true
+    
+    # Custom fields per identificare il tipo di log
     fields:
       app: caddy-waf
+      log_type: waf_threat
       environment: production
     fields_under_root: true
-
+    
     # Reading optimizations
-    ignore_older: 24h        # ignore logs older than 24 hours
-    scan_frequency: 10s      # check for new files every 10 seconds
-    close_inactive: 5m       # close inactive files after 5 minutes
+    ignore_older: 24h        # ignora log più vecchi di 24 ore
+    scan_frequency: 10s      # controlla nuovi file ogni 10 secondi
+    close_inactive: 5m       # chiudi file inattivi dopo 5 minuti
+    clean_inactive: 48h      # rimuovi stato file inattivi dopo 48 ore
+    
+  # ==========================================
+  # INPUT 2: Access Logs (access_*.log)
+  # ==========================================
+  - type: filestream
+    id: caddy-access-logs
+    enabled: true
+    
+    # Access logs only
+    paths:
+      - /var/log/caddy/access_wan.log
+      - /var/log/caddy/access_lan_http.log
+      - /var/log/caddy/access_lan_https.log
+    
+    # Parser JSON per filestream (CORRETTO)
+    parsers:
+      - ndjson:
+          target: ""
+          add_error_key: true
+          overwrite_keys: true
+    
+    # Custom fields per identificare il tipo di log
+    fields:
+      app: caddy-waf
+      log_type: access
+      environment: production
+    fields_under_root: true
+    
+    # Reading optimizations
+    ignore_older: 24h
+    scan_frequency: 10s
+    close_inactive: 5m
+    clean_inactive: 48h
 
 # ================================
 # FILEBEAT MODULES (disabled)
@@ -47,34 +88,237 @@ filebeat.config.modules:
 setup.template.enabled: true
 setup.template.name: "caddy-waf"
 setup.template.pattern: "caddy-waf-*"
+setup.template.overwrite: true
 setup.ilm.enabled: false
-# setup.ilm.rollover_alias: "caddy-waf"
-# setup.ilm.pattern: "{now/d}-000001"
 
 # ================================
 # OUTPUT: Direct Elasticsearch
 # ================================
 output.elasticsearch:
-  hosts: ["https://10.246.50.82:15601"]
-  username: "elastic"        # set your real username if needed
-  password: "changeme"       # set your real password if needed
-  ssl.verification_mode: none  # accept self-signed certificates
-  index: "caddy-waf-%{+yyyy.MM.dd}"
+  hosts: ["https://10.246.50.82:9200"]
+  username: "elastic"
+  password: "KWZNH8hg3GQ64Sf"
+  
+  # SSL configuration
+  ssl:
+    enabled: true
+    verification_mode: none
+  
+  # Index routing basato sul tipo di log
+  indices:
+    - index: "caddy-waf-threats-%{+yyyy.MM.dd}"
+      when.equals:
+        log_type: "waf_threat"
+    
+    - index: "caddy-waf-access-%{+yyyy.MM.dd}"
+      when.equals:
+        log_type: "access"
+  
+  # Performance tuning
   worker: 2
-  bulk_max_size: 4096
+  bulk_max_size: 2048
   compression_level: 3
+  timeout: 90
+  
+  # NO pipeline - il parsing è già fatto da Filebeat
+  # pipeline: "caddy-waf-json"  # ← RIMOSSO
 
 # ================================
 # PROCESSORS
 # ================================
 processors:
-  - add_host_metadata: ~
+  # 1. Add host metadata
+  - add_host_metadata:
+      when.not.has_fields: ['agent.name', 'host.name']
+  
+  # 2. Add cloud metadata if applicable
   - add_cloud_metadata: ~
+  
+  # 3. Add process metadata
   - add_process_metadata: ~
+  
+  # 4. Normalize timestamps
   - timestamp:
-      field: "@timestamp"
+      field: timestamp
       layouts:
+        - '2006-01-02T15:04:05.999999999Z07:00'
+        - '2006-01-02T15:04:05Z07:00'
         - ISO8601
+      test:
+        - '2025-11-13T17:59:27.814988447+01:00'
+      ignore_missing: true
+      ignore_failure: false
+  
+  # ================================================
+  # 5. CLEAN WAF THREAT LOGS (keep only essentials)
+  # ================================================
+  - drop_fields:
+      when:
+        equals:
+          log_type: "waf_threat"
+      fields:
+        # Remove redundant timestamp fields
+        - ts
+        - timestamp  # Già convertito in @timestamp
+        
+        # Remove verbose request headers (se presenti)
+        - request.headers.Accept
+        - request.headers.Accept-Encoding
+        - request.headers.Accept-Language
+        - request.headers.Cache-Control
+        - request.headers.Connection
+        - request.headers.If-Modified-Since
+        - request.headers.If-None-Match
+        - request.headers.Origin
+        - request.headers.Pragma
+        - request.headers.Priority
+        - request.headers.Referer
+        - request.headers.Sec-Ch-Ua
+        - request.headers.Sec-Ch-Ua-Mobile
+        - request.headers.Sec-Ch-Ua-Platform
+        - request.headers.Sec-Fetch-Dest
+        - request.headers.Sec-Fetch-Mode
+        - request.headers.Sec-Fetch-Site
+        - request.headers.Sec-Fetch-User
+        - request.headers.Sec-Websocket-Extensions
+        - request.headers.Sec-Websocket-Key
+        - request.headers.Sec-Websocket-Version
+        - request.headers.Tailscale-Headers-Info
+        - request.headers.Tailscale-User-Login
+        - request.headers.Tailscale-User-Name
+        - request.headers.Tailscale-User-Profile-Pic
+        - request.headers.Upgrade
+        - request.headers.Upgrade-Insecure-Requests
+        - request.headers.X-Forwarded-For
+        - request.headers.X-Forwarded-Host
+        - request.headers.X-Forwarded-Proto
+        
+        # Remove request metadata not needed for threats
+        - request.remote_port
+        - request.proto
+        
+        # Remove ALL response headers for threat logs
+        - resp_headers
+        
+        # Remove redundant/unnecessary fields
+        - bytes_read
+        - user_id
+        - level
+        - logger
+        - msg
+        - message
+        - duration
+        - size
+        
+        # Remove Filebeat metadata
+        - agent.ephemeral_id
+        - log.offset
+        - log.file.inode
+        - log.file.device_id
+        - input.type
+        - ecs.version
+      ignore_missing: true
+  
+  # ================================================
+  # 6. CLEAN ACCESS LOGS (keep only essentials)
+  # ================================================
+  - drop_fields:
+      when:
+        equals:
+          log_type: "access"
+      fields:
+        # Remove redundant timestamp
+        - ts
+        
+        # Remove verbose request headers
+        - request.headers.Accept
+        - request.headers.Accept-Encoding
+        - request.headers.Accept-Language
+        - request.headers.Authorization
+        - request.headers.Cache-Control
+        - request.headers.Connection
+        - request.headers.If-Modified-Since
+        - request.headers.If-None-Match
+        - request.headers.Origin
+        - request.headers.Pragma
+        - request.headers.Priority
+        - request.headers.Referer
+        - request.headers.Sec-Ch-Ua
+        - request.headers.Sec-Ch-Ua-Mobile
+        - request.headers.Sec-Ch-Ua-Platform
+        - request.headers.Sec-Fetch-Dest
+        - request.headers.Sec-Fetch-Mode
+        - request.headers.Sec-Fetch-Site
+        - request.headers.Sec-Fetch-User
+        - request.headers.Sec-Websocket-Extensions
+        - request.headers.Sec-Websocket-Key
+        - request.headers.Sec-Websocket-Version
+        - request.headers.Tailscale-Headers-Info
+        - request.headers.Tailscale-User-Login
+        - request.headers.Tailscale-User-Name
+        - request.headers.Tailscale-User-Profile-Pic
+        - request.headers.Upgrade
+        - request.headers.Upgrade-Insecure-Requests
+        - request.headers.X-Forwarded-For
+        - request.headers.X-Forwarded-Host
+        - request.headers.X-Forwarded-Proto
+        
+        # Remove request metadata
+        - request.remote_port
+        - request.proto
+        
+        # Remove ALL response headers EXCEPT WAF custom headers
+        - resp_headers.Access-Control-Allow-Headers
+        - resp_headers.Access-Control-Allow-Methods
+        - resp_headers.Access-Control-Allow-Origin
+        - resp_headers.Cache-Control
+        - resp_headers.Connection
+        - resp_headers.Content-Encoding
+        - resp_headers.Content-Length
+        - resp_headers.Content-Security-Policy
+        - resp_headers.Content-Type
+        - resp_headers.Date
+        - resp_headers.Etag
+        - resp_headers.Last-Modified
+        - resp_headers.Referrer-Policy
+        - resp_headers.Sec-WebSocket-Accept
+        - resp_headers.Server
+        - resp_headers.Upgrade
+        - resp_headers.Vary
+        - resp_headers.Via
+        - resp_headers.X-Content-Type-Options
+        - resp_headers.X-Frame-Options
+        - resp_headers.X-Xss-Protection
+        # KEEP: resp_headers.X-Waf-Blocked, X-Waf-Severity, X-Waf-Threat
+        
+        # Remove redundant fields
+        - bytes_read
+        - user_id
+        - level
+        - logger
+        - msg
+        - message
+        
+        # Remove Filebeat metadata
+        - agent.ephemeral_id
+        - log.offset
+        - log.file.inode
+        - log.file.device_id
+        - input.type
+        - ecs.version
+      ignore_missing: true
+  
+  # 7. Rename WAF custom headers for clarity (optional)
+  - rename:
+      fields:
+        - from: "resp_headers.X-Waf-Blocked"
+          to: "waf.blocked"
+        - from: "resp_headers.X-Waf-Severity"
+          to: "waf.severity"
+        - from: "resp_headers.X-Waf-Threat"
+          to: "waf.threat_type"
+      ignore_missing: true
+      fail_on_error: false
 
 # ================================
 # LOCAL FILEBEAT LOGGING
@@ -86,3 +330,18 @@ logging.files:
   name: filebeat
   keepfiles: 7
   permissions: 0644
+  rotateeverybytes: 10485760  # 10 MB
+
+# ================================
+# MONITORING (optional)
+# ================================
+monitoring:
+  enabled: false
+
+# ================================
+# HTTP ENDPOINT (for debugging)
+# ================================
+http:
+  enabled: true
+  host: localhost
+  port: 5066
