@@ -374,8 +374,31 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			// Mark this request as processed
 			m.markAsProcessed(fingerprint)
 
-			// Log the threat with detailed IP source information
+			// Determine if we should block/handle the request based on threat and configuration
+			// 1. Default rules always block (IsDefault: true) - use block action
+			// 2. Custom rules: check their Action field ("block" or "log")
+			// 3. Global block mode blocks everything
+
+			shouldHandle := false
+			if threat.IsDefault || m.BlockMode {
+				// Default rules and global block mode always trigger blocking
+				shouldHandle = true
+				// For default rules, default to "block" action if not specified
+				if threat.BlockAction == "" {
+					threat.BlockAction = "block"
+				}
+			} else if threat.Action == "block" {
+				// Custom rules only trigger blocking if action is "block"
+				shouldHandle = true
+			}
+
+			// Log the threat with detailed IP source information AND blocking status
 			if m.logger != nil {
+				blockedBy := ""
+				if shouldHandle {
+					blockedBy = "auto" // Blocked by WAF rule (default or custom with action="block")
+				}
+
 				entry := logger.LogEntry{
 					ThreatType:        threat.Type,
 					Severity:          threat.Severity,
@@ -388,6 +411,8 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 					URL:               r.URL.String(),
 					UserAgent:         r.UserAgent(),
 					Payload:           threat.Payload,
+					Blocked:           shouldHandle,  // Whether the request is blocked
+					BlockedBy:         blockedBy,     // How it was blocked ("auto" or "")
 				}
 				m.logger.Log(entry)
 			}
@@ -396,29 +421,12 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			if m.APIEndpoint != "" {
 				go m.sendEventToAPI(r, clientIP, threat, enhancedIPInfo)
 			}
-		}
 
-		// Determine if we should block/handle the request based on threat and configuration
-		// 1. Default rules always block (IsDefault: true) - use block action
-		// 2. Custom rules: check their Action field ("block" or "log")
-		// 3. Global block mode blocks everything
-
-		shouldHandle := false
-		if threat.IsDefault || m.BlockMode {
-			// Default rules and global block mode always trigger blocking
-			shouldHandle = true
-			// For default rules, default to "block" action if not specified
-			if threat.BlockAction == "" {
-				threat.BlockAction = "block"
+			// Execute the blocking action if needed
+			if shouldHandle {
+				// Execute the blocking action (block, drop, redirect, challenge, none)
+				return m.executeBlockingAction(w, r, threat)
 			}
-		} else if threat.Action == "block" {
-			// Custom rules only trigger blocking if action is "block"
-			shouldHandle = true
-		}
-
-		if shouldHandle {
-			// Execute the blocking action (block, drop, redirect, challenge, none)
-			return m.executeBlockingAction(w, r, threat)
 		}
 	}
 
