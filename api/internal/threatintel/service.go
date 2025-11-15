@@ -15,10 +15,12 @@ import (
 const httpTimeout = 5 * time.Second
 
 type EnrichmentService struct {
-	client    *http.Client
-	cache     map[string]*CachedEnrichment
-	cacheLock sync.RWMutex
-	db        *gorm.DB
+	client         *http.Client
+	cache          map[string]*CachedEnrichment
+	cacheLock      sync.RWMutex
+	db             *gorm.DB
+	abuseIPDBKey   string
+	virusTotalKey  string
 }
 
 type CachedEnrichment struct {
@@ -50,6 +52,14 @@ func NewEnrichmentService() *EnrichmentService {
 
 func (es *EnrichmentService) SetDB(db *gorm.DB) {
 	es.db = db
+}
+
+func (es *EnrichmentService) SetAbuseIPDBKey(apiKey string) {
+	es.abuseIPDBKey = apiKey
+}
+
+func (es *EnrichmentService) SetVirusTotalKey(apiKey string) {
+	es.virusTotalKey = apiKey
 }
 
 func (es *EnrichmentService) getFromCache(key string) (*CachedEnrichment, bool) {
@@ -100,14 +110,38 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 		if err == nil && geoData != nil {
 			data = geoData
 			if !isPrivate {
-				reputationData, err := es.checkAlienVaultOTX(ipToGeolocate)
-				if err == nil && reputationData != nil {
-					data.IPReputation = reputationData.IPReputation
-					data.IsMalicious = reputationData.IsMalicious
-					data.ThreatLevel = reputationData.ThreatLevel
-					data.AbuseReports = reputationData.AbuseReports
-					data.ThreatSource = "alienvault-otx + ip-api.com"
+				// Try VirusTotal first (most comprehensive - 70+ vendors)
+				vtData, vtErr := es.checkVirusTotal(ipToGeolocate, es.virusTotalKey)
+
+				// Try AbuseIPDB as secondary source (abuse reports)
+				abuseData, abuseErr := es.checkAbuseIPDB(ipToGeolocate, es.abuseIPDBKey)
+
+				// Combine results using weighted scoring
+				if vtErr == nil && vtData != nil && abuseErr == nil && abuseData != nil {
+					// Both sources available - combine scores
+					// VirusTotal gets 70% weight (more comprehensive detection)
+					// AbuseIPDB gets 30% weight (community reports)
+					data.IPReputation = combineReputationScores(vtData.IPReputation, abuseData.IPReputation, 70, 30)
+					data.IsMalicious = vtData.IsMalicious || abuseData.IsMalicious
+					data.AbuseReports = vtData.AbuseReports + abuseData.AbuseReports
+					data.ThreatLevel = calculateThreatLevel(data.IPReputation)
+					data.ThreatSource = "virustotal + abuseipdb + ip-api.com"
+				} else if vtErr == nil && vtData != nil {
+					// Only VirusTotal available
+					data.IPReputation = vtData.IPReputation
+					data.IsMalicious = vtData.IsMalicious
+					data.AbuseReports = vtData.AbuseReports
+					data.ThreatLevel = vtData.ThreatLevel
+					data.ThreatSource = "virustotal + ip-api.com"
+				} else if abuseErr == nil && abuseData != nil {
+					// Only AbuseIPDB available
+					data.IPReputation = abuseData.IPReputation
+					data.IsMalicious = abuseData.IsMalicious
+					data.AbuseReports = abuseData.AbuseReports
+					data.ThreatLevel = abuseData.ThreatLevel
+					data.ThreatSource = "abuseipdb + ip-api.com"
 				} else {
+					// No reputation data available
 					data.ThreatSource = "ip-api.com"
 				}
 			}
@@ -151,70 +185,142 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 	return nil
 }
 
-func (es *EnrichmentService) checkAlienVaultOTX(ip string) (*ThreatIntelData, error) {
-	url := "https://otx.alienvault.com/api/v1/indicators/IPv4/" + ip + "/general"
+func (es *EnrichmentService) checkVirusTotal(ip string, apiKey string) (*ThreatIntelData, error) {
+	if apiKey == "" {
+		return nil, nil // Skip if API key not configured
+	}
+
+	url := "https://www.virustotal.com/api/v3/ip_addresses/" + ip
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
+
 	req.Header.Set("User-Agent", "WAF-SIEM-ThreatIntel/1.0")
+	req.Header.Set("x-apikey", apiKey)
+	req.Header.Set("Accept", "application/json")
+
 	resp, err := es.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, err
-	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	var otxResp struct {
-		Status          string `json:"status"`
-		Message         string `json:"message"`
-		ValidationCount int    `json:"validation_count"`
-		ThreatCount     int    `json:"threat_count"`
-		Pulses          []struct {
-			ID          string `json:"id"`
-			Name        string `json:"name"`
-			Description string `json:"description"`
-		} `json:"pulses"`
+	var vtResp struct {
+		Data struct {
+			Attributes struct {
+				LastAnalysisStats struct {
+					Malicious   int `json:"malicious"`
+					Suspicious  int `json:"suspicious"`
+					Undetected  int `json:"undetected"`
+					Harmless    int `json:"harmless"`
+					Timeout     int `json:"timeout"`
+				} `json:"last_analysis_stats"`
+				AsnOrganization string `json:"asn_organization"`
+				Country         string `json:"country"`
+			} `json:"attributes"`
+		} `json:"data"`
 	}
 
-	if err := json.Unmarshal(body, &otxResp); err != nil {
+	if err := json.Unmarshal(body, &vtResp); err != nil {
 		return nil, err
 	}
 
-	if otxResp.Status == "fail" && otxResp.Message == "reserved range" {
-		return &ThreatIntelData{
-			IPReputation: 0,
-			IsMalicious:  false,
-			ThreatSource: "alienvault-otx",
-			ThreatLevel:  "none",
-		}, nil
-	}
+	// Calculate reputation score based on detection ratio
+	stats := vtResp.Data.Attributes.LastAnalysisStats
+	totalEngines := stats.Malicious + stats.Suspicious + stats.Undetected + stats.Harmless
 
 	reputation := 0
 	isMalicious := false
-	threatLevel := "none"
 
-	if otxResp.ThreatCount > 0 || len(otxResp.Pulses) > 0 {
-		isMalicious = true
-		reputation = 20 + (otxResp.ThreatCount * 10) + (len(otxResp.Pulses) * 5)
+	if totalEngines > 0 {
+		// Score based on percentage of detections
+		detectionRatio := (stats.Malicious * 100) / totalEngines
+
+		// Malicious gets full weight, Suspicious gets half weight
+		suspiciousRatio := (stats.Suspicious * 50) / totalEngines
+		reputation = detectionRatio + suspiciousRatio
+
 		if reputation > 100 {
 			reputation = 100
 		}
-		threatLevel = calculateThreatLevel(reputation)
+
+		isMalicious = stats.Malicious > 0 || stats.Suspicious > 2
 	}
+
+	threatLevel := calculateThreatLevel(reputation)
 
 	data := &ThreatIntelData{
 		IPReputation: reputation,
 		IsMalicious:  isMalicious,
-		AbuseReports: otxResp.ThreatCount + len(otxResp.Pulses),
-		ThreatSource: "alienvault-otx",
+		AbuseReports: stats.Malicious + stats.Suspicious,
+		ThreatSource: "virustotal",
+		ThreatLevel:  threatLevel,
+	}
+	return data, nil
+}
+
+func (es *EnrichmentService) checkAbuseIPDB(ip string, apiKey string) (*ThreatIntelData, error) {
+	if apiKey == "" {
+		return nil, nil // Skip if API key not configured
+	}
+
+	url := "https://api.abuseipdb.com/api/v2/check"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	q := req.URL.Query()
+	q.Add("ipAddress", ip)
+	q.Add("maxAgeInDays", "90")
+	q.Add("verbose", "")
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Set("User-Agent", "WAF-SIEM-ThreatIntel/1.0")
+	req.Header.Set("Key", apiKey)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := es.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var abuseResp struct {
+		Data struct {
+			AbuseConfidenceScore int `json:"abuseConfidenceScore"`
+			Reports              int `json:"totalReports"`
+			Hostnames            []struct {
+				Name string `json:"hostname"`
+			} `json:"hostnames"`
+			ReportedCategories []int `json:"reportedCategories"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &abuseResp); err != nil {
+		return nil, err
+	}
+
+	reputation := abuseResp.Data.AbuseConfidenceScore
+	isMalicious := reputation > 25 // Consider suspicious if score > 25
+	threatLevel := calculateThreatLevel(reputation)
+
+	data := &ThreatIntelData{
+		IPReputation: reputation,
+		IsMalicious:  isMalicious,
+		AbuseReports: abuseResp.Data.Reports,
+		ThreatSource: "abuseipdb",
 		ThreatLevel:  threatLevel,
 	}
 	return data, nil
@@ -307,18 +413,50 @@ func parseASN(org string) string {
 	return org
 }
 
+// combineReputationScores combines two reputation scores using weighted average
+// score1Weight is the weight for the first score (VirusTotal in our case)
+// score2Weight is the weight for the second score (AbuseIPDB in our case)
+func combineReputationScores(score1, score2 int, weight1, weight2 int) int {
+	// If one source is 0 and the other is valid, use the valid one
+	if score1 == 0 && score2 > 0 {
+		return score2
+	}
+	if score2 == 0 && score1 > 0 {
+		return score1
+	}
+	if score1 == 0 && score2 == 0 {
+		return 0
+	}
+
+	// Weighted average based on provided weights
+	totalWeight := weight1 + weight2
+	combined := (score1 * weight1 / totalWeight) + (score2 * weight2 / totalWeight)
+	if combined > 100 {
+		combined = 100
+	}
+	return combined
+}
+
 func calculateThreatLevel(score int) string {
+	// Improved threat level calculation with better granularity
+	// Based on industry-standard reputation scoring practices
 	switch {
+	case score >= 90:
+		return "critical" // Almost certainly malicious
 	case score >= 75:
-		return "critical"
-	case score >= 50:
-		return "high"
+		return "critical" // Highly suspicious, strong indicators
+	case score >= 60:
+		return "high" // Strong indicators of malicious activity
+	case score >= 40:
+		return "high" // Moderate-to-strong indicators
 	case score >= 25:
-		return "medium"
+		return "medium" // Some indicators of suspicious activity
+	case score >= 10:
+		return "low" // Minor indicators, needs monitoring
 	case score > 0:
-		return "low"
+		return "low" // Minimal indicators
 	default:
-		return "none"
+		return "none" // Clean or no data
 	}
 }
 

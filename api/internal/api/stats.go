@@ -40,6 +40,28 @@ var (
 func InitTIService(db *gorm.DB) {
 	tiService = threatintel.NewEnrichmentService()
 	tiService.SetDB(db)
+
+	// Set VirusTotal API key from environment variable
+	virusTotalKey := os.Getenv("VIRUSTOTAL_API_KEY")
+	if virusTotalKey != "" {
+		tiService.SetVirusTotalKey(virusTotalKey)
+		fmt.Println("[INFO] VirusTotal API key configured")
+	} else {
+		fmt.Println("[WARN] VIRUSTOTAL_API_KEY not set. VirusTotal enrichment will be skipped. Get a free API key from https://www.virustotal.com/")
+	}
+
+	// Set AbuseIPDB API key from environment variable
+	abuseIPDBKey := os.Getenv("ABUSEIPDB_API_KEY")
+	if abuseIPDBKey != "" {
+		tiService.SetAbuseIPDBKey(abuseIPDBKey)
+		fmt.Println("[INFO] AbuseIPDB API key configured")
+	} else {
+		fmt.Println("[WARN] ABUSEIPDB_API_KEY not set. AbuseIPDB enrichment will be skipped. Get a free API key from https://www.abuseipdb.com/")
+	}
+
+	if virusTotalKey == "" && abuseIPDBKey == "" {
+		fmt.Println("[WARN] No TI API keys configured. Using only GeoIP enrichment.")
+	}
 }
 
 // extractRealClientIP extracts the real client IP from proxy headers

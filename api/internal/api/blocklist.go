@@ -2,12 +2,15 @@ package api
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 )
 
 // GetBlocklist - Ritorna la lista degli IP bloccati da database
@@ -192,6 +195,9 @@ func BlockIPWithDB(db *gorm.DB, c *gin.Context) {
 			"ip", req.IP, fmt.Sprintf("Blocked IP %s for threat: %s", req.IP, req.Threat),
 			details, c.ClientIP())
 
+		// Emit blocking event to SIEM
+		emitBlockedIPEvent(req.IP, req.Threat, durationStr, userEmail.(string), c.ClientIP(), "success")
+
 		c.JSON(201, gin.H{
 			"message": "IP blocked successfully",
 			"entry":   blockedIP,
@@ -346,4 +352,43 @@ func NewGetWhitelistForWAF(db *gorm.DB) func(*gin.Context) {
 			"count":           len(whitelisted),
 		})
 	}
+}
+
+// emitBlockedIPEvent emits a blocking event to the SIEM via log file
+func emitBlockedIPEvent(ip, threatType, duration, operator, operatorIP, status string) {
+	// Create logs directory if it doesn't exist
+	logsDir := "/var/log/caddy"
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		log.Printf("[ERROR] Failed to create logs directory: %v\n", err)
+		return
+	}
+
+	// Initialize event logger for blocked IP events
+	eventLogPath := logsDir + "/blocked_ip_events.log"
+	eventLogger, err := logger.NewEventLogger(eventLogPath)
+	if err != nil {
+		log.Printf("[ERROR] Failed to initialize event logger: %v\n", err)
+		return
+	}
+	defer eventLogger.Close()
+
+	// Create the event
+	event := logger.BlockedIPEvent{
+		Timestamp:   time.Now(),
+		EventType:   "ip_blocked_manual",
+		IP:          ip,
+		ThreatType:  threatType,
+		Duration:    duration,
+		Operator:    operator,
+		OperatorIP:  operatorIP,
+		Status:      status,
+	}
+
+	// Log the event
+	if err := eventLogger.LogBlockedIPEvent(event); err != nil {
+		log.Printf("[ERROR] Failed to log blocked IP event: %v\n", err)
+		return
+	}
+
+	log.Printf("[INFO] Blocked IP event emitted: %s (threat: %s, duration: %s)\n", ip, threatType, duration)
 }

@@ -75,6 +75,37 @@ filebeat.inputs:
     close_inactive: 5m
     clean_inactive: 48h
 
+  # ==========================================
+  # INPUT 3: Blocked IP Manual Events
+  # ==========================================
+  - type: filestream
+    id: blocked-ip-events
+    enabled: true
+
+    # Blocked IP events logs
+    paths:
+      - /var/log/caddy/blocked_ip_events.log
+
+    # Parser JSON per filestream
+    parsers:
+      - ndjson:
+          target: ""
+          add_error_key: true
+          overwrite_keys: true
+
+    # Custom fields per identificare il tipo di log
+    fields:
+      app: caddy-waf
+      log_type: blocked_ip_event
+      environment: production
+    fields_under_root: true
+
+    # Reading optimizations
+    ignore_older: 24h
+    scan_frequency: 5s      # Check more frequently for these events
+    close_inactive: 1m
+    clean_inactive: 48h
+
 # ================================
 # FILEBEAT MODULES (disabled)
 # ================================
@@ -109,10 +140,14 @@ output.elasticsearch:
     - index: "caddy-waf-threats-%{+yyyy.MM.dd}"
       when.equals:
         log_type: "waf_threat"
-    
+
     - index: "caddy-waf-access-%{+yyyy.MM.dd}"
       when.equals:
         log_type: "access"
+
+    - index: "caddy-waf-blocked-ip-events-%{+yyyy.MM.dd}"
+      when.equals:
+        log_type: "blocked_ip_event"
   
   # Performance tuning
   worker: 2
@@ -319,6 +354,23 @@ processors:
           to: "waf.threat_type"
       ignore_missing: true
       fail_on_error: false
+
+  # ================================================
+  # 8. CLEAN BLOCKED IP EVENTS (keep only essentials)
+  # ================================================
+  - drop_fields:
+      when:
+        equals:
+          log_type: "blocked_ip_event"
+      fields:
+        # Remove Filebeat metadata
+        - agent.ephemeral_id
+        - log.offset
+        - log.file.inode
+        - log.file.device_id
+        - input.type
+        - ecs.version
+      ignore_missing: true
 
 # ================================
 # LOCAL FILEBEAT LOGGING
