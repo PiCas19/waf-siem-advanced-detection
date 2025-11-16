@@ -251,6 +251,42 @@ const StatsPage: React.FC = () => {
     return unsubscribe;
   }, [onAlertReceived]);
 
+  // Listen for enrichment updates from the backend
+  useEffect(() => {
+    const handleEnrichmentUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const enrichmentData = customEvent.detail;
+
+      // Update the alert with the same IP with enrichment data
+      setRecentAlerts(prevAlerts => {
+        return prevAlerts.map(alert => {
+          if (alert.ip === enrichmentData.ip) {
+            return {
+              ...alert,
+              ip_reputation: enrichmentData.ip_reputation,
+              threat_level: enrichmentData.threat_level,
+              country: enrichmentData.country,
+              asn: enrichmentData.asn,
+              is_malicious: enrichmentData.is_malicious,
+              threat_source: enrichmentData.threat_source,
+              abuse_reports: enrichmentData.abuse_reports,
+              is_on_blocklist: enrichmentData.is_on_blocklist,
+              blocklist_name: enrichmentData.blocklist_name,
+            };
+          }
+          return alert;
+        });
+      });
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('enrichmentUpdate', handleEnrichmentUpdate);
+      return () => {
+        window.removeEventListener('enrichmentUpdate', handleEnrichmentUpdate);
+      };
+    }
+  }, []);
+
 
   // Type per i filtri di tempo
   type TimeFilter = 'today' | '15m' | '30m' | '1h' | '24h' | 'week' | '7d' | '30d' | '90d' | '1y';

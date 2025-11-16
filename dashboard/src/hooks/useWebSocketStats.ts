@@ -119,11 +119,29 @@ export function useWebSocketStats() {
               blocked: wafEvent.blocked || false,
               blockedBy: wafEvent.blocked_by || wafEvent.blockedBy || '',
               user_agent: wafEvent.user_agent,
+              ip_reputation: wafEvent.ip_reputation,
+              threat_level: wafEvent.threat_level,
+              country: wafEvent.country,
+              asn: wafEvent.asn,
+              is_malicious: wafEvent.is_malicious,
+              threat_source: wafEvent.threat_source,
+              abuse_reports: wafEvent.abuse_reports,
+              is_on_blocklist: wafEvent.is_on_blocklist,
+              blocklist_name: wafEvent.blocklist_name,
             };
 
             // Chiama tutti i callback registrati
             alertCallbacksRef.current.forEach(callback => callback(alert));
             setNewAlert(alert);
+          }
+          // Handle enrichment updates from the backend
+          else if (message.type === 'enrichment_update' && message.data) {
+            const enrichmentData = message.data;
+            // Dispatch enrichment update event that can be listened to
+            if (typeof window !== 'undefined') {
+              const updateEvent = new CustomEvent('enrichmentUpdate', { detail: enrichmentData });
+              window.dispatchEvent(updateEvent);
+            }
           }
         } catch (error) {
           // Silently ignore parse errors
