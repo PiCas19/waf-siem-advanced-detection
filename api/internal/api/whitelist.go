@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
