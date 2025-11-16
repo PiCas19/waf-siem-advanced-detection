@@ -28,11 +28,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	// Initialize services
 	logService := service.NewLogService(logRepo)
 	ruleService := service.NewRuleService(ruleRepo)
-	_ = service.NewBlocklistService(blockedIPRepo, logRepo)       // TODO: Use in blocklist handlers
-	_ = service.NewWhitelistService(whitelistRepo)               // TODO: Use in whitelist handlers
+	blocklistService := service.NewBlocklistService(blockedIPRepo, logRepo)
+	whitelistService := service.NewWhitelistService(whitelistRepo)
 	auditLogService := service.NewAuditLogService(auditLogRepo)
-	_ = service.NewFalsePositiveService(falsePositiveRepo)       // TODO: Use in false positive handlers
-	_ = service.NewUserService(userRepo)                         // TODO: Use in user handlers
+	falsePositiveService := service.NewFalsePositiveService(falsePositiveRepo)
+	userService := service.NewUserService(userRepo)
 
 	r.GET("/ws", websocket.WSHub)
 
@@ -50,8 +50,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		// WAF endpoint to fetch custom rules
 		public.GET("/waf/custom-rules", NewGetCustomRulesHandler(ruleService))
 		// WAF endpoint to fetch blocklist/whitelist
-		public.GET("/waf/blocklist", NewGetBlocklistForWAF(db))
-		public.GET("/waf/whitelist", NewGetWhitelistForWAF(db))
+		public.GET("/waf/blocklist", NewGetBlocklistForWAF(blocklistService))
+		public.GET("/waf/whitelist", NewGetWhitelistForWAF(whitelistService))
 		// WAF challenge verification endpoint
 		public.POST("/waf/challenge/verify", NewWAFChallengeVerifyHandler(db))
 	}
@@ -72,27 +72,27 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		}
 
 		// Logs endpoints - accessible to analyst and above
-		protected.GET("/logs", NewGetLogsHandler(db))
+		protected.GET("/logs", NewGetLogsHandler(logService, auditLogService))
 
 		// Audit logs endpoints
-		protected.GET("/audit-logs", NewGetAuditLogsHandler(db))
-		protected.GET("/audit-logs/stats", NewGetAuditLogStatsHandler(db))
+		protected.GET("/audit-logs", NewGetAuditLogsHandler(auditLogService))
+		protected.GET("/audit-logs/stats", NewGetAuditLogStatsHandler(auditLogService))
 
 		// Blocklist endpoints
-		protected.GET("/blocklist", GetBlocklist(db))
-		protected.POST("/blocklist", auth.PermissionMiddleware("manage_threats"), NewBlockIPHandler(db))
-		protected.DELETE("/blocklist/:ip", auth.PermissionMiddleware("manage_threats"), NewUnblockIPHandler(db))
+		protected.GET("/blocklist", GetBlocklist(blocklistService))
+		protected.POST("/blocklist", auth.PermissionMiddleware("manage_threats"), NewBlockIPHandler(blocklistService, logService))
+		protected.DELETE("/blocklist/:ip", auth.PermissionMiddleware("manage_threats"), NewUnblockIPHandler(blocklistService, logService))
 
 		// Whitelist endpoints
-		protected.GET("/whitelist", NewGetWhitelistHandler(db))
-		protected.POST("/whitelist", auth.PermissionMiddleware("manage_whitelist"), NewAddToWhitelistHandler(db))
-		protected.DELETE("/whitelist/:id", auth.PermissionMiddleware("manage_whitelist"), NewRemoveFromWhitelistHandler(db))
+		protected.GET("/whitelist", NewGetWhitelistHandler(whitelistService))
+		protected.POST("/whitelist", auth.PermissionMiddleware("manage_whitelist"), NewAddToWhitelistHandler(whitelistService))
+		protected.DELETE("/whitelist/:id", auth.PermissionMiddleware("manage_whitelist"), NewRemoveFromWhitelistHandler(whitelistService))
 
 		// False Positives endpoints
-		protected.GET("/false-positives", NewGetFalsePositivesHandler(db))
-		protected.POST("/false-positives", auth.PermissionMiddleware("report_false_positives"), NewReportFalsePositiveHandler(db))
-		protected.PATCH("/false-positives/:id", auth.PermissionMiddleware("resolve_false_positives"), NewUpdateFalsePositiveStatusHandler(db))
-		protected.DELETE("/false-positives/:id", auth.PermissionMiddleware("delete_false_positives"), NewDeleteFalsePositiveHandler(db))
+		protected.GET("/false-positives", NewGetFalsePositivesHandler(falsePositiveService))
+		protected.POST("/false-positives", auth.PermissionMiddleware("report_false_positives"), NewReportFalsePositiveHandler(falsePositiveService))
+		protected.PATCH("/false-positives/:id", auth.PermissionMiddleware("resolve_false_positives"), NewUpdateFalsePositiveStatusHandler(falsePositiveService))
+		protected.DELETE("/false-positives/:id", auth.PermissionMiddleware("delete_false_positives"), NewDeleteFalsePositiveHandler(falsePositiveService))
 
 		// 2FA endpoints
 		protected.POST("/auth/2fa/setup", authHandler.InitiateTwoFASetup)
@@ -107,12 +107,12 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	admin.Use(auth.AuthMiddleware(), auth.AdminMiddleware())
 	{
 		// List users (admin-only)
-		admin.GET("/users", NewGetUsersHandler(db))
+		admin.GET("/users", NewGetUsersHandler(userService))
 		// Admin-only user creation (invite flow)
 		admin.POST("/users", authHandler.AdminCreateUser)
 		// Update user (admin-only)
-		admin.PUT("/users/:id", NewUpdateUserHandler(db))
+		admin.PUT("/users/:id", NewUpdateUserHandler(userService))
 		// Delete user (admin-only)
-		admin.DELETE("/users/:id", NewDeleteUserHandler(db))
+		admin.DELETE("/users/:id", NewDeleteUserHandler(userService))
 	}
 }

@@ -1,21 +1,23 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 
-	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
 
 // NewGetUsersHandler returns a handler that lists users (admin-only)
-func NewGetUsersHandler(db *gorm.DB) gin.HandlerFunc {
+func NewGetUsersHandler(userService *service.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var users []models.User
-		if err := db.Find(&users).Error; err != nil {
+		ctx := context.Background()
+
+		users, err := userService.GetAllUsers(ctx)
+		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load users"})
 			return
 		}
@@ -43,7 +45,7 @@ func NewGetUsersHandler(db *gorm.DB) gin.HandlerFunc {
 func GetUsers(c *gin.Context) { c.JSON(400, gin.H{"error": "use NewGetUsersHandler"}) }
 
 // NewUpdateUserHandler returns a handler that updates a user (admin-only)
-func NewUpdateUserHandler(db *gorm.DB) gin.HandlerFunc {
+func NewUpdateUserHandler(userService *service.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userIDStr := c.Param("id")
 		userID, err := strconv.ParseUint(userIDStr, 10, 32)
@@ -81,13 +83,10 @@ func NewUpdateUserHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		var user models.User
-		if err := db.First(&user, uint(userID)).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
-			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user"})
-			}
+		ctx := context.Background()
+		user, err := userService.GetUserByID(ctx, uint(userID))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 			return
 		}
 
@@ -99,11 +98,11 @@ func NewUpdateUserHandler(db *gorm.DB) gin.HandlerFunc {
 			user.Role = req.Role
 		}
 		// Only update Active if explicitly provided
-	if req.Active != nil {
-		user.Active = *req.Active
-	}
+		if req.Active != nil {
+			user.Active = *req.Active
+		}
 
-		if err := db.Save(&user).Error; err != nil {
+		if err := userService.UpdateUser(ctx, user); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user"})
 			return
 		}
@@ -125,7 +124,7 @@ func NewUpdateUserHandler(db *gorm.DB) gin.HandlerFunc {
 }
 
 // NewDeleteUserHandler returns a handler that deletes a user (admin-only)
-func NewDeleteUserHandler(db *gorm.DB) gin.HandlerFunc {
+func NewDeleteUserHandler(userService *service.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userIDStr := c.Param("id")
 		userID, err := strconv.ParseUint(userIDStr, 10, 32)
@@ -152,17 +151,14 @@ func NewDeleteUserHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		var user models.User
-		if err := db.First(&user, uint(userID)).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
-			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user"})
-			}
+		ctx := context.Background()
+		user, err := userService.GetUserByID(ctx, uint(userID))
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 			return
 		}
 
-		if err := db.Unscoped().Delete(&user).Error; err != nil {
+		if err := userService.DeleteUser(ctx, uint(userID)); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user"})
 			return
 		}
