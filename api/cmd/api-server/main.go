@@ -1,119 +1,218 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/api"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/config"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/middleware"
 )
 
 func main() {
-	// Try to load variables from a local .env file for development.
-	// This is non-fatal: if the file doesn't exist we continue reading from the environment.
+	// Carica variabili d'ambiente dal file .env
 	if err := godotenv.Load(); err == nil {
-		log.Println("Loaded environment variables from .env")
+		fmt.Println("✓ Loaded environment variables from .env")
 	} else {
-		log.Println("No .env file found or failed to load; using environment variables")
+		fmt.Println("ℹ No .env file found, using environment variables")
 	}
 
-	// Set Gin mode from environment variable (default: release mode)
-	// This suppresses Gin debug warnings like "trusted all proxies"
-	ginMode := os.Getenv("GIN_MODE")
-	if ginMode == "" {
-		ginMode = "release"  // Default to release mode for production
+	// Carica configurazione centralizzata
+	cfg := config.LoadFromEnv()
+
+	// Inizializza logger strutturato
+	if err := logger.InitLogger(cfg.Logger.Level, cfg.Logger.OutputPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+		os.Exit(1)
 	}
-	gin.SetMode(ginMode)
-	log.Printf("Gin mode set to: %s\n", ginMode)
+	defer func() {
+		if err := logger.CloseLogger(); err != nil {
+			logger.WithError(err).Error("Failed to close logger")
+		}
+	}()
 
-    // Resolve configuration from env with sensible defaults
-    dbPath := os.Getenv("DATABASE_URL")
-    if dbPath == "" {
-        dbPath = "./data/waf.db"
-    }
-    port := os.Getenv("PORT")
-    if port == "" {
-        port = "8081"
-    }
+	logger.Log.WithFields(map[string]interface{}{
+		"log_level": cfg.Logger.Level,
+		"output":    cfg.Logger.OutputPath,
+	}).Info("Logger initialized")
 
-    // Initialize database
-    db, err := database.Initialize(dbPath)
+	// Imposta Gin mode
+	if cfg.Logger.Level == "debug" {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
+	// Inizializza database
+	logger.Log.Info("Initializing database...")
+	db, err := database.Initialize(cfg.Database.Path)
 	if err != nil {
-		log.Fatal("Failed to initialize database:", err)
+		logger.WithError(err).Fatal("Failed to initialize database")
 	}
+	logger.Log.WithFields(map[string]interface{}{
+		"database": cfg.Database.Path,
+	}).Info("Database initialized")
 
-	// Seed default users (creates root admin if it doesn't exist)
+	// Seed default users
 	if err := database.SeedDefaultUsers(db); err != nil {
-		log.Printf("[WARN] Failed to seed default users: %v\n", err)
+		logger.WithError(err).Warn("Failed to seed default users")
 	}
 
-	// Initialize MaxMind GeoIP database
+	// Inizializza MaxMind GeoIP
+	logger.Log.Info("Initializing GeoIP database...")
 	licenseKey := os.Getenv("MAXMIND_LICENSE_KEY")
 	if licenseKey != "" {
-		log.Println("[INFO] MaxMind license key found, checking for existing database...")
-		config := geoip.DefaultDownloadConfig(licenseKey)
-		if err := geoip.DownloadDatabase(config); err != nil {
-			log.Printf("[WARN] Failed to download/initialize MaxMind database: %v. Will use fallback IP ranges.\n", err)
+		geoConfig := geoip.DefaultDownloadConfig(licenseKey)
+		if err := geoip.DownloadDatabase(geoConfig); err != nil {
+			logger.WithError(err).Warn("Failed to download MaxMind database, using fallback")
 		} else {
-			log.Println("[INFO] MaxMind GeoIP database ready")
+			logger.Log.Info("MaxMind GeoIP database ready")
 		}
 	} else {
-		log.Println("[WARN] MAXMIND_LICENSE_KEY not set. Using fallback IP ranges. To use MaxMind, set MAXMIND_LICENSE_KEY environment variable.")
+		logger.Log.Warn("MAXMIND_LICENSE_KEY not set, using fallback IP ranges")
 	}
 
-	// Create Gin router with explicit configuration
-	// Disable "trust all proxies" by creating custom engine
+	// Crea Gin router con configurazione esplicita
 	engine := gin.New()
 
-	// Set explicit trusted proxies BEFORE adding any middleware
-	// Configure trusted proxies based on your network architecture:
-	// - 127.0.0.1, ::1: localhost (always safe)
-	// - 192.168.216.0/24: Your internal LAN
-	// - 172.16.216.0/24: Your DMZ
+	// Imposta trusted proxies
 	engine.SetTrustedProxies([]string{"127.0.0.1", "::1", "192.168.216.0/24", "172.16.216.0/24"})
 
-	// Add middleware after setting trusted proxies
+	// Aggiungi middleware
 	engine.Use(gin.Logger())
 	engine.Use(gin.Recovery())
 
-	r := engine
+	// Middleware personalizzati
+	engine.Use(middleware.RequestIDMiddleware())
+	engine.Use(middleware.ContextPropagationMiddleware())
 
-	// CORS middleware
-	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		
+	// CORS middleware (con whitelist di domini)
+	engine.Use(func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+
+		// Verifica se l'origine è nella whitelist
+		allowed := false
+		for _, allowedOrigin := range cfg.CORS.AllowedOrigins {
+			if allowedOrigin == "*" || origin == allowedOrigin {
+				allowed = true
+				break
+			}
+		}
+
+		if allowed {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-Request-ID, Content-Length")
+		c.Writer.Header().Set("Access-Control-Max-Age", "300")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+
 		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
+			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
-		
+
 		c.Next()
 	})
-	
-	// Health check
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
-	
-	// Setup routes
-	api.SetupRoutes(r, db)
 
-	// Initialize threat intelligence service with database for blocklist checking
+	// Aggiungi rate limiting se abilitato
+	var rateLimiter *middleware.RateLimiter
+	if cfg.RateLimit.Enabled {
+		rateLimiter = middleware.NewRateLimiter(float64(cfg.RateLimit.RPS), cfg.RateLimit.BurstSize)
+		engine.Use(middleware.RateLimitMiddleware(rateLimiter))
+		logger.Log.Info("Rate limiting enabled")
+	}
+
+	// Health check endpoint
+	engine.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "healthy",
+			"time":   time.Now(),
+		})
+	})
+
+	// Readiness probe
+	engine.GET("/health/ready", func(c *gin.Context) {
+		// Puoi aggiungere controlli più sofisticati qui
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ready",
+			"time":   time.Now(),
+		})
+	})
+
+	// Liveness probe
+	engine.GET("/health/live", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "alive",
+			"time":   time.Now(),
+		})
+	})
+
+	// Setup routes
+	api.SetupRoutes(engine, db)
+
+	// Inizializza threat intelligence service
 	api.InitTIService(db)
 
-	// Initialize stats handler with database
+	// Inizializza stats handler
 	api.SetStatsDB(db)
 
-    // Start server
-    addr := fmt.Sprintf(":%s", port)
-    log.Printf("Starting API server on %s (DB: %s)\n", addr, dbPath)
-    if err := r.Run(addr); err != nil {
-		log.Fatal("Failed to start server:", err)
+	// Crea server HTTP
+	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	srv := &http.Server{
+		Addr:           addr,
+		Handler:        engine,
+		ReadTimeout:    15 * time.Second,
+		WriteTimeout:   15 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1MB
 	}
+
+	// Avvia server in goroutine
+	go func() {
+		logger.Log.WithFields(map[string]interface{}{
+			"address": addr,
+		}).Info("Starting API server")
+
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.WithError(err).Fatal("Server failed to start")
+		}
+	}()
+
+	// Gestisci graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	<-quit
+	logger.Log.Info("Shutdown signal received, gracefully shutting down...")
+
+	// Context con timeout per graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
+	defer cancel()
+
+	// Chiudi server
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.WithError(err).Error("Server forced to shutdown")
+	}
+
+	// Chiudi database
+	sqlDB, err := db.DB()
+	if err == nil {
+		if err := sqlDB.Close(); err != nil {
+			logger.WithError(err).Error("Failed to close database")
+		}
+	}
+
+	logger.Log.Info("Server stopped gracefully")
 }
