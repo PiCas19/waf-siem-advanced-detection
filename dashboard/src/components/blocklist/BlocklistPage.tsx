@@ -425,23 +425,22 @@ const BlocklistPage: React.FC = () => {
             return;
           }
 
-          // Reload whitelist from server to ensure it's in sync
+          // Get the response to add to local state immediately
           try {
-            const whitelistRes = await fetch('/api/whitelist', {
-              headers: { 'Authorization': `Bearer ${token}` },
-            });
-            if (whitelistRes.ok) {
-              const whitelistData = await whitelistRes.json();
-              setWhitelist(whitelistData.whitelisted_ips || []);
-              // Mark that whitelist was just loaded, so don't reload on tab change
-              whitelistJustLoadedRef.current = true;
-              showToast('IP added to whitelist', 'success', 2000);
-            } else {
-              showToast('Failed to reload whitelist', 'error', 4000);
-              return;
-            }
+            const responseData = await whiteRes.json();
+            // Add the new entry to local whitelist state immediately
+            const newEntry: WhitelistedEntry = {
+              id: responseData.entry?.id || Date.now(),
+              ip_address: fp.client_ip,
+              reason: 'Auto-whitelisted from false positive',
+              created_at: new Date().toISOString(),
+            };
+            setWhitelist([...whitelist, newEntry]);
+            // Mark that whitelist was just loaded, so don't reload on tab change
+            whitelistJustLoadedRef.current = true;
+            showToast('IP added to whitelist', 'success', 2000);
           } catch (err) {
-            showToast('Error loading whitelist', 'error', 4000);
+            showToast('Error processing whitelist response', 'error', 4000);
             return;
           }
         }
