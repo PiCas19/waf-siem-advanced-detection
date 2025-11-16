@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
+	"gorm.io/gorm"
 )
 
 // NewGetWhitelistHandler - Returns the list of whitelisted IPs (only non-deleted)
@@ -65,6 +66,7 @@ func NewAddToWhitelistHandler(whitelistService *service.WhitelistService) gin.Ha
 		if err == nil && existingIP != nil {
 			// IP already exists, restore it if soft-deleted and update the reason
 			existingIP.Reason = req.Reason
+			existingIP.DeletedAt = gorm.DeletedAt{}
 			if err := whitelistService.UpdateWhitelistedIP(ctx, existingIP); err != nil {
 				c.JSON(500, gin.H{"error": "failed to update whitelist entry"})
 				return
