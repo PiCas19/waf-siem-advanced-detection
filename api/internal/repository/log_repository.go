@@ -1,0 +1,78 @@
+package repository
+
+import (
+	"context"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"gorm.io/gorm"
+)
+
+type GormLogRepository struct {
+	db *gorm.DB
+}
+
+func NewGormLogRepository(db *gorm.DB) LogRepository {
+	return &GormLogRepository{db: db}
+}
+
+func (r *GormLogRepository) FindAll(ctx context.Context) ([]models.Log, error) {
+	var logs []models.Log
+	err := r.db.WithContext(ctx).Order("created_at DESC").Find(&logs).Error
+	return logs, err
+}
+
+func (r *GormLogRepository) FindByID(ctx context.Context, id uint) (*models.Log, error) {
+	var log models.Log
+	err := r.db.WithContext(ctx).First(&log, id).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	return &log, err
+}
+
+func (r *GormLogRepository) FindByIP(ctx context.Context, ip string) ([]models.Log, error) {
+	var logs []models.Log
+	err := r.db.WithContext(ctx).Where("client_ip = ?", ip).Order("created_at DESC").Find(&logs).Error
+	return logs, err
+}
+
+func (r *GormLogRepository) FindBlocked(ctx context.Context) ([]models.Log, error) {
+	var logs []models.Log
+	err := r.db.WithContext(ctx).Where("blocked = ?", true).Order("created_at DESC").Find(&logs).Error
+	return logs, err
+}
+
+func (r *GormLogRepository) FindByThreatType(ctx context.Context, threatType string) ([]models.Log, error) {
+	var logs []models.Log
+	err := r.db.WithContext(ctx).Where("threat_type = ?", threatType).Order("created_at DESC").Find(&logs).Error
+	return logs, err
+}
+
+func (r *GormLogRepository) FindRecent(ctx context.Context, limit int) ([]models.Log, error) {
+	var logs []models.Log
+	err := r.db.WithContext(ctx).Order("created_at DESC").Limit(limit).Find(&logs).Error
+	return logs, err
+}
+
+func (r *GormLogRepository) Count(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Log{}).Count(&count).Error
+	return count, err
+}
+
+func (r *GormLogRepository) CountBlocked(ctx context.Context) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Log{}).Where("blocked = ?", true).Count(&count).Error
+	return count, err
+}
+
+func (r *GormLogRepository) Create(ctx context.Context, log *models.Log) error {
+	return r.db.WithContext(ctx).Create(log).Error
+}
+
+func (r *GormLogRepository) Update(ctx context.Context, log *models.Log) error {
+	return r.db.WithContext(ctx).Save(log).Error
+}
+
+func (r *GormLogRepository) Delete(ctx context.Context, id uint) error {
+	return r.db.WithContext(ctx).Delete(&models.Log{}, id).Error
+}
