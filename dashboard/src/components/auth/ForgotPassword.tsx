@@ -12,7 +12,7 @@ const ForgotPassword: React.FC = () => {
   const [loading, setLoading] = useState(false)
 
   // Reset password form state
-  const [resetToken, setResetToken] = useState(searchParams.get('token') || '')
+  const resetToken = searchParams.get('token') || ''
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
