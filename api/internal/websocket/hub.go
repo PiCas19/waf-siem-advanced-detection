@@ -86,7 +86,7 @@ func Broadcast(event WAFEvent) {
 }
 
 // BroadcastEnrichment sends enrichment updates (threat_level, ip_reputation, etc.) to all connected clients
-func BroadcastEnrichment(ip string, ipReputation *int, threatLevel string, country string, asn string, isMalicious bool, threatSource string, abuseReports int, isOnBlocklist bool, blocklistName string) {
+func BroadcastEnrichment(ip string, ipReputation *int, threatLevel string, country string, asn string, isMalicious bool, threatSource string, abuseReports *int, isOnBlocklist bool, blocklistName string) {
 	data := map[string]any{
 		"type": "enrichment_update",
 		"data": map[string]any{
