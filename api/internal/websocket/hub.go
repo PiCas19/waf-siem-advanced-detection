@@ -85,6 +85,32 @@ func Broadcast(event WAFEvent) {
 	}
 }
 
+// BroadcastEnrichment sends enrichment updates (threat_level, ip_reputation, etc.) to all connected clients
+func BroadcastEnrichment(ip string, ipReputation *int, threatLevel string, country string, asn string, isMalicious bool, threatSource string, abuseReports int, isOnBlocklist bool, blocklistName string) {
+	data := map[string]any{
+		"type": "enrichment_update",
+		"data": map[string]any{
+			"ip":              ip,
+			"ip_reputation":   ipReputation,
+			"threat_level":    threatLevel,
+			"country":         country,
+			"asn":             asn,
+			"is_malicious":    isMalicious,
+			"threat_source":   threatSource,
+			"abuse_reports":   abuseReports,
+			"is_on_blocklist": isOnBlocklist,
+			"blocklist_name":  blocklistName,
+		},
+	}
+	jsonData, _ := json.Marshal(data)
+
+	select {
+	case broadcast <- jsonData:
+	default:
+		// Broadcast channel full, dropping message
+	}
+}
+
 func WSHub(c *gin.Context) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {

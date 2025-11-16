@@ -261,6 +261,19 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 		fmt.Printf("[ERROR] Failed to update log %d with threat intelligence: %v\n", log.ID, err)
 	} else {
 		fmt.Printf("[INFO] Log %d successfully enriched and updated\n", log.ID)
+		// Send enrichment update via WebSocket so the dashboard can update the UI immediately
+		websocket.BroadcastEnrichment(
+			log.ClientIP,
+			log.IPReputation,
+			log.ThreatLevel,
+			log.Country,
+			log.ASN,
+			log.IsMalicious,
+			log.ThreatSource,
+			log.AbuseReports,
+			log.IsOnBlocklist,
+			log.BlocklistName,
+		)
 	}
 
 	websocket.Broadcast(event)
