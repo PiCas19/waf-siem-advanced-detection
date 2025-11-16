@@ -12,7 +12,7 @@ import (
 // NewGetWhitelistHandler - Returns the list of whitelisted IPs (only non-deleted)
 func NewGetWhitelistHandler(whitelistService *service.WhitelistService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		whitelisted, err := whitelistService.GetAllWhitelistedIPs(ctx)
 		if err != nil {
@@ -53,7 +53,7 @@ func NewAddToWhitelistHandler(whitelistService *service.WhitelistService) gin.Ha
 			return
 		}
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		whitelist := models.WhitelistedIP{
 			IPAddress: validatedIP,
@@ -100,7 +100,7 @@ func NewRemoveFromWhitelistHandler(whitelistService *service.WhitelistService) g
 			return
 		}
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		if err := whitelistService.RemoveFromWhitelist(ctx, uint(idUint)); err != nil {
 			c.JSON(500, gin.H{"error": "failed to remove from whitelist"})
@@ -114,7 +114,7 @@ func NewRemoveFromWhitelistHandler(whitelistService *service.WhitelistService) g
 // NewGetWhitelistForWAFHandler - Returns the whitelist for the WAF (public endpoint)
 func NewGetWhitelistForWAFHandler(whitelistService *service.WhitelistService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		whitelisted, err := whitelistService.GetAllWhitelistedIPs(ctx)
 		if err != nil {
