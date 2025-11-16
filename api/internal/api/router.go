@@ -6,6 +6,8 @@ import (
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/auth"
 	mailerpkg "github.com/PiCas19/waf-siem-advanced-detection/api/internal/mailer"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/repository"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/websocket"
 )
 
@@ -13,6 +15,24 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	// init mailer (reads env vars). If not configured, mailer will be nil.
 	mailer := mailerpkg.NewMailerFromEnv()
 	authHandler := auth.NewAuthHandler(db, mailer)
+
+	// Initialize repositories
+	logRepo := repository.NewGormLogRepository(db)
+	ruleRepo := repository.NewGormRuleRepository(db)
+	blockedIPRepo := repository.NewGormBlockedIPRepository(db)
+	whitelistRepo := repository.NewGormWhitelistedIPRepository(db)
+	auditLogRepo := repository.NewGormAuditLogRepository(db)
+	falsePositiveRepo := repository.NewGormFalsePositiveRepository(db)
+	userRepo := repository.NewGormUserRepository(db)
+
+	// Initialize services
+	logService := service.NewLogService(logRepo)
+	ruleService := service.NewRuleService(ruleRepo)
+	_ = service.NewBlocklistService(blockedIPRepo, logRepo)       // TODO: Use in blocklist handlers
+	_ = service.NewWhitelistService(whitelistRepo)               // TODO: Use in whitelist handlers
+	auditLogService := service.NewAuditLogService(auditLogRepo)
+	_ = service.NewFalsePositiveService(falsePositiveRepo)       // TODO: Use in false positive handlers
+	_ = service.NewUserService(userRepo)                         // TODO: Use in user handlers
 
 	r.GET("/ws", websocket.WSHub)
 
@@ -26,9 +46,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		// Forgot password endpoints (public - no auth required)
 		public.POST("/auth/forgot-password", authHandler.ForgotPassword)
 		public.POST("/auth/reset-password", authHandler.ResetPassword)
-		public.POST("/waf/event", NewWAFEventHandler(db))
+		public.POST("/waf/event", NewWAFEventHandler(logService, auditLogService))
 		// WAF endpoint to fetch custom rules
-		public.GET("/waf/custom-rules", NewGetCustomRulesHandler(db))
+		public.GET("/waf/custom-rules", NewGetCustomRulesHandler(ruleService))
 		// WAF endpoint to fetch blocklist/whitelist
 		public.GET("/waf/blocklist", NewGetBlocklistForWAF(db))
 		public.GET("/waf/whitelist", NewGetWhitelistForWAF(db))
@@ -44,11 +64,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 		rules := protected.Group("/rules")
 		{
-			rules.GET("", NewGetRulesHandler(db))
-			rules.POST("", NewCreateRuleHandler(db))
-			rules.PUT("/:id", NewUpdateRuleHandler(db))
-			rules.DELETE("/:id", NewDeleteRuleHandler(db))
-			rules.PATCH("/:id/toggle", NewToggleRuleHandler(db))
+			rules.GET("", NewGetRulesHandler(ruleService))
+			rules.POST("", NewCreateRuleHandler(ruleService, auditLogService))
+			rules.PUT("/:id", NewUpdateRuleHandler(ruleService, auditLogService))
+			rules.DELETE("/:id", NewDeleteRuleHandler(ruleService, auditLogService))
+			rules.PATCH("/:id/toggle", NewToggleRuleHandler(ruleService))
 		}
 
 		// Logs endpoints - accessible to analyst and above
