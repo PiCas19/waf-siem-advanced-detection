@@ -76,3 +76,30 @@ func (r *GormLogRepository) Update(ctx context.Context, log *models.Log) error {
 func (r *GormLogRepository) Delete(ctx context.Context, id uint) error {
 	return r.db.WithContext(ctx).Delete(&models.Log{}, id).Error
 }
+
+func (r *GormLogRepository) UpdateByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error {
+	return r.db.WithContext(ctx).
+		Where("client_ip = ? AND description = ?", ip, description).
+		Updates(updates).Error
+}
+
+func (r *GormLogRepository) FindPaginated(ctx context.Context, offset int, limit int) ([]models.Log, int64, error) {
+	var logs []models.Log
+	var total int64
+
+	query := r.db.WithContext(ctx)
+
+	// Get total count
+	if err := query.Model(&models.Log{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
+	err := query.
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&logs).Error
+
+	return logs, total, err
+}

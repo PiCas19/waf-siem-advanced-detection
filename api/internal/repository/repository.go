@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
-	"gorm.io/gorm"
 )
 
 // LogRepository handles all database operations for logs
@@ -19,6 +18,8 @@ type LogRepository interface {
 	Create(ctx context.Context, log *models.Log) error
 	Update(ctx context.Context, log *models.Log) error
 	Delete(ctx context.Context, id uint) error
+	UpdateByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error
+	FindPaginated(ctx context.Context, offset int, limit int) ([]models.Log, int64, error)
 }
 
 // RuleRepository handles database operations for WAF rules
@@ -31,6 +32,7 @@ type RuleRepository interface {
 	Delete(ctx context.Context, id uint) error
 	ToggleEnabled(ctx context.Context, id uint, enabled bool) error
 	Count(ctx context.Context) (int64, error)
+	FindByType(ctx context.Context, threatType string) ([]models.Rule, error)
 }
 
 // BlockedIPRepository handles database operations for blocked IPs
@@ -43,6 +45,7 @@ type BlockedIPRepository interface {
 	Delete(ctx context.Context, ip string) error
 	IsBlocked(ctx context.Context, ip string) (bool, error)
 	Count(ctx context.Context) (int64, error)
+	FindByIPAndDescription(ctx context.Context, ip string, description string) (*models.BlockedIP, error)
 }
 
 // WhitelistedIPRepository handles database operations for whitelisted IPs
@@ -54,6 +57,8 @@ type WhitelistedIPRepository interface {
 	Delete(ctx context.Context, id uint) error
 	IsWhitelisted(ctx context.Context, ip string) (bool, error)
 	Count(ctx context.Context) (int64, error)
+	Restore(ctx context.Context, ip string) (*models.WhitelistedIP, error)
+	ExistsSoftDeleted(ctx context.Context, ip string) (*models.WhitelistedIP, error)
 }
 
 // AuditLogRepository handles database operations for audit logs
@@ -65,6 +70,8 @@ type AuditLogRepository interface {
 	Create(ctx context.Context, auditLog *models.AuditLog) error
 	Count(ctx context.Context) (int64, error)
 	CountByStatus(ctx context.Context, status string) (int64, error)
+	FindPaginated(ctx context.Context, offset int, limit int) ([]models.AuditLog, int64, error)
+	GetActionBreakdown(ctx context.Context) (map[string]int64, error)
 }
 
 // FalsePositiveRepository handles database operations for false positives
@@ -77,6 +84,8 @@ type FalsePositiveRepository interface {
 	Update(ctx context.Context, fp *models.FalsePositive) error
 	Delete(ctx context.Context, id uint) error
 	Count(ctx context.Context) (int64, error)
+	CountUnresolved(ctx context.Context) (int64, error)
+	FindPaginated(ctx context.Context, offset int, limit int) ([]models.FalsePositive, int64, error)
 }
 
 // UserRepository handles database operations for users
@@ -89,4 +98,7 @@ type UserRepository interface {
 	Delete(ctx context.Context, id uint) error
 	Count(ctx context.Context) (int64, error)
 	UpdateRole(ctx context.Context, id uint, role string) error
+	FindByRole(ctx context.Context, role string) ([]models.User, error)
+	CountByRole(ctx context.Context, role string) (int64, error)
+	ExistsByEmail(ctx context.Context, email string) (bool, error)
 }

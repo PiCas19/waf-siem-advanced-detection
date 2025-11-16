@@ -26,25 +26,14 @@ type StrategyResult struct {
 	Err      error
 }
 
-// ThreatIntelData represents enriched threat intelligence data
-type ThreatIntelData struct {
-	IPReputation  *int
-	IsMalicious   bool
-	Country       string
-	ASN           string
-	ISP           string
-	ThreatLevel   string
-	ThreatSource  string
-	AbuseReports  int
-	IsOnBlocklist bool
-	BlocklistName string
-}
+// Note: ThreatIntelData is defined in service.go to avoid conflicts
+// This file extends and uses the ThreatIntelData type defined there
 
 // Combine multiple strategy results using weighted averaging
 func CombineResults(results []StrategyResult) *ThreatIntelData {
 	if len(results) == 0 {
 		return &ThreatIntelData{
-			IPReputation:  nil,
+			IPReputation:  0,
 			IsMalicious:   false,
 			ThreatLevel:   "none",
 			ThreatSource:  "none",
@@ -52,7 +41,7 @@ func CombineResults(results []StrategyResult) *ThreatIntelData {
 	}
 
 	combined := &ThreatIntelData{
-		IPReputation: nil,
+		IPReputation: 0,
 		IsMalicious:  false,
 		ThreatLevel:  "none",
 		ThreatSource: "",
@@ -74,8 +63,8 @@ func CombineResults(results []StrategyResult) *ThreatIntelData {
 		totalPriority += priority
 
 		// Combine IP reputation with weighted averaging
-		if data.IPReputation != nil {
-			reputationSum += *data.IPReputation * priority
+		if data.IPReputation > 0 {
+			reputationSum += data.IPReputation * priority
 			validReputations += priority
 		}
 
@@ -113,8 +102,7 @@ func CombineResults(results []StrategyResult) *ThreatIntelData {
 
 	// Calculate weighted average reputation
 	if validReputations > 0 {
-		avgReputation := reputationSum / validReputations
-		combined.IPReputation = &avgReputation
+		combined.IPReputation = reputationSum / validReputations
 	}
 
 	combined.AbuseReports = maxAbuseReports
