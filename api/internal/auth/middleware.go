@@ -87,9 +87,10 @@ var RolePermissions = map[string][]string{
 		// NO: users_view, users_create, users_edit, users_delete, users_change_role
 	},
 	"analyst": {
-		// Analyst: Read-only access to logs and dashboard
+		// Analyst: Read-only access to logs and dashboard, can report false positives
 		"logs_view",  // Can view but not export/delete
-		// NO: rules, blocklist, whitelist, false_positives, threats, users
+		"false_positives_view", "false_positives_report",  // Can view and report false positives
+		// NO: rules, blocklist, whitelist, threats, users
 	},
 	"user": {
 		// User: Minimal access - only dashboard

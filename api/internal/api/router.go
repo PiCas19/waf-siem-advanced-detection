@@ -80,19 +80,19 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 		// Blocklist endpoints
 		protected.GET("/blocklist", GetBlocklist(blocklistService))
-		protected.POST("/blocklist", auth.PermissionMiddleware("manage_threats"), NewBlockIPHandler(blocklistService, logService))
-		protected.DELETE("/blocklist/:ip", auth.PermissionMiddleware("manage_threats"), NewUnblockIPHandler(blocklistService, logService))
+		protected.POST("/blocklist", auth.PermissionMiddleware("blocklist_add"), NewBlockIPHandler(blocklistService, logService))
+		protected.DELETE("/blocklist/:ip", auth.PermissionMiddleware("blocklist_remove"), NewUnblockIPHandler(blocklistService, logService))
 
 		// Whitelist endpoints
 		protected.GET("/whitelist", NewGetWhitelistHandler(whitelistService))
-		protected.POST("/whitelist", auth.PermissionMiddleware("manage_whitelist"), NewAddToWhitelistHandler(whitelistService))
-		protected.DELETE("/whitelist/:id", auth.PermissionMiddleware("manage_whitelist"), NewRemoveFromWhitelistHandler(whitelistService))
+		protected.POST("/whitelist", auth.PermissionMiddleware("whitelist_add"), NewAddToWhitelistHandler(whitelistService))
+		protected.DELETE("/whitelist/:id", auth.PermissionMiddleware("whitelist_remove"), NewRemoveFromWhitelistHandler(whitelistService))
 
 		// False Positives endpoints
 		protected.GET("/false-positives", NewGetFalsePositivesHandler(falsePositiveService))
-		protected.POST("/false-positives", auth.PermissionMiddleware("report_false_positives"), NewReportFalsePositiveHandler(falsePositiveService))
-		protected.PATCH("/false-positives/:id", auth.PermissionMiddleware("resolve_false_positives"), NewUpdateFalsePositiveStatusHandler(falsePositiveService))
-		protected.DELETE("/false-positives/:id", auth.PermissionMiddleware("delete_false_positives"), NewDeleteFalsePositiveHandler(falsePositiveService))
+		protected.POST("/false-positives", auth.PermissionMiddleware("false_positives_report"), NewReportFalsePositiveHandler(falsePositiveService))
+		protected.PATCH("/false-positives/:id", auth.PermissionMiddleware("false_positives_resolve"), NewUpdateFalsePositiveStatusHandler(falsePositiveService))
+		protected.DELETE("/false-positives/:id", auth.PermissionMiddleware("false_positives_delete"), NewDeleteFalsePositiveHandler(falsePositiveService))
 
 		// 2FA endpoints
 		protected.POST("/auth/2fa/setup", authHandler.InitiateTwoFASetup)
