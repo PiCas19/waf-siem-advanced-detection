@@ -17,6 +17,16 @@ interface WAFEvent {
   blockedBy?: string;
   user_agent?: string;
   description?: string; // Rule name/description for per-rule blocking
+  // Threat Intelligence Enrichment fields
+  ip_reputation?: number;
+  threat_level?: string;
+  country?: string;
+  asn?: string;
+  is_malicious?: boolean;
+  threat_source?: string;
+  abuse_reports?: number;
+  is_on_blocklist?: boolean;
+  blocklist_name?: string;
 }
 
 // WebSocket globale - mantiene la connessione tra i re-render
