@@ -4,6 +4,7 @@ import { ToastProvider, useToast } from '@/contexts/SnackbarContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Login from '@/components/auth/Login'
 import SetPassword from '@/components/auth/SetPassword'
+import ForgotPassword from '@/components/auth/ForgotPassword'
 import ForcedTwoFASetup from '@/components/auth/ForcedTwoFASetup'
 import Dashboard from '@/components/Dashboard'
 import Settings from '@/components/auth/Settings'
@@ -33,6 +34,7 @@ function AppContent() {
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/set-password" element={<SetPassword />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
 
           {/* Redirect dashboard/other pages to /setup-2fa if 2FA setup required */}
           <Route

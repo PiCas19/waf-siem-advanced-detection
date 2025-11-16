@@ -23,6 +23,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		public.POST("/auth/verify-otp", authHandler.VerifyOTPLogin)
 		// endpoint for users to set password using an invite/reset token
 		public.POST("/auth/set-password", authHandler.SetPasswordWithToken)
+		// Forgot password endpoints (public - no auth required)
+		public.POST("/auth/forgot-password", authHandler.ForgotPassword)
+		public.POST("/auth/reset-password", authHandler.ResetPassword)
 		public.POST("/waf/event", NewWAFEventHandler(db))
 		// WAF endpoint to fetch custom rules
 		public.GET("/waf/custom-rules", NewGetCustomRulesHandler(db))

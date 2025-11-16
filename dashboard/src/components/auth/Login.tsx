@@ -205,6 +205,16 @@ const Login: React.FC = () => {
           </button>
         </form>
 
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={() => navigate('/forgot-password')}
+            className="text-blue-400 hover:text-blue-300 text-sm transition"
+          >
+            Forgot password?
+          </button>
+        </div>
+
         {/* Registration is disabled - admin should create users */}
       </div>
     </div>
