@@ -1,23 +1,26 @@
 package api
 
 import (
-	"fmt"
+	"context"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
-	"gorm.io/gorm"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
 
-// GetFalsePositives - Ritorna la lista dei false positives
-func NewGetFalsePositivesHandler(db *gorm.DB) gin.HandlerFunc {
+// NewGetFalsePositivesHandler - Returns the list of false positives
+func NewGetFalsePositivesHandler(falsePositiveService *service.FalsePositiveService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var falsePositives []models.FalsePositive
-		if err := db.Order("created_at DESC").Find(&falsePositives).Error; err != nil {
+		ctx := context.Background()
+
+		falsePositives, err := falsePositiveService.GetAllFalsePositives(ctx)
+		if err != nil {
 			c.JSON(500, gin.H{"error": "failed to fetch false positives"})
 			return
 		}
+
 		c.JSON(200, gin.H{
 			"false_positives": falsePositives,
 			"count":           len(falsePositives),
@@ -25,8 +28,8 @@ func NewGetFalsePositivesHandler(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// ReportFalsePositive - Segnala una minaccia come falso positivo
-func NewReportFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
+// NewReportFalsePositiveHandler - Reports a threat as a false positive
+func NewReportFalsePositiveHandler(falsePositiveService *service.FalsePositiveService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			ThreatType  string `json:"threat_type" binding:"required"`
@@ -43,6 +46,8 @@ func NewReportFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		ctx := context.Background()
+
 		falsePositive := models.FalsePositive{
 			ThreatType:  req.ThreatType,
 			Description: req.Description,
@@ -54,23 +59,10 @@ func NewReportFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
 			Status:      "pending",
 		}
 
-		if err := db.Create(&falsePositive).Error; err != nil {
+		if err := falsePositiveService.ReportFalsePositive(ctx, &falsePositive); err != nil {
 			c.JSON(500, gin.H{"error": "failed to report false positive"})
 			return
 		}
-
-		// Log to audit logs using the LogFalsePositiveAction helper
-		userID := uint(0)
-		userEmail := "system"
-		if user, exists := c.Get("user"); exists {
-			if userModel, ok := user.(*models.User); ok {
-				userID = userModel.ID
-				userEmail = userModel.Email
-			}
-		}
-
-		ipAddress := c.ClientIP()
-		LogFalsePositiveAction(db, userID, userEmail, "REPORT", fmt.Sprintf("%d", falsePositive.ID), req.ThreatType, req.ClientIP, "pending", ipAddress)
 
 		c.JSON(201, gin.H{
 			"message": "False positive reported successfully",
@@ -79,8 +71,8 @@ func NewReportFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// UpdateFalsePositiveStatus - Aggiorna lo stato di un false positive
-func NewUpdateFalsePositiveStatusHandler(db *gorm.DB) gin.HandlerFunc {
+// NewUpdateFalsePositiveStatusHandler - Updates the status of a false positive
+func NewUpdateFalsePositiveStatusHandler(falsePositiveService *service.FalsePositiveService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		idUint, err := strconv.ParseUint(id, 10, 32)
@@ -99,25 +91,24 @@ func NewUpdateFalsePositiveStatusHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Valida lo status
+		// Validate status
 		if req.Status != "pending" && req.Status != "reviewed" && req.Status != "whitelisted" {
 			c.JSON(400, gin.H{"error": "Invalid status"})
 			return
 		}
 
-		now := time.Now()
-		update := map[string]interface{}{
-			"status":       req.Status,
-			"review_notes": req.ReviewNotes,
-			"reviewed_at":  &now,
-		}
+		ctx := context.Background()
 
-		if err := db.Model(&models.FalsePositive{}).Where("id = ?", uint(idUint)).Updates(update).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				c.JSON(404, gin.H{"error": "Entry not found"})
-			} else {
-				c.JSON(500, gin.H{"error": "failed to update false positive"})
-			}
+		update := models.FalsePositive{
+			ID:          uint(idUint),
+			Status:      req.Status,
+			ReviewNotes: req.ReviewNotes,
+		}
+		now := time.Now()
+		update.ReviewedAt = &now
+
+		if err := falsePositiveService.UpdateFalsePositive(ctx, &update); err != nil {
+			c.JSON(500, gin.H{"error": "failed to update false positive"})
 			return
 		}
 
@@ -125,8 +116,8 @@ func NewUpdateFalsePositiveStatusHandler(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// DeleteFalsePositive - Elimina un false positive
-func NewDeleteFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
+// NewDeleteFalsePositiveHandler - Deletes a false positive
+func NewDeleteFalsePositiveHandler(falsePositiveService *service.FalsePositiveService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		idUint, err := strconv.ParseUint(id, 10, 32)
@@ -135,12 +126,10 @@ func NewDeleteFalsePositiveHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		if err := db.Delete(&models.FalsePositive{}, uint(idUint)).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				c.JSON(404, gin.H{"error": "Entry not found"})
-			} else {
-				c.JSON(500, gin.H{"error": "failed to delete false positive"})
-			}
+		ctx := context.Background()
+
+		if err := falsePositiveService.DeleteFalsePositive(ctx, uint(idUint)); err != nil {
+			c.JSON(500, gin.H{"error": "failed to delete false positive"})
 			return
 		}
 

@@ -1,9 +1,11 @@
 package api
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
-	"gorm.io/gorm"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
 
 // isDefaultThreatType checks if a threat type is a default WAF rule
@@ -26,20 +28,23 @@ func isDefaultThreatType(threatType string) bool {
 	return defaultThreats[threatType]
 }
 
-func NewGetLogsHandler(db *gorm.DB) gin.HandlerFunc {
+// NewGetLogsHandler returns security and audit logs with service layer
+func NewGetLogsHandler(logService *service.LogService, auditLogService *service.AuditLogService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var logs []models.Log
-		var auditLogs []models.AuditLog
+		ctx := context.Background()
 
 		// Fetch security logs
-		if err := db.Order("created_at DESC").Find(&logs).Error; err != nil {
+		logs, err := logService.GetAllLogs(ctx)
+		if err != nil {
 			c.JSON(500, gin.H{"error": "failed to fetch logs"})
 			return
 		}
 
 		// Fetch audit logs
-		if err := db.Order("created_at DESC").Find(&auditLogs).Error; err != nil {
+		auditLogs, err := auditLogService.GetAllAuditLogs(ctx)
+		if err != nil {
 			// If audit logs fail, continue with just security logs
+			auditLogs = []models.AuditLog{}
 		}
 
 		// Normalize blockedBy for default threats
