@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/threatintel"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/websocket"
 	"github.com/gin-gonic/gin"
@@ -155,22 +157,20 @@ func GetSeverityFromThreatType(threatType string) string {
 	return "Medium" // Default severity for unknown threats
 }
 
-func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
+// NewWAFEventHandler creates a handler for WAF events with dependency injection
+func NewWAFEventHandler(logService *service.LogService, auditLogService *service.AuditLogService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var event websocket.WAFEvent
 		if err := c.ShouldBindJSON(&event); err != nil {
 			fmt.Printf("[ERROR] Failed to bind JSON: %v\n", err)
-			fmt.Printf("[ERROR] Request body: %v\n", c.Request.Body)
 			c.JSON(400, gin.H{"error": "invalid json"})
 			return
 		}
 
 		// Extract real client IP from proxy headers if available
-		// Also extracts the public IP if this is from a Tailscale/VPN client (X-Public-IP header)
 		realIP, publicIP, isXPublicIP := extractRealClientIP(c)
 		if realIP != event.IP && realIP != "" {
 			fmt.Printf("[INFO] Real client IP detected from headers: %s (WAF reported: %s)\n", realIP, event.IP)
-			// Update event IP to the real one
 			event.IP = realIP
 		}
 
@@ -180,10 +180,9 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		event.Timestamp = time.Now().Format("2006-01-02T15:04:05Z07:00")
-
-		// Use BlockedBy from WAF event (it already comes set)
 		fmt.Printf("[INFO] Received event with BlockedBy=%s for threat=%s (blocked=%v)\n", event.BlockedBy, event.Threat, event.Blocked)
 
+		// Update in-memory stats
 		statsMu.Lock()
 		stats.ThreatsDetected++
 		if event.Blocked {
@@ -192,93 +191,89 @@ func NewWAFEventHandler(db *gorm.DB) gin.HandlerFunc {
 		stats.TotalRequests++
 		stats.LastSeen = time.Now().Format("15:04:05")
 
-		fmt.Printf("[INFO] Stats updated: Threats=%d, Blocked=%d, Total=%d (Blocked=%v)\n", stats.ThreatsDetected, stats.RequestsBlocked, stats.TotalRequests, event.Blocked)
-
 		if len(stats.Recent) >= 5 {
 			stats.Recent = stats.Recent[1:]
 		}
 		stats.Recent = append(stats.Recent, event)
 		statsMu.Unlock()
 
-		// Save event to database
+		// Create log model
 		log := models.Log{
-			ThreatType:  event.Threat,
-			Description: event.Description, // Rule name/description for per-rule blocking
-			ClientIP:    event.IP,
-			Method:      event.Method,
-			URL:         event.Path,
-			UserAgent:   event.UA,
-			Payload:     event.Payload,
-			CreatedAt:   time.Now(),
-			Blocked:     event.Blocked,
-			BlockedBy:   event.BlockedBy,
-			Severity:    GetSeverityFromThreatType(event.Threat),
-			// IP source metadata from WAF
-			// These fields track how the IP was extracted by the WAF (X-Public-IP, X-Forwarded-For, etc)
+			ThreatType:        event.Threat,
+			Description:       event.Description,
+			ClientIP:          event.IP,
+			Method:            event.Method,
+			URL:               event.Path,
+			UserAgent:         event.UA,
+			Payload:           event.Payload,
+			CreatedAt:         time.Now(),
+			Blocked:           event.Blocked,
+			BlockedBy:         event.BlockedBy,
+			Severity:          GetSeverityFromThreatType(event.Threat),
 			ClientIPSource:    event.IPSource,
 			ClientIPTrusted:   event.IPTrusted,
 			ClientIPVPNReport: event.IPVPNReport,
-			ClientIPPublic:    publicIP, // Store the public IP from X-Public-IP header if available
-		IPTrustScore:      event.IPTrustScore, // Store the trust score calculated by WAF
-	}
+			ClientIPPublic:    publicIP,
+			IPTrustScore:      event.IPTrustScore,
+		}
 
-	// Log important IP metadata
-	if log.ClientIPVPNReport {
-		fmt.Printf("[INFO] *** TAILSCALE/VPN CLIENT DETECTED *** Internal IP=%s, Public IP=%s, Source=%s, Trusted=%v\n",
-			log.ClientIP, log.ClientIPPublic, log.ClientIPSource, log.ClientIPTrusted)
-	}
-	if err := db.Create(&log).Error; err != nil {
-		fmt.Printf("[ERROR] Failed to save log to database: %v\n", err)
-		c.JSON(500, gin.H{"error": "failed to save event"})
-		return
-	}
+		if log.ClientIPVPNReport {
+			fmt.Printf("[INFO] *** TAILSCALE/VPN CLIENT DETECTED *** Internal IP=%s, Public IP=%s, Source=%s, Trusted=%v\n",
+				log.ClientIP, log.ClientIPPublic, log.ClientIPSource, log.ClientIPTrusted)
+		}
 
-	// Enrich log with threat intelligence synchronously (blocks until enrichment completes or times out)
-	enrichmentStart := time.Now()
-	if err := tiService.EnrichLog(&log); err != nil {
-		fmt.Printf("[WARN] Threat intelligence enrichment failed for IP %s: %v\n", log.ClientIP, err)
-	} else {
-		fmt.Printf("[INFO] Threat intelligence enrichment completed for IP %s in %v\n", log.ClientIP, time.Since(enrichmentStart))
-	}
+		// Save event using service layer
+		ctx := context.Background()
+		if err := logService.CreateLog(ctx, &log); err != nil {
+			fmt.Printf("[ERROR] Failed to save log: %v\n", err)
+			c.JSON(500, gin.H{"error": "failed to save event"})
+			return
+		}
 
-	// Update the log with enriched threat intel data using explicit field updates
-	// This prevents GORM from skipping zero values
-	updateData := map[string]interface{}{
-		"enriched_at":     log.EnrichedAt,
-		"ip_reputation":   log.IPReputation,
-		"is_malicious":    log.IsMalicious,
-		"asn":             log.ASN,
-		"isp":             log.ISP,
-		"country":         log.Country,
-		"threat_level":    log.ThreatLevel,
-		"threat_source":   log.ThreatSource,
-		"is_on_blocklist": log.IsOnBlocklist,
-		"blocklist_name":  log.BlocklistName,
-		"abuse_reports":   log.AbuseReports,
-		"ip_trust_score":  log.IPTrustScore, // Persist the trust score to database
-	}
-	if err := db.Model(&models.Log{}).Where("id = ?", log.ID).Updates(updateData).Error; err != nil {
-		fmt.Printf("[ERROR] Failed to update log %d with threat intelligence: %v\n", log.ID, err)
-	} else {
-		fmt.Printf("[INFO] Log %d successfully enriched and updated\n", log.ID)
-		// Send enrichment update via WebSocket so the dashboard can update the UI immediately
-		websocket.BroadcastEnrichment(
-			log.ClientIP,
-			log.IPReputation,
-			log.ThreatLevel,
-			log.Country,
-			log.ASN,
-			log.IsMalicious,
-			log.ThreatSource,
-			log.AbuseReports,
-			log.IsOnBlocklist,
-			log.BlocklistName,
-		)
-	}
+		// Enrich log with threat intelligence synchronously
+		enrichmentStart := time.Now()
+		if err := tiService.EnrichLog(&log); err != nil {
+			fmt.Printf("[WARN] Threat intelligence enrichment failed for IP %s: %v\n", log.ClientIP, err)
+		} else {
+			fmt.Printf("[INFO] Threat intelligence enrichment completed for IP %s in %v\n", log.ClientIP, time.Since(enrichmentStart))
+		}
 
-	websocket.Broadcast(event)
+		// Update the log with enriched threat intel data
+		updateData := map[string]interface{}{
+			"enriched_at":     log.EnrichedAt,
+			"ip_reputation":   log.IPReputation,
+			"is_malicious":    log.IsMalicious,
+			"asn":             log.ASN,
+			"isp":             log.ISP,
+			"country":         log.Country,
+			"threat_level":    log.ThreatLevel,
+			"threat_source":   log.ThreatSource,
+			"is_on_blocklist": log.IsOnBlocklist,
+			"blocklist_name":  log.BlocklistName,
+			"abuse_reports":   log.AbuseReports,
+			"ip_trust_score":  log.IPTrustScore,
+		}
 
-	c.JSON(200, gin.H{"status": "event_received"})
+		if err := logService.UpdateLogsByIPAndDescription(ctx, log.ClientIP, log.Description, updateData); err != nil {
+			fmt.Printf("[ERROR] Failed to update log with threat intelligence: %v\n", err)
+		} else {
+			fmt.Printf("[INFO] Log successfully enriched and updated\n")
+			websocket.BroadcastEnrichment(
+				log.ClientIP,
+				log.IPReputation,
+				log.ThreatLevel,
+				log.Country,
+				log.ASN,
+				log.IsMalicious,
+				log.ThreatSource,
+				log.AbuseReports,
+				log.IsOnBlocklist,
+				log.BlocklistName,
+			)
+		}
+
+		websocket.Broadcast(event)
+		c.JSON(200, gin.H{"status": "event_received"})
 	}
 }
 
