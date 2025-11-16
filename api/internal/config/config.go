@@ -67,7 +67,7 @@ type RateLimitConfig struct {
 func LoadFromEnv() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Port:            getEnvAsInt("SERVER_PORT", 8080),
+			Port:            getEnvAsInt("PORT", 8081),
 			Host:            getEnvAsString("SERVER_HOST", "0.0.0.0"),
 			ShutdownTimeout: getEnvAsDuration("SERVER_SHUTDOWN_TIMEOUT", 30*time.Second),
 		},
