@@ -32,10 +32,18 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    chunkSizeWarningLimit: 1000, // Suppress warnings for chunks up to 1MB
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom']
+          // Vendor libraries
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-charts': ['recharts'],
+          'vendor-ui': ['lucide-react', 'tailwindcss'],
+          // Large component pages
+          'page-stats': ['./src/components/stats/StatsPage.tsx'],
+          'page-logs': ['./src/components/logs/LogViewer.tsx'],
+          'page-blocklist': ['./src/components/blocklist/BlocklistPage.tsx'],
         }
       }
     }
