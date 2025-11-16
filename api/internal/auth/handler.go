@@ -712,3 +712,136 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
 }
+
+// ForgotPassword handles password reset request (send email)
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	type ForgotPasswordRequest struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+
+	var req ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email"})
+		return
+	}
+
+	// Find user
+	var user models.User
+	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		// For security, don't reveal if email exists
+		c.JSON(http.StatusOK, gin.H{"message": "If the email exists, a reset link will be sent"})
+		return
+	}
+
+	// Generate reset token (valid for 1 hour)
+	resetToken, err := generateRandomToken(32)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate reset token"})
+		return
+	}
+
+	// Hash the token for storage
+	hashedToken, err := bcrypt.GenerateFromPassword([]byte(resetToken), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process token"})
+		return
+	}
+
+	// Store reset token in database
+	expiresAt := time.Now().Add(1 * time.Hour)
+	if err := h.db.Model(&user).Update("password_reset_token", string(hashedToken)).
+		Update("password_reset_expiry", expiresAt).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save reset token"})
+		return
+	}
+
+	// Send reset email
+	resetURL := fmt.Sprintf("https://%s/forgot-password?token=%s", c.Request.Host, resetToken)
+	subject := "Password Reset Request"
+	body := fmt.Sprintf(`
+		<h2>Password Reset Request</h2>
+		<p>You requested a password reset. Click the link below to reset your password:</p>
+		<p><a href="%s">Reset Password</a></p>
+		<p>This link will expire in 1 hour.</p>
+		<p>If you didn't request this, ignore this email.</p>
+	`, resetURL)
+
+	if err := h.mailer.SendEmail(user.Email, subject, body); err != nil {
+		// Log the error but don't expose it to client
+		fmt.Printf("[ERROR] Failed to send password reset email to %s: %v\n", user.Email, err)
+	}
+
+	// Always return success for security
+	c.JSON(http.StatusOK, gin.H{"message": "If the email exists, a reset link will be sent"})
+}
+
+// ResetPassword handles password reset (with token)
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	type ResetPasswordRequest struct {
+		Token       string `json:"token" binding:"required"`
+		NewPassword string `json:"new_password" binding:"required,min=8"`
+	}
+
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	// Find user with valid reset token
+	var user models.User
+	now := time.Now()
+	if err := h.db.Where("password_reset_expiry > ? AND password_reset_token IS NOT NULL AND password_reset_token != ''", now).
+		First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired reset token"})
+		return
+	}
+
+	// Verify token
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordResetToken), []byte(req.Token)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid reset token"})
+		return
+	}
+
+	// Hash new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process password"})
+		return
+	}
+
+	// Update password and clear reset token
+	if err := h.db.Model(&user).
+		Update("password_hash", string(hashedPassword)).
+		Update("password_reset_token", "").
+		Update("password_reset_expiry", time.Now()).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
+		return
+	}
+
+	// Log successful password reset
+	auditLog := models.AuditLog{
+		UserID:       user.ID,
+		UserEmail:    user.Email,
+		Action:       "PASSWORD_RESET",
+		Category:     "AUTH",
+		ResourceType: "user",
+		ResourceID:   fmt.Sprintf("%d", user.ID),
+		Description:  "Password reset successful",
+		Status:       "success",
+		IPAddress:    c.ClientIP(),
+		CreatedAt:    time.Now(),
+	}
+	h.db.Create(&auditLog)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully"})
+}
+
+// Helper function to generate random token
+func generateRandomToken(length int) (string, error) {
+	bytes := make([]byte, length)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}

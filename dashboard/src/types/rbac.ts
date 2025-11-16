@@ -134,7 +134,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     whitelist_add: false,
     whitelist_remove: false,
     false_positives_view: false,
-    false_positives_report: false,  // ✗ Cannot report FP
+    false_positives_report: true,   // ✓ Can report FP
     false_positives_resolve: false,
     false_positives_delete: false,
     threats_block: false,           // ✗ Cannot block
