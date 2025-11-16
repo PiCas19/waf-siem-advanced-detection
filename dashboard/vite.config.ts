@@ -9,6 +9,11 @@ export default defineConfig({
       jsxRuntime: 'automatic' // Fix: Non serve più importare React
     })
   ],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   server: {
     port: 3000,
     middleware: [
@@ -23,11 +28,6 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
   },
   build: {
     outDir: 'dist',
@@ -45,6 +45,13 @@ export default defineConfig({
           'page-logs': ['./src/components/logs/LogViewer.tsx'],
           'page-blocklist': ['./src/components/blocklist/BlocklistPage.tsx'],
         }
+      },
+      // Suppress Node.js module externalization warnings from build-time dependencies
+      onwarn: (warning, warn) => {
+        if (warning.code === 'EXTERNAL_NO_STRIPPING' || warning.message?.includes('externalized for browser compatibility')) {
+          return;
+        }
+        warn(warning);
       }
     }
   }
