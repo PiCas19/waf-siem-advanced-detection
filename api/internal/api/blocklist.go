@@ -154,9 +154,8 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 		"blocked_by": "manual",
 	}
 	if err := logService.UpdateLogsByIPAndDescription(ctx, validatedIP, req.Threat, updates); err != nil {
-		// Log the error but don't fail the request
-		c.JSON(500, gin.H{"error": "Failed to update logs", "details": err.Error()})
-		return
+		// Log the error but don't fail the request - block was already created successfully
+		fmt.Println("Warning: Failed to update logs for blocked IP:", err)
 	}
 }
 
@@ -203,8 +202,8 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 		// For default threats, restore blocked_by="auto"
 		updates := map[string]interface{}{"blocked_by": "auto"}
 		if err := logService.UpdateLogsByIPAndDescription(ctx, ip, threat, updates); err != nil {
-			c.JSON(500, gin.H{"error": "Failed to update logs"})
-			return
+			// Log the error but don't fail the request - IP was already unblocked successfully
+			fmt.Println("Warning: Failed to update logs for unblocked IP:", err)
 		}
 	} else {
 		// For custom rules, set blocked_by="" and blocked=false
@@ -213,8 +212,8 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 			"blocked_by": "",
 		}
 		if err := logService.UpdateLogsByIPAndDescription(ctx, ip, threat, updates); err != nil {
-			c.JSON(500, gin.H{"error": "Failed to update logs"})
-			return
+			// Log the error but don't fail the request - IP was already unblocked successfully
+			fmt.Println("Warning: Failed to update logs for unblocked IP:", err)
 		}
 	}
 
