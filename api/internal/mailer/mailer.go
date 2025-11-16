@@ -60,6 +60,32 @@ func NewMailerFromEnv() *Mailer {
     }
 }
 
+// SendEmail sends a generic email with HTML and plain text content.
+func (m *Mailer) SendEmail(toEmail, subject, htmlBody string) error {
+	if m == nil {
+		return fmt.Errorf("mailer not configured")
+	}
+
+	msg := gomail.NewMessage()
+	// Format From header: "Name <email>" if a name is provided
+	fromHeader := m.FromEmail
+	if m.FromName != "" {
+		fromHeader = fmt.Sprintf("%s <%s>", m.FromName, m.FromEmail)
+	}
+	msg.SetHeader("From", fromHeader)
+	if m.ReplyTo != "" {
+		msg.SetHeader("Reply-To", m.ReplyTo)
+	}
+	msg.SetHeader("To", toEmail)
+	msg.SetHeader("Subject", subject)
+	msg.SetBody("text/html", htmlBody)
+
+	d := gomail.NewDialer(m.Host, m.Port, m.Username, m.Password)
+	// If SMTP_USER/PASS empty, dialer will attempt unauthenticated send
+
+	return d.DialAndSend(msg)
+}
+
 // SendInvite sends an invitation email with reset link and temporary password.
 func (m *Mailer) SendInvite(toEmail, fullName, resetLink, tempPassword string) error {
     if m == nil {
