@@ -715,7 +715,12 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 
     <script>
         console.log('[CHALLENGE] Page loaded');
-        console.log('[CHALLENGE] Turnstile widget:', document.querySelector('.cf-turnstile'));
+        var widget = document.querySelector('.cf-turnstile');
+        console.log('[CHALLENGE] Turnstile widget found:', widget);
+        if (widget) {
+            console.log('[CHALLENGE] Widget data-sitekey:', widget.getAttribute('data-sitekey'));
+            console.log('[CHALLENGE] Widget data-callback:', widget.getAttribute('data-callback'));
+        }
         console.log('[CHALLENGE] Turnstile script loaded:', typeof window.turnstile !== 'undefined');
 
         function onTurnstileSuccess(token) {
