@@ -463,13 +463,27 @@ func NewWAFChallengeVerifyHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		fmt.Printf("[INFO] Challenge verification request received:\n")
+		fmt.Printf("  ChallengeID: %s\n", request.ChallengeID)
+		fmt.Printf("  OriginalRequest: %s\n", request.OriginalRequest)
+		if len(request.CaptchaToken) > 20 {
+			fmt.Printf("  CaptchaToken: %s... (length: %d)\n", request.CaptchaToken[:20], len(request.CaptchaToken))
+		} else {
+			fmt.Printf("  CaptchaToken: %s (length: %d)\n", request.CaptchaToken, len(request.CaptchaToken))
+		}
+
 		// Verify the Turnstile token with Cloudflare
 		captchaVerified := false
 		if request.CaptchaToken != "" {
+			fmt.Printf("[INFO] Verifying Turnstile token with Cloudflare...\n")
 			captchaVerified = verifyTurnstileToken(request.CaptchaToken)
-			if !captchaVerified {
-				fmt.Printf("[WARN] Turnstile verification failed\n")
+			if captchaVerified {
+				fmt.Printf("[INFO] Turnstile verification SUCCESS\n")
+			} else {
+				fmt.Printf("[WARN] Turnstile verification FAILED\n")
 			}
+		} else {
+			fmt.Printf("[WARN] No Captcha token provided\n")
 		}
 
 		// Log the successful challenge verification
