@@ -513,14 +513,6 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
 
 	// Return CAPTCHA challenge HTML (matching dashboard theme) with Cloudflare Turnstile
-	// If TurnstileSiteKey is not set, we'll show a warning message instead
-	turnstileScript := ""
-	turnstileWidget := ""
-	if m.TurnstileSiteKey != "" {
-		turnstileScript = `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
-		turnstileWidget = fmt.Sprintf(`<div class="cf-turnstile" data-sitekey="%s" data-callback="onTurnstileSuccess" data-theme="dark"></div>`, m.TurnstileSiteKey)
-	}
-
 	challengeHTML := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
@@ -528,7 +520,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    %s
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -654,7 +646,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
                 <input type="hidden" id="turnstile-token" name="captcha_token">
 
                 <div class="turnstile-container">
-                    %s
+                    <div class="cf-turnstile" data-sitekey="0x4AAAAAAB_vC04yTw3CJIFZ" data-callback="onTurnstileSuccess" data-theme="dark"></div>
                 </div>
 
                 <button type="submit" id="submitBtn">Verify and Continue</button>
@@ -684,7 +676,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
         });
     </script>
 </body>
-</html>`, turnstileScript, challengeID, r.RequestURI, turnstileWidget, getClientIP(r))
+</html>`, challengeID, r.RequestURI, getClientIP(r))
 
 	w.WriteHeader(http.StatusForbidden)
 	w.Write([]byte(challengeHTML))
