@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -55,6 +56,7 @@ type Middleware struct {
 	BlocklistEndpoint  string   `json:"blocklist_endpoint,omitempty"`  // API endpoint to fetch blocklist
 	WhitelistEndpoint  string   `json:"whitelist_endpoint,omitempty"`  // API endpoint to fetch whitelist
 	TrustedProxies     []string `json:"trusted_proxies,omitempty"`     // List of trusted proxy IPs/CIDR ranges
+	TurnstileSiteKey   string   `json:"turnstile_site_key,omitempty"`  // Cloudflare Turnstile site key for CHALLENGE action
 
 	// Enterprise-grade IP detection configuration
 	EnableHMACSignatureValidation bool   `json:"enable_hmac_signature_validation,omitempty"` // Enable HMAC header validation
@@ -117,6 +119,11 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 			return fmt.Errorf("failed to initialize logger: %v", err)
 		}
 		m.logger = l
+	}
+
+	// Load Turnstile Site Key from environment if not configured
+	if m.TurnstileSiteKey == "" {
+		m.TurnstileSiteKey = os.Getenv("TURNSTILE_SITE_KEY")
 	}
 
 	// Configure trusted proxies for IP extraction
@@ -467,16 +474,15 @@ func (m *Middleware) handleDropAction(w http.ResponseWriter, r *http.Request, th
 	// Try to hijack the connection and close it
 	if hijacker, ok := w.(http.Hijacker); ok {
 		conn, _, err := hijacker.Hijack()
-		if err != nil {
-			// Fallback to block if hijacking fails
-			return m.handleBlockAction(w, r, threat)
+		if err == nil {
+			// Close the connection without sending any response
+			conn.Close()
+			return nil
 		}
-		// Close the connection without sending any response
-		conn.Close()
-		return nil
 	}
-	// If hijacking not available, fall back to block
-	return m.handleBlockAction(w, r, threat)
+	// If hijacking fails or not available, close silently without sending any response
+	// by not writing anything to the response writer
+	return nil
 }
 
 // handleRedirectAction returns HTTP 302 with Location header
@@ -507,6 +513,14 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
 
 	// Return CAPTCHA challenge HTML (matching dashboard theme) with Cloudflare Turnstile
+	// If TurnstileSiteKey is not set, we'll show a warning message instead
+	turnstileScript := ""
+	turnstileWidget := ""
+	if m.TurnstileSiteKey != "" {
+		turnstileScript = `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
+		turnstileWidget = fmt.Sprintf(`<div class="cf-turnstile" data-sitekey="%s" data-callback="onTurnstileSuccess" data-theme="dark"></div>`, m.TurnstileSiteKey)
+	}
+
 	challengeHTML := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
@@ -514,7 +528,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    %s
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -640,7 +654,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
                 <input type="hidden" id="turnstile-token" name="captcha_token">
 
                 <div class="turnstile-container">
-                    <div class="cf-turnstile" data-sitekey="0x4AAAAAAB_vC04yTw3CJIFZ" data-callback="onTurnstileSuccess" data-theme="dark"></div>
+                    %s
                 </div>
 
                 <button type="submit" id="submitBtn">Verify and Continue</button>
@@ -670,7 +684,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
         });
     </script>
 </body>
-</html>`, challengeID, r.RequestURI, getClientIP(r))
+</html>`, turnstileScript, challengeID, r.RequestURI, turnstileWidget, getClientIP(r))
 
 	w.WriteHeader(http.StatusForbidden)
 	w.Write([]byte(challengeHTML))
