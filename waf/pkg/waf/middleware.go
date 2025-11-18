@@ -164,6 +164,21 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	// Load Turnstile Site Key from environment if not configured
 	if m.TurnstileSiteKey == "" {
 		m.TurnstileSiteKey = os.Getenv("TURNSTILE_SITE_KEY")
+		if m.TurnstileSiteKey != "" {
+			fmt.Printf("[INFO] Loaded TURNSTILE_SITE_KEY from environment: %s\n", m.TurnstileSiteKey)
+		} else {
+			fmt.Printf("[WARN] TURNSTILE_SITE_KEY not found in environment!\n")
+			fmt.Printf("[DEBUG] Environment variables available:\n")
+			for _, env := range os.Environ() {
+				if len(env) > 100 {
+					fmt.Printf("  %s\n", env[:100]+"...")
+				} else {
+					fmt.Printf("  %s\n", env)
+				}
+			}
+		}
+	} else {
+		fmt.Printf("[INFO] TURNSTILE_SITE_KEY configured in Caddyfile: %s\n", m.TurnstileSiteKey)
 	}
 
 	// Configure trusted proxies for IP extraction
