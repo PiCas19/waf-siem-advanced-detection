@@ -477,8 +477,12 @@ func (m *Middleware) handleDropAction(w http.ResponseWriter, r *http.Request, th
 		if err == nil {
 			// Close the connection without sending any response
 			conn.Close()
+			fmt.Printf("[INFO] DROP action: Connection hijacked and closed for threat %s from IP %s\n", threat.Type, threat.ClientIP)
 			return nil
 		}
+		fmt.Printf("[WARN] DROP action: Failed to hijack connection: %v\n", err)
+	} else {
+		fmt.Printf("[WARN] DROP action: ResponseWriter does not support Hijacker\n")
 	}
 	// If hijacking fails or not available, close silently without sending any response
 	// by not writing anything to the response writer
