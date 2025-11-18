@@ -455,22 +455,12 @@ func (m *Middleware) executeBlockingAction(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// handleBlockAction returns HTTP 403 Forbidden
+// handleBlockAction returns HTTP 403 Forbidden without exposing threat details
 func (m *Middleware) handleBlockAction(w http.ResponseWriter, r *http.Request, threat *detector.Threat) error {
 	w.Header().Set("X-WAF-Blocked", "true")
-	w.Header().Set("X-WAF-Threat", threat.Type)
-	w.Header().Set("X-WAF-Severity", threat.Severity)
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusForbidden)
-
-	response := fmt.Sprintf(`{
-		"error": "Request blocked by WAF",
-		"threat_type": "%s",
-		"severity": "%s",
-		"description": "%s"
-	}`, threat.Type, threat.Severity, threat.Description)
-
-	w.Write([]byte(response))
+	w.Write([]byte("Forbidden"))
 	return nil
 }
 
@@ -639,7 +629,8 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
         <p>Please verify you're human to continue.</p>
 
         <div class="threat-box">
-            <strong>Threat Detected:</strong> %s
+            <strong>Security Check Required</strong>
+            <p style="margin-top: 8px; font-size: 14px;">Your request has been flagged for additional verification.</p>
         </div>
 
         <div class="challenge-box">
@@ -681,7 +672,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
         });
     </script>
 </body>
-</html>`, threat.Type, challengeID, r.RequestURI, getClientIP(r))
+</html>`, challengeID, r.RequestURI, getClientIP(r))
 
 	w.WriteHeader(http.StatusForbidden)
 	w.Write([]byte(challengeHTML))
@@ -690,17 +681,9 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 
 // blockRequest returns a 403 Forbidden response (deprecated, kept for compatibility)
 func (m *Middleware) blockRequest(w http.ResponseWriter, threat *detector.Threat) error {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusForbidden)
-
-	response := fmt.Sprintf(`{
-		"error": "Request blocked by WAF",
-		"threat_type": "%s",
-		"severity": "%s",
-		"description": "%s"
-	}`, threat.Type, threat.Severity, threat.Description)
-
-	w.Write([]byte(response))
+	w.Write([]byte("Forbidden"))
 	return nil
 }
 
