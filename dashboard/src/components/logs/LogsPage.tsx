@@ -281,7 +281,7 @@ export default function LogsPage(): React.ReactElement {
   const handleDownloadCSV = () => {
     const headers = logType === 'security'
       ? ['Time', 'Threat Type', 'Severity', 'Client IP', 'Method', 'URL', 'Blocked', 'Description']
-      : ['Time', 'User Email', 'Action', 'Category', 'IP Address', 'Status', 'Description', 'Error'];
+      : ['Time', 'User Email', 'Action', 'Category', 'Type', 'Resource ID', 'IP Address', 'Status', 'Description', 'Error'];
 
     const rows = currentLogs.map((log: any) => {
       if (logType === 'security') {
@@ -301,6 +301,8 @@ export default function LogsPage(): React.ReactElement {
           log.user_email || '',
           log.action || '',
           log.category || '',
+          log.resource_type || '',
+          log.resource_id || '',
           log.ip_address || '',
           log.status || '',
           log.description || '',
@@ -363,7 +365,7 @@ export default function LogsPage(): React.ReactElement {
             <tr>
               ${logType === 'security'
                 ? '<th>Time</th><th>Threat Type</th><th>Severity</th><th>Client IP</th><th>Method</th><th>URL</th><th>Status</th><th>Description</th>'
-                : '<th>Time</th><th>User Email</th><th>Action</th><th>Category</th><th>IP Address</th><th>Status</th><th>Description</th>'
+                : '<th>Time</th><th>User Email</th><th>Action</th><th>Category</th><th>Type</th><th>Resource ID</th><th>IP Address</th><th>Status</th><th>Description</th>'
               }
             </tr>
           </thead>
@@ -389,6 +391,8 @@ export default function LogsPage(): React.ReactElement {
                     <td>${log.user_email || ''}</td>
                     <td>${log.action || ''}</td>
                     <td>${log.category || ''}</td>
+                    <td>${log.resource_type || ''}</td>
+                    <td>${log.resource_id || ''}</td>
                     <td>${log.ip_address || ''}</td>
                     <td>${log.status || ''}</td>
                     <td>${log.description || ''}</td>
@@ -826,14 +830,16 @@ export default function LogsPage(): React.ReactElement {
           {/* AUDIT LOGS TABLE */}
           <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-12 gap-4 p-4 bg-gray-750 border-b border-gray-700">
-              <div className="col-span-1 text-xs font-semibold text-gray-400 uppercase">Time</div>
-              <div className="col-span-2 text-xs font-semibold text-gray-400 uppercase">User</div>
-              <div className="col-span-2 text-xs font-semibold text-gray-400 uppercase">Action</div>
-              <div className="col-span-2 text-xs font-semibold text-gray-400 uppercase">Category</div>
-              <div className="col-span-2 text-xs font-semibold text-gray-400 uppercase">IP Address</div>
-              <div className="col-span-2 text-xs font-semibold text-gray-400 uppercase">Status</div>
-              <div className="col-span-1 text-xs font-semibold text-gray-400 uppercase">Details</div>
+            <div className="grid gap-2 p-4 bg-gray-750 border-b border-gray-700" style={{gridTemplateColumns: '80px 150px 100px 90px 80px 140px 130px 70px 50px'}}>
+              <div className="text-xs font-semibold text-gray-400 uppercase">Time</div>
+              <div className="text-xs font-semibold text-gray-400 uppercase">User</div>
+              <div className="text-xs font-semibold text-gray-400 uppercase">Action</div>
+              <div className="text-xs font-semibold text-gray-400 uppercase">Category</div>
+              <div className="text-xs font-semibold text-gray-400 uppercase">Type</div>
+              <div className="text-xs font-semibold text-gray-400 uppercase">Resource ID</div>
+              <div className="text-xs font-semibold text-gray-400 uppercase">IP Address</div>
+              <div className="text-xs font-semibold text-gray-400 uppercase">Status</div>
+              <div className="text-xs font-semibold text-gray-400 uppercase">Details</div>
             </div>
 
             {/* Table Body */}
@@ -845,26 +851,35 @@ export default function LogsPage(): React.ReactElement {
                     onClick={() =>
                       setExpandedRow(expandedRow === log.id ? null : log.id)
                     }
-                    className="grid grid-cols-12 gap-4 p-4 hover:bg-gray-750 transition cursor-pointer border-b border-gray-700/50"
+                    className="grid gap-2 p-4 hover:bg-gray-750 transition cursor-pointer border-b border-gray-700/50 items-center"
+                    style={{gridTemplateColumns: '80px 150px 100px 90px 80px 140px 130px 70px 50px'}}
                   >
-                    <div className="col-span-1 text-xs text-gray-300">
+                    <div className="text-xs text-gray-300">
                       {new Date(log.created_at).toLocaleTimeString('it-IT')}
                     </div>
-                    <div className="col-span-2 text-sm text-white font-medium truncate">
+                    <div className="text-sm text-white font-medium truncate">
                       {log.user_email}
                     </div>
-                    <div className="col-span-2 text-sm text-blue-300 font-medium truncate">
+                    <div className="text-sm text-blue-300 font-medium truncate">
                       {log.action}
                     </div>
-                    <div className="col-span-2 text-xs text-gray-400">
+                    <div className="text-xs text-gray-400">
                       <span className="px-2 py-1 bg-purple-500/20 text-purple-300 rounded text-xs font-medium border border-purple-500/30">
                         {log.category}
                       </span>
                     </div>
-                    <div className="col-span-2 text-xs text-gray-400 font-mono">
+                    <div className="text-xs text-gray-400 truncate">
+                      <span className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs font-medium border border-blue-500/30">
+                        {log.resource_type || 'N/A'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 font-mono truncate" title={log.resource_id}>
+                      {log.resource_id || 'N/A'}
+                    </div>
+                    <div className="text-xs text-gray-400 font-mono">
                       {log.ip_address}
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       {log.status === 'success' ? (
                         <span className="px-2 py-1 bg-green-500/20 text-green-300 rounded text-xs font-medium border border-green-500/30">
                           Success
@@ -875,7 +890,7 @@ export default function LogsPage(): React.ReactElement {
                         </span>
                       )}
                     </div>
-                    <div className="col-span-1 flex items-center justify-end">
+                    <div className="flex items-center justify-end">
                       <ChevronDown
                         size={18}
                         className={`text-gray-500 transition ${

@@ -69,21 +69,23 @@ func NewGetCustomRulesHandler(ruleService *service.RuleService) gin.HandlerFunc 
 }
 
 // NewCreateRuleHandler creates a new WAF rule
-func NewCreateRuleHandler(ruleService *service.RuleService, auditLogService *service.AuditLogService) gin.HandlerFunc {
+func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rule models.Rule
 		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+		clientIP, _ := c.Get("client_ip")
 		ctx := context.Background()
 
 		if err := c.ShouldBindJSON(&rule); err != nil {
 			fmt.Printf("[ERROR] Failed to parse rule: %v\n", err)
-			auditLogService.LogActionFailure(ctx, userID.(uint), "CREATE_RULE", "Invalid rule data format")
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Invalid rule data format", nil, clientIP.(string), "Invalid JSON format")
 			c.JSON(400, gin.H{"error": "Invalid rule data"})
 			return
 		}
 
 		if rule.Name == "" || rule.Pattern == "" {
-			auditLogService.LogActionFailure(ctx, userID.(uint), "CREATE_RULE", "Missing required fields: Name and Pattern")
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Missing required fields: Name and Pattern", nil, clientIP.(string), "Missing required fields")
 			c.JSON(400, gin.H{"error": "Name and Pattern are required"})
 			return
 		}
@@ -101,13 +103,18 @@ func NewCreateRuleHandler(ruleService *service.RuleService, auditLogService *ser
 
 		if err := ruleService.CreateRule(ctx, &rule); err != nil {
 			fmt.Printf("[ERROR] Failed to create rule: %v\n", err)
-			auditLogService.LogActionFailure(ctx, userID.(uint), "CREATE_RULE", fmt.Sprintf("Database error: %v", err))
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Database error: failed to create rule", nil, clientIP.(string), err.Error())
 			c.JSON(500, gin.H{"error": "failed to create rule"})
 			return
 		}
 
-		auditLogService.LogActionSuccess(ctx, userID.(uint), "CREATE_RULE",
-			fmt.Sprintf("Created rule '%s' (type: %s, action: %s)", rule.Name, rule.Type, rule.Action))
+		details := map[string]interface{}{
+			"type":   rule.Type,
+			"action": rule.Action,
+			"pattern": rule.Pattern,
+		}
+
+		LogRuleAction(db, userID.(uint), userEmail.(string), "CREATE_RULE", fmt.Sprintf("%d", rule.ID), rule.Name, details, clientIP.(string))
 
 		fmt.Printf("[INFO] Rule created: ID=%d, Name=%s, Type=%s, Action=%s\n", rule.ID, rule.Name, rule.Type, rule.Action)
 
@@ -119,22 +126,24 @@ func NewCreateRuleHandler(ruleService *service.RuleService, auditLogService *ser
 }
 
 // NewUpdateRuleHandler updates an existing WAF rule
-func NewUpdateRuleHandler(ruleService *service.RuleService, auditLogService *service.AuditLogService) gin.HandlerFunc {
+func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ruleID := c.Param("id")
 		id, err := strconv.ParseUint(ruleID, 10, 32)
 		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+		clientIP, _ := c.Get("client_ip")
 		ctx := context.Background()
 
 		if err != nil {
-			auditLogService.LogActionFailure(ctx, userID.(uint), "UPDATE_RULE", "Invalid rule ID format")
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Invalid rule ID format", nil, clientIP.(string), "Invalid rule ID")
 			c.JSON(400, gin.H{"error": "Invalid rule ID"})
 			return
 		}
 
 		var updatedRule models.Rule
 		if err := c.ShouldBindJSON(&updatedRule); err != nil {
-			auditLogService.LogActionFailure(ctx, userID.(uint), "UPDATE_RULE", "Invalid request data format")
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Invalid request data format", nil, clientIP.(string), "Invalid JSON format")
 			c.JSON(400, gin.H{"error": "Invalid rule data"})
 			return
 		}
@@ -150,7 +159,7 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, auditLogService *ser
 		}
 
 		if err := ruleService.UpdateRule(ctx, &updatedRule); err != nil {
-			auditLogService.LogActionFailure(ctx, userID.(uint), "UPDATE_RULE", fmt.Sprintf("Failed to update rule: %v", err))
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Failed to update rule", nil, clientIP.(string), err.Error())
 			if err.Error() == "rule not found" {
 				c.JSON(404, gin.H{"error": "Rule not found"})
 			} else {
@@ -167,8 +176,13 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, auditLogService *ser
 			return
 		}
 
-		auditLogService.LogActionSuccess(ctx, userID.(uint), "UPDATE_RULE",
-			fmt.Sprintf("Updated rule '%s'", rule.Name))
+		details := map[string]interface{}{
+			"type":   rule.Type,
+			"action": rule.Action,
+			"pattern": rule.Pattern,
+		}
+
+		LogRuleAction(db, userID.(uint), userEmail.(string), "UPDATE_RULE", ruleID, rule.Name, details, clientIP.(string))
 
 		fmt.Printf("[INFO] Rule updated: ID=%d, Name=%s\n", rule.ID, rule.Name)
 
@@ -180,15 +194,17 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, auditLogService *ser
 }
 
 // NewDeleteRuleHandler deletes a WAF rule
-func NewDeleteRuleHandler(ruleService *service.RuleService, auditLogService *service.AuditLogService) gin.HandlerFunc {
+func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ruleID := c.Param("id")
 		id, err := strconv.ParseUint(ruleID, 10, 32)
 		userID, _ := c.Get("user_id")
+		userEmail, _ := c.Get("user_email")
+		clientIP, _ := c.Get("client_ip")
 		ctx := context.Background()
 
 		if err != nil {
-			auditLogService.LogActionFailure(ctx, userID.(uint), "DELETE_RULE", "Invalid rule ID format")
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "DELETE_RULE", "RULE", "rule", ruleID, "Invalid rule ID format", nil, clientIP.(string), "Invalid rule ID")
 			c.JSON(400, gin.H{"error": "Invalid rule ID"})
 			return
 		}
@@ -201,7 +217,7 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, auditLogService *ser
 		}
 
 		if err := ruleService.DeleteRule(ctx, uint(id)); err != nil {
-			auditLogService.LogActionFailure(ctx, userID.(uint), "DELETE_RULE", fmt.Sprintf("Failed to delete rule: %v", err))
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "DELETE_RULE", "RULE", "rule", ruleID, "Failed to delete rule", nil, clientIP.(string), err.Error())
 			if err.Error() == "rule not found" {
 				c.JSON(404, gin.H{"error": "Rule not found"})
 			} else {
@@ -211,8 +227,7 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, auditLogService *ser
 			return
 		}
 
-		auditLogService.LogActionSuccess(ctx, userID.(uint), "DELETE_RULE",
-			fmt.Sprintf("Deleted rule '%s'", ruleName))
+		LogRuleAction(db, userID.(uint), userEmail.(string), "DELETE_RULE", ruleID, ruleName, nil, clientIP.(string))
 
 		fmt.Printf("[INFO] Rule deleted: ID=%s\n", ruleID)
 

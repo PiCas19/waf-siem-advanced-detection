@@ -65,9 +65,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		rules := protected.Group("/rules")
 		{
 			rules.GET("", NewGetRulesHandler(ruleService))
-			rules.POST("", NewCreateRuleHandler(ruleService, auditLogService))
-			rules.PUT("/:id", NewUpdateRuleHandler(ruleService, auditLogService))
-			rules.DELETE("/:id", NewDeleteRuleHandler(ruleService, auditLogService))
+			rules.POST("", NewCreateRuleHandler(ruleService, db))
+			rules.PUT("/:id", NewUpdateRuleHandler(ruleService, db))
+			rules.DELETE("/:id", NewDeleteRuleHandler(ruleService, db))
 			rules.PATCH("/:id/toggle", NewToggleRuleHandler(ruleService))
 		}
 
