@@ -718,12 +718,37 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 
         // Verify form on submit
         document.getElementById('challengeForm').addEventListener('submit', function(e) {
+            e.preventDefault();
             var token = document.getElementById('turnstile-token').value;
             if (!token) {
-                e.preventDefault();
                 alert('Please complete the Turnstile verification');
                 return false;
             }
+
+            var formData = new FormData(this);
+            var originalRequest = document.querySelector('input[name="original_request"]').value;
+
+            // Submit verification
+            fetch('/api/waf/challenge/verify', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Redirect to original request URL
+                    if (originalRequest && originalRequest !== '') {
+                        window.location.href = originalRequest;
+                    } else {
+                        window.location.href = '/';
+                    }
+                } else {
+                    alert('Verification failed. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Verification error:', error);
+                alert('An error occurred during verification. Please try again.');
+            });
         });
     </script>
 </body>
