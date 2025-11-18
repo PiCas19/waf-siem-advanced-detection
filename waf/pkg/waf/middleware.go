@@ -1,14 +1,11 @@
 package waf
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -25,44 +22,6 @@ import (
 func init() {
 	caddy.RegisterModule(Middleware{})
 	httpcaddyfile.RegisterHandlerDirective("waf", parseCaddyfile)
-	// Load .env file on startup
-	loadEnvFile()
-}
-
-// loadEnvFile reads the .env file and sets environment variables
-func loadEnvFile() {
-	envFile := "waf/.env"
-	// Try to read from current directory first, then parent
-	if _, err := os.Stat(envFile); os.IsNotExist(err) {
-		envFile = ".env"
-	}
-
-	file, err := os.Open(envFile)
-	if err != nil {
-		// .env file is optional, so just return if not found
-		return
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		// Parse KEY=VALUE
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-			// Only set if not already in environment
-			if os.Getenv(key) == "" {
-				os.Setenv(key, value)
-			}
-		}
-	}
 }
 
 // RequestFingerprint represents a unique request to deduplicate retries
@@ -96,7 +55,6 @@ type Middleware struct {
 	BlocklistEndpoint  string   `json:"blocklist_endpoint,omitempty"`  // API endpoint to fetch blocklist
 	WhitelistEndpoint  string   `json:"whitelist_endpoint,omitempty"`  // API endpoint to fetch whitelist
 	TrustedProxies     []string `json:"trusted_proxies,omitempty"`     // List of trusted proxy IPs/CIDR ranges
-	TurnstileSiteKey   string   `json:"turnstile_site_key,omitempty"`  // Cloudflare Turnstile site key for CHALLENGE action
 
 	// Enterprise-grade IP detection configuration
 	EnableHMACSignatureValidation bool   `json:"enable_hmac_signature_validation,omitempty"` // Enable HMAC header validation
@@ -159,26 +117,6 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 			return fmt.Errorf("failed to initialize logger: %v", err)
 		}
 		m.logger = l
-	}
-
-	// Load Turnstile Site Key from environment if not configured
-	if m.TurnstileSiteKey == "" {
-		m.TurnstileSiteKey = os.Getenv("TURNSTILE_SITE_KEY")
-		if m.TurnstileSiteKey != "" {
-			fmt.Printf("[INFO] Loaded TURNSTILE_SITE_KEY from environment: %s\n", m.TurnstileSiteKey)
-		} else {
-			fmt.Printf("[WARN] TURNSTILE_SITE_KEY not found in environment!\n")
-			fmt.Printf("[DEBUG] Environment variables available:\n")
-			for _, env := range os.Environ() {
-				if len(env) > 100 {
-					fmt.Printf("  %s\n", env[:100]+"...")
-				} else {
-					fmt.Printf("  %s\n", env)
-				}
-			}
-		}
-	} else {
-		fmt.Printf("[INFO] TURNSTILE_SITE_KEY configured in Caddyfile: %s\n", m.TurnstileSiteKey)
 	}
 
 	// Configure trusted proxies for IP extraction
@@ -517,10 +455,22 @@ func (m *Middleware) executeBlockingAction(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// handleBlockAction returns HTTP 403 Forbidden without exposing threat details
+// handleBlockAction returns HTTP 403 Forbidden
 func (m *Middleware) handleBlockAction(w http.ResponseWriter, r *http.Request, threat *detector.Threat) error {
 	w.Header().Set("X-WAF-Blocked", "true")
+	w.Header().Set("X-WAF-Threat", threat.Type)
+	w.Header().Set("X-WAF-Severity", threat.Severity)
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusForbidden)
+
+	response := fmt.Sprintf(`{
+		"error": "Request blocked by WAF",
+		"threat_type": "%s",
+		"severity": "%s",
+		"description": "%s"
+	}`, threat.Type, threat.Severity, threat.Description)
+
+	w.Write([]byte(response))
 	return nil
 }
 
@@ -529,19 +479,16 @@ func (m *Middleware) handleDropAction(w http.ResponseWriter, r *http.Request, th
 	// Try to hijack the connection and close it
 	if hijacker, ok := w.(http.Hijacker); ok {
 		conn, _, err := hijacker.Hijack()
-		if err == nil {
-			// Close the connection without sending any response
-			conn.Close()
-			fmt.Printf("[INFO] DROP action: Connection hijacked and closed for threat %s from IP %s\n", threat.Type, threat.ClientIP)
-			return nil
+		if err != nil {
+			// Fallback to block if hijacking fails
+			return m.handleBlockAction(w, r, threat)
 		}
-		fmt.Printf("[WARN] DROP action: Failed to hijack connection: %v\n", err)
-	} else {
-		fmt.Printf("[WARN] DROP action: ResponseWriter does not support Hijacker\n")
+		// Close the connection without sending any response
+		conn.Close()
+		return nil
 	}
-	// If hijacking fails or not available, close silently without sending any response
-	// by not writing anything to the response writer
-	return nil
+	// If hijacking not available, fall back to block
+	return m.handleBlockAction(w, r, threat)
 }
 
 // handleRedirectAction returns HTTP 302 with Location header
@@ -572,11 +519,6 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
 
 	// Return CAPTCHA challenge HTML (matching dashboard theme) with Cloudflare Turnstile
-	// Hardcoded Turnstile site key
-	turnstileSiteKey := "0x4AAAAAAB_vC04yTw3CJIFZ"
-	turnstileScript := `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
-	turnstileWidget := fmt.Sprintf(`<div class="cf-turnstile" data-sitekey="%s" data-callback="onTurnstileSuccess" data-theme="dark"></div>`, turnstileSiteKey)
-
 	challengeHTML := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
@@ -584,7 +526,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    %s
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -697,8 +639,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
         <p>Please verify you're human to continue.</p>
 
         <div class="threat-box">
-            <strong>Security Check Required</strong>
-            <p style="margin-top: 8px; font-size: 14px;">Your request has been flagged for additional verification.</p>
+            <strong>Threat Detected:</strong> %s
         </div>
 
         <div class="challenge-box">
@@ -710,7 +651,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
                 <input type="hidden" id="turnstile-token" name="captcha_token">
 
                 <div class="turnstile-container">
-                    %s
+                    <div class="cf-turnstile" data-sitekey="0x4AAAAAAB_vC04yTw3CJIFZ" data-callback="onTurnstileSuccess" data-theme="dark"></div>
                 </div>
 
                 <button type="submit" id="submitBtn">Verify and Continue</button>
@@ -724,59 +665,23 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
     </div>
 
     <script>
-        console.log('[CHALLENGE] Page loaded');
-        var widget = document.querySelector('.cf-turnstile');
-        console.log('[CHALLENGE] Turnstile widget found:', widget);
-        if (widget) {
-            console.log('[CHALLENGE] Widget data-sitekey:', widget.getAttribute('data-sitekey'));
-            console.log('[CHALLENGE] Widget data-callback:', widget.getAttribute('data-callback'));
-        }
-        console.log('[CHALLENGE] Turnstile script loaded:', typeof window.turnstile !== 'undefined');
-
         function onTurnstileSuccess(token) {
-            console.log('[CHALLENGE] Turnstile success callback triggered with token:', token);
             // Store the token from Turnstile
             document.getElementById('turnstile-token').value = token;
         }
 
         // Verify form on submit
         document.getElementById('challengeForm').addEventListener('submit', function(e) {
-            e.preventDefault();
             var token = document.getElementById('turnstile-token').value;
-            console.log('[CHALLENGE] Form submitted, token value:', token);
             if (!token) {
+                e.preventDefault();
                 alert('Please complete the Turnstile verification');
                 return false;
             }
-
-            var formData = new FormData(this);
-            var originalRequest = document.querySelector('input[name="original_request"]').value;
-
-            // Submit verification
-            fetch('/api/waf/challenge/verify', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    // Redirect to original request URL
-                    if (originalRequest && originalRequest !== '') {
-                        window.location.href = originalRequest;
-                    } else {
-                        window.location.href = '/';
-                    }
-                } else {
-                    alert('Verification failed. Please try again.');
-                }
-            })
-            .catch(error => {
-                console.error('Verification error:', error);
-                alert('An error occurred during verification. Please try again.');
-            });
         });
     </script>
 </body>
-</html>`, turnstileScript, challengeID, r.RequestURI, turnstileWidget, getClientIP(r))
+</html>`, threat.Type, challengeID, r.RequestURI, getClientIP(r))
 
 	w.WriteHeader(http.StatusForbidden)
 	w.Write([]byte(challengeHTML))
@@ -785,9 +690,17 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 
 // blockRequest returns a 403 Forbidden response (deprecated, kept for compatibility)
 func (m *Middleware) blockRequest(w http.ResponseWriter, threat *detector.Threat) error {
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusForbidden)
-	w.Write([]byte("Forbidden"))
+
+	response := fmt.Sprintf(`{
+		"error": "Request blocked by WAF",
+		"threat_type": "%s",
+		"severity": "%s",
+		"description": "%s"
+	}`, threat.Type, threat.Severity, threat.Description)
+
+	w.Write([]byte(response))
 	return nil
 }
 
