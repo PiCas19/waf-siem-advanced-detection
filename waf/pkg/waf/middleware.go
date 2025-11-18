@@ -519,8 +519,14 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 	// Generate a challenge ID
 	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
 
-	// Hardcoded Turnstile site key
-	turnstileSiteKey := "0x4AAAAAAB_vC04yTw3CJIFZ"
+	// Get Turnstile site key from environment (loaded from .env by loadEnvFile())
+	turnstileSiteKey := os.Getenv("TURNSTILE_SITE_KEY")
+	if turnstileSiteKey == "" {
+		fmt.Printf("[WARN] TURNSTILE_SITE_KEY not set in environment\n")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Configuration error: Turnstile not configured"))
+		return nil
+	}
 
 	// Return CAPTCHA challenge HTML (matching dashboard theme) with Cloudflare Turnstile
 	challengeHTML := fmt.Sprintf(`<!DOCTYPE html>
