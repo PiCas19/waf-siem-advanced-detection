@@ -518,6 +518,15 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 	// Generate a challenge ID
 	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
 
+	// Get Turnstile site key from environment
+	turnstileSiteKey := os.Getenv("TURNSTILE_SITE_KEY")
+	if turnstileSiteKey == "" {
+		fmt.Printf("[WARN] TURNSTILE_SITE_KEY not set in environment\n")
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Configuration error: Turnstile not configured"))
+		return nil
+	}
+
 	// Return CAPTCHA challenge HTML (matching dashboard theme) with Cloudflare Turnstile
 	challengeHTML := fmt.Sprintf(`<!DOCTYPE html>
 <html>
@@ -651,7 +660,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
                 <input type="hidden" id="turnstile-token" name="captcha_token">
 
                 <div class="turnstile-container">
-                    <div class="cf-turnstile" data-sitekey="0x4AAAAAAB_vC04yTw3CJIFZ" data-callback="onTurnstileSuccess" data-theme="dark"></div>
+                    <div class="cf-turnstile" data-sitekey="%s" data-callback="onTurnstileSuccess" data-theme="dark"></div>
                 </div>
 
                 <button type="submit" id="submitBtn">Verify and Continue</button>
@@ -681,7 +690,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
         });
     </script>
 </body>
-</html>`, threat.Type, challengeID, r.RequestURI, getClientIP(r))
+</html>`, turnstileSiteKey, threat.Type, challengeID, r.RequestURI, getClientIP(r))
 
 	w.WriteHeader(http.StatusForbidden)
 	w.Write([]byte(challengeHTML))
