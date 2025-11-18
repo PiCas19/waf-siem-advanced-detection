@@ -96,7 +96,7 @@ func (h *WAFHandler) handleBlockAction(w http.ResponseWriter, r *http.Request, t
 	w.Header().Set("X-WAF-Blocked", "true")
 	w.Header().Set("X-WAF-Threat", threat.Type)
 	w.Header().Set("X-WAF-Severity", threat.Severity)
-	http.Error(w, "Forbidden - Request blocked by WAF", http.StatusForbidden)
+	w.WriteHeader(http.StatusForbidden)
 }
 
 // handleDropAction closes the connection immediately without response
