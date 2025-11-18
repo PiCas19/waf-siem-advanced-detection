@@ -458,9 +458,7 @@ func (m *Middleware) executeBlockingAction(w http.ResponseWriter, r *http.Reques
 // handleBlockAction returns HTTP 403 Forbidden without exposing threat details
 func (m *Middleware) handleBlockAction(w http.ResponseWriter, r *http.Request, threat *detector.Threat) error {
 	w.Header().Set("X-WAF-Blocked", "true")
-	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusForbidden)
-	w.Write([]byte("Forbidden"))
 	return nil
 }
 
