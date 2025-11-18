@@ -107,6 +107,7 @@
             rules_endpoint http://localhost:8081/api/waf/custom-rules
             blocklist_endpoint http://localhost:8081/api/waf/blocklist
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
+            turnstile_site_key {$TURNSTILE_SITE_KEY}
 
             # ============================================
             # ENTERPRISE-GRADE IP DETECTION (WAN - TAILSCALE)
@@ -242,6 +243,7 @@
             block_mode true
             api_endpoint http://localhost:8081/api
             rules_endpoint http://localhost:8081/api/waf/custom-rules
+            turnstile_site_key {$TURNSTILE_SITE_KEY}
 
             # ============================================
             # ENTERPRISE-GRADE IP DETECTION (LAN HTTPS)
@@ -360,6 +362,7 @@ http://172.16.216.10 {
             block_mode true
             api_endpoint http://localhost:8081/api
             rules_endpoint http://localhost:8081/api/waf/custom-rules
+            turnstile_site_key {$TURNSTILE_SITE_KEY}
 
             # ============================================
             # ENTERPRISE-GRADE IP DETECTION (LAN HTTP)
