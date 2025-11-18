@@ -1,12 +1,14 @@
 package waf
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,6 +25,44 @@ import (
 func init() {
 	caddy.RegisterModule(Middleware{})
 	httpcaddyfile.RegisterHandlerDirective("waf", parseCaddyfile)
+	// Load .env file on startup
+	loadEnvFile()
+}
+
+// loadEnvFile reads the .env file and sets environment variables
+func loadEnvFile() {
+	envFile := "waf/.env"
+	// Try to read from current directory first, then parent
+	if _, err := os.Stat(envFile); os.IsNotExist(err) {
+		envFile = ".env"
+	}
+
+	file, err := os.Open(envFile)
+	if err != nil {
+		// .env file is optional, so just return if not found
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse KEY=VALUE
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			// Only set if not already in environment
+			if os.Getenv(key) == "" {
+				os.Setenv(key, value)
+			}
+		}
+	}
 }
 
 // RequestFingerprint represents a unique request to deduplicate retries
