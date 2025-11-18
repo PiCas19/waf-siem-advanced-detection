@@ -104,17 +104,14 @@ func (h *WAFHandler) handleDropAction(w http.ResponseWriter, r *http.Request, th
 	// Try to hijack the connection and close it
 	if hijacker, ok := w.(http.Hijacker); ok {
 		conn, _, err := hijacker.Hijack()
-		if err != nil {
-			// Fallback to block if hijacking fails
-			h.handleBlockAction(w, r, threat)
+		if err == nil {
+			// Close the connection without sending any response
+			conn.Close()
 			return
 		}
-		// Close the connection without sending any response
-		conn.Close()
-	} else {
-		// If hijacking not available, fall back to block
-		h.handleBlockAction(w, r, threat)
 	}
+	// If hijacking fails or not available, close silently without sending any response
+	// by not writing anything to the response writer
 }
 
 // handleRedirectAction returns HTTP 302 with Location header
