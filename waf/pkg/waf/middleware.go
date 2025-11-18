@@ -572,15 +572,10 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
 
 	// Return CAPTCHA challenge HTML (matching dashboard theme) with Cloudflare Turnstile
-	turnstileScript := ""
-	turnstileWidget := ""
-	if m.TurnstileSiteKey != "" {
-		fmt.Printf("[INFO] CHALLENGE: Using Turnstile site key: %s\n", m.TurnstileSiteKey)
-		turnstileScript = `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
-		turnstileWidget = fmt.Sprintf(`<div class="cf-turnstile" data-sitekey="%s" data-callback="onTurnstileSuccess" data-theme="dark"></div>`, m.TurnstileSiteKey)
-	} else {
-		fmt.Printf("[WARN] CHALLENGE: TURNSTILE_SITE_KEY not configured!\n")
-	}
+	// Hardcoded Turnstile site key
+	turnstileSiteKey := "0x4AAAAAAB_vC04yTw3CJIFZ"
+	turnstileScript := `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`
+	turnstileWidget := fmt.Sprintf(`<div class="cf-turnstile" data-sitekey="%s" data-callback="onTurnstileSuccess" data-theme="dark"></div>`, turnstileSiteKey)
 
 	challengeHTML := fmt.Sprintf(`<!DOCTYPE html>
 <html>
