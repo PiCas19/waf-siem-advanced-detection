@@ -714,7 +714,12 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
     </div>
 
     <script>
+        console.log('[CHALLENGE] Page loaded');
+        console.log('[CHALLENGE] Turnstile widget:', document.querySelector('.cf-turnstile'));
+        console.log('[CHALLENGE] Turnstile script loaded:', typeof window.turnstile !== 'undefined');
+
         function onTurnstileSuccess(token) {
+            console.log('[CHALLENGE] Turnstile success callback triggered with token:', token);
             // Store the token from Turnstile
             document.getElementById('turnstile-token').value = token;
         }
@@ -723,6 +728,7 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
         document.getElementById('challengeForm').addEventListener('submit', function(e) {
             e.preventDefault();
             var token = document.getElementById('turnstile-token').value;
+            console.log('[CHALLENGE] Form submitted, token value:', token);
             if (!token) {
                 alert('Please complete the Turnstile verification');
                 return false;
