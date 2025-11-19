@@ -685,10 +685,13 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
         });
     </script>
 </body>
-</html>`, turnstileSiteKey, threat.Type, challengeID, r.RequestURI, getClientIP(r))
+</html>`
 
 	w.WriteHeader(http.StatusForbidden)
-	w.Write([]byte(challengeHTML))
+	// Format the HTML with all parameters in correct order:
+	// 1. threat.Type  2. challengeID  3. r.RequestURI  4. turnstileSiteKey  5. getClientIP(r)
+	formattedHTML := fmt.Sprintf(challengeHTML, threat.Type, challengeID, r.RequestURI, turnstileSiteKey, getClientIP(r))
+	w.Write([]byte(formattedHTML))
 	return nil
 }
 
