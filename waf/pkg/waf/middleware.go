@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -414,6 +415,8 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 					blockedBy = "auto" // Blocked by WAF rule (default or custom with action="block")
 				}
 
+				// Sanitize fields to remove newlines and prevent JSON line splitting
+				// Newlines in payloads can cause Filebeat to treat them as multiple JSON lines
 				entry := logger.LogEntry{
 					ThreatType:        threat.Type,
 					Severity:          threat.Severity,
@@ -423,9 +426,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 					ClientIPTrusted:   threat.ClientIPTrusted,
 					ClientIPVPNReport: threat.ClientIPVPNReport,
 					Method:            r.Method,
-					URL:               r.URL.String(),
-					UserAgent:         r.UserAgent(),
-					Payload:           threat.Payload,
+					URL:               strings.ReplaceAll(strings.ReplaceAll(r.URL.String(), "\n", " "), "\r", " "),
+					UserAgent:         strings.ReplaceAll(strings.ReplaceAll(r.UserAgent(), "\n", " "), "\r", " "),
+					Payload:           strings.ReplaceAll(strings.ReplaceAll(threat.Payload, "\n", " "), "\r", " "),
 					Blocked:           shouldHandle,  // Whether the request is blocked
 					BlockedBy:         blockedBy,     // How it was blocked ("auto" or "")
 				}
