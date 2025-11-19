@@ -184,11 +184,16 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 
 		// Update in-memory stats
 		statsMu.Lock()
+	// ThreatsDetected = only detected threats (not blocked)
+	if !event.Blocked {
 		stats.ThreatsDetected++
-		if event.Blocked {
-			stats.RequestsBlocked++
-		}
-		stats.TotalRequests++
+	}
+	// RequestsBlocked = only blocked threats
+	if event.Blocked {
+		stats.RequestsBlocked++
+	}
+	// TotalRequests = detected + blocked (all security events)
+	stats.TotalRequests++
 		stats.LastSeen = time.Now().Format("15:04:05")
 
 		if len(stats.Recent) >= 5 {
@@ -288,18 +293,18 @@ func SetStatsDB(db *gorm.DB) {
 func WAFStatsHandler(c *gin.Context) {
 	// Se il database è disponibile, carica i dati dal database invece che dalla memoria
 	if statsDB != nil {
-		var totalLogs int64
-		var blockedLogs int64
-		var threatLogs int64
+		var detectedLogs int64     // Threats detected but not blocked (blocked = false)
+		var blockedLogs int64      // Threats blocked (blocked = true)
+		var totalLogs int64        // Total = detected + blocked
 
-		// Conta tutti i logs
-		statsDB.Model(&models.Log{}).Count(&totalLogs)
+		// Conta i logs detected (not blocked)
+		statsDB.Model(&models.Log{}).Where("blocked = ?", false).Count(&detectedLogs)
 
 		// Conta i logs bloccati
 		statsDB.Model(&models.Log{}).Where("blocked = ?", true).Count(&blockedLogs)
 
-		// Conta i logs con minacce (tutti sono considerati minacce)
-		statsDB.Model(&models.Log{}).Count(&threatLogs)
+		// Total = detected + blocked
+		totalLogs = detectedLogs + blockedLogs
 
 		// Carica i log recenti
 		var recentLogs []models.Log
@@ -326,9 +331,9 @@ func WAFStatsHandler(c *gin.Context) {
 		}
 
 		c.JSON(200, WAFStats{
-			ThreatsDetected: int(threatLogs),
-			RequestsBlocked: int(blockedLogs),
-			TotalRequests:   int(totalLogs),
+			ThreatsDetected: int(detectedLogs),  // Only detected (not blocked)
+			RequestsBlocked: int(blockedLogs),   // Only blocked
+			TotalRequests:   int(totalLogs),     // Detected + Blocked
 			LastSeen:        fmt.Sprintf("%d minuti fa", 0),
 			Recent:          recentEvents,
 		})
