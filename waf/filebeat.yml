@@ -7,8 +7,10 @@ filebeat.inputs:
     paths:
       - /var/log/caddy/waf_wan.log
       - /var/log/caddy/waf_lan.log
-    json.keys_under_root: true
-    json.add_error_key: true
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
     processors:
       - add_fields:
           target: ""
@@ -20,8 +22,10 @@ filebeat.inputs:
     enabled: true
     paths:
       - /var/log/caddy/blocked_ip_events.log
-    json.keys_under_root: true
-    json.add_error_key: true
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
     processors:
       - add_fields:
           target: ""
