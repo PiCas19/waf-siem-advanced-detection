@@ -14,11 +14,30 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/joho/godotenv"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/detector"
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/ipextract"
 )
+
+// loadEnvFile loads environment variables from .env file
+func loadEnvFile() error {
+	// Try to load .env file from current working directory
+	err := godotenv.Load(".env")
+	if err != nil {
+		// Check if file doesn't exist - that's okay, other methods can provide env vars
+		if os.IsNotExist(err) {
+			fmt.Printf("[INFO] .env file not found, using environment variables\n")
+			return nil
+		}
+		// Other errors are logged but don't fail
+		fmt.Printf("[WARN] Error loading .env file: %v\n", err)
+		return nil
+	}
+	fmt.Printf("[INFO] Successfully loaded .env file\n")
+	return nil
+}
 
 func init() {
 	caddy.RegisterModule(Middleware{})
@@ -108,6 +127,11 @@ func (Middleware) CaddyModule() caddy.ModuleInfo {
 
 // Provision sets up the middleware
 func (m *Middleware) Provision(ctx caddy.Context) error {
+	// Load environment variables from .env file
+	if err := loadEnvFile(); err != nil {
+		fmt.Printf("[WARN] Failed to load .env file: %v\n", err)
+	}
+
 	// Initialize detector
 	m.detector = detector.NewDetector()
 
@@ -519,9 +543,16 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 	// Generate a challenge ID
 	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
 
-	// Hardcoded Turnstile keys
-	turnstileSiteKey := "0x4AAAAAAB_vC04yTw3CJIFZ"
-	turnstileSecretKey := "0x4AAAAAAB_vC3CDfh51vS4SmtGZp_M0xu0"
+	// Get Turnstile keys from environment (loaded from .env by loadEnvFile())
+	turnstileSiteKey := os.Getenv("TURNSTILE_SITE_KEY")
+	if turnstileSiteKey == "" {
+		turnstileSiteKey = "0x4AAAAAAB_vC04yTw3CJIFZ" // Fallback to hardcoded key
+	}
+
+	turnstileSecretKey := os.Getenv("TURNSTILE_SECRET_KEY")
+	if turnstileSecretKey == "" {
+		turnstileSecretKey = "0x4AAAAAAB_vC3CDfh51vS4SmtGZp_M0xu0" // Fallback to hardcoded key
+	}
 
 	// Set Turnstile secret key in environment for API verification
 	os.Setenv("TURNSTILE_SECRET_KEY", turnstileSecretKey)
