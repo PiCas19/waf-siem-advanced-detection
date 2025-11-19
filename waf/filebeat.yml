@@ -1,5 +1,15 @@
 ###################### Filebeat Configuration - WAF Logs ########################
 
+# ================================== Template ==================================
+setup.template.enabled: true
+setup.template.name: "caddy-waf"
+setup.template.pattern: "caddy-waf-*"
+setup.template.overwrite: true
+setup.template.type: "composable"
+setup.ilm.enabled: true
+setup.ilm.check_exists: true
+setup.ilm.overwrite: true
+
 filebeat.inputs:
   - type: filestream
     id: waf-threats
@@ -10,6 +20,9 @@ filebeat.inputs:
     parsers:
       - ndjson:
           target: ""
+    fields:
+      log_type: "waf_threat"
+    fields_under_root: true
 
   - type: filestream
     id: blocked-ips
@@ -19,6 +32,9 @@ filebeat.inputs:
     parsers:
       - ndjson:
           target: ""
+    fields:
+      log_type: "blocked_ip_event"
+    fields_under_root: true
 
 # ================================== Output ===================================
 output.elasticsearch:
@@ -28,6 +44,15 @@ output.elasticsearch:
   ssl:
     enabled: true
     verification_mode: none
+
+  # Data Stream routing based on log_type
+  indices:
+    - index: "caddy-waf-waf-threats"
+      when.equals:
+        log_type: "waf_threat"
+    - index: "caddy-waf-blocked-ips"
+      when.equals:
+        log_type: "blocked_ip_event"
 
 # ================================== Logging ==================================
 logging.level: info
