@@ -139,24 +139,20 @@ output.elasticsearch:
     verification_mode: none
 
   # Data Stream routing dinamico basato sul tipo di log
-  indices:
-    # WAF Threat Logs Data Stream
-    - data_stream.namespace: caddy-waf
-      data_stream.dataset: waf_threats
-      when.equals:
-        log_type: "waf_threat"
+  pipeline: "_id"
+  index: "caddy-waf-%{[log_type]}-%{+yyyy.MM.dd}"
 
-    # Access Logs Data Stream
-    - data_stream.namespace: caddy-waf
-      data_stream.dataset: access
-      when.equals:
-        log_type: "access"
-
-    # Blocked IP Events Data Stream
-    - data_stream.namespace: caddy-waf
-      data_stream.dataset: blocked_ips
-      when.equals:
-        log_type: "blocked_ip_event"
+  # Alternative: Use Data Streams with correct syntax
+  # indices:
+  #   - index: "logs-caddy-waf-threats-%{+yyyy.MM.dd}"
+  #     when.equals:
+  #       log_type: "waf_threat"
+  #   - index: "logs-caddy-access-%{+yyyy.MM.dd}"
+  #     when.equals:
+  #       log_type: "access"
+  #   - index: "logs-caddy-blocked-ips-%{+yyyy.MM.dd}"
+  #     when.equals:
+  #       log_type: "blocked_ip_event"
 
   # Performance tuning
   worker: 2
