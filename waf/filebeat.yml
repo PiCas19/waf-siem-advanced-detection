@@ -1,5 +1,7 @@
+setup.template.enabled: true
 setup.template.name: caddy-waf
 setup.template.pattern: caddy-waf-*
+setup.ilm.enabled: true
 
 filebeat.inputs:
   - type: filestream
