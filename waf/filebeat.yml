@@ -114,22 +114,13 @@ filebeat.config.modules:
   reload.enabled: false
 
 # ================================
-# TEMPLATE and ILM (Data Streams)
+# TEMPLATE and ILM (index management)
 # ================================
 setup.template.enabled: true
-setup.template.name: "logs-caddy-waf"
-setup.template.pattern: "logs-caddy-waf*"
+setup.template.name: "caddy-waf"
+setup.template.pattern: "caddy-waf-*"
 setup.template.overwrite: true
 setup.template.type: "composable"
-
-# Disable dynamic mapping to prevent field explosion and mapping conflicts
-setup.template.settings:
-  index:
-    mapping:
-      total_fields.limit: 2000
-      total_fields.ignore_dynamic_beyond_limit: true
-    dynamic: "strict"
-
 setup.ilm.enabled: true
 setup.ilm.check_exists: true
 setup.ilm.overwrite: true
@@ -147,29 +138,21 @@ output.elasticsearch:
     enabled: true
     verification_mode: none
 
-  # Data Streams configuration with dynamic routing
-  # This creates separate data streams for each log type
-  indices:
-    # WAF Threat Logs Data Stream
-    - index: "logs-caddy-waf.threats-default"
-      data_stream.namespace: "default"
-      data_stream.dataset: "caddy-waf.threats"
-      when.equals:
-        log_type: "waf_threat"
+  # Data Stream routing dinamico basato sul tipo di log
+  pipeline: "_id"
+  index: "caddy-waf-%{[log_type]}-%{+yyyy.MM.dd}"
 
-    # Access Logs Data Stream
-    - index: "logs-caddy-waf.access-default"
-      data_stream.namespace: "default"
-      data_stream.dataset: "caddy-waf.access"
-      when.equals:
-        log_type: "access"
-
-    # Blocked IP Events Data Stream
-    - index: "logs-caddy-waf.blocked-ips-default"
-      data_stream.namespace: "default"
-      data_stream.dataset: "caddy-waf.blocked-ips"
-      when.equals:
-        log_type: "blocked_ip_event"
+  # Alternative: Use Data Streams with correct syntax
+  # indices:
+  #   - index: "logs-caddy-waf-threats-%{+yyyy.MM.dd}"
+  #     when.equals:
+  #       log_type: "waf_threat"
+  #   - index: "logs-caddy-access-%{+yyyy.MM.dd}"
+  #     when.equals:
+  #       log_type: "access"
+  #   - index: "logs-caddy-blocked-ips-%{+yyyy.MM.dd}"
+  #     when.equals:
+  #       log_type: "blocked_ip_event"
 
   # Performance tuning
   worker: 2
