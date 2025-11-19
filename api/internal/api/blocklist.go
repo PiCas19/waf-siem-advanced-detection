@@ -140,7 +140,12 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 		if ue, ok := userEmail.(string); ok {
 			userEmailStr = ue
 		}
-		emitBlockedIPEvent(req.IP, req.Threat, durationStr, userEmailStr, c.ClientIP(), "success")
+		// Get severity and description for the threat
+		severity := GetSeverityFromThreatType(req.Threat)
+		description := req.Threat
+		reason := req.Reason
+
+		emitBlockedIPEvent(req.IP, req.Threat, severity, description, reason, durationStr, userEmailStr, c.ClientIP(), "success")
 
 		c.JSON(201, gin.H{
 			"message": "IP blocked successfully",
@@ -280,7 +285,7 @@ func NewGetWhitelistForWAF(whitelistService *service.WhitelistService) func(*gin
 }
 
 // emitBlockedIPEvent emits a blocking event to the SIEM via log file
-func emitBlockedIPEvent(ip, threatType, duration, operator, operatorIP, status string) {
+func emitBlockedIPEvent(ip, threatType, severity, description, reason, duration, operator, operatorIP, status string) {
 	// Create logs directory if it doesn't exist
 	logsDir := "/var/log/caddy"
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
@@ -297,12 +302,15 @@ func emitBlockedIPEvent(ip, threatType, duration, operator, operatorIP, status s
 	}
 	defer eventLogger.Close()
 
-	// Create the event
+	// Create the event with all available fields
 	event := logger.BlockedIPEvent{
 		Timestamp:   time.Now(),
 		EventType:   "ip_blocked_manual",
 		IP:          ip,
 		ThreatType:  threatType,
+		Severity:    severity,     // Now populated
+		Description: description,   // Now populated
+		Reason:      reason,        // Now populated
 		Duration:    duration,
 		Operator:    operator,
 		OperatorIP:  operatorIP,
