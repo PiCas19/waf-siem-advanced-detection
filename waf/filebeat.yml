@@ -7,30 +7,22 @@ filebeat.inputs:
     paths:
       - /var/log/caddy/waf_wan.log
       - /var/log/caddy/waf_lan.log
-    parsers:
-      - ndjson:
-          keys_under_root: true
-          add_error_key: true
-    processors:
-      - add_fields:
-          target: ""
-          fields:
-            log_type: waf_threat
+    encoding: utf-8
+    json.keys_under_root: true
+    json.overwrite_keys: true
+    fields:
+      log_type: waf_threat
 
   - type: filestream
     id: blocked-ips
     enabled: true
     paths:
       - /var/log/caddy/blocked_ip_events.log
-    parsers:
-      - ndjson:
-          keys_under_root: true
-          add_error_key: true
-    processors:
-      - add_fields:
-          target: ""
-          fields:
-            log_type: blocked_ip
+    encoding: utf-8
+    json.keys_under_root: true
+    json.overwrite_keys: true
+    fields:
+      log_type: blocked_ip
 
 # ================================== Output ===================================
 output.elasticsearch:
