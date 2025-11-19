@@ -42,10 +42,7 @@ output.elasticsearch:
     verification_mode: none
   index: "waf-%{+yyyy.MM.dd}"
 
-setup.template.name: "waf"
-setup.template.pattern: "waf-*"
-setup.template.enabled: true
-setup.template.overwrite: true
+setup.template.enabled: false
 
 # ================================== Logging ==================================
 logging.level: info
