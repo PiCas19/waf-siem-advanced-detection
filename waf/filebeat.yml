@@ -120,43 +120,49 @@ setup.template.enabled: true
 setup.template.name: "caddy-waf"
 setup.template.pattern: "caddy-waf-*"
 setup.template.overwrite: true
-setup.ilm.enabled: false
+setup.template.type: "composable"
+setup.ilm.enabled: true
+setup.ilm.check_exists: true
+setup.ilm.overwrite: true
 
 # ================================
-# OUTPUT: Direct Elasticsearch
+# OUTPUT: Direct Elasticsearch (Data Streams)
 # ================================
 output.elasticsearch:
   hosts: ["https://10.246.50.82:9200"]
   username: "elastic"
   password: "KWZNH8hg3GQ64Sf"
-  
+
   # SSL configuration
   ssl:
     enabled: true
     verification_mode: none
-  
-  # Index routing basato sul tipo di log
+
+  # Data Stream routing dinamico basato sul tipo di log
   indices:
-    - index: "caddy-waf-threats-%{+yyyy.MM.dd}"
+    # WAF Threat Logs Data Stream
+    - data_stream.namespace: caddy-waf
+      data_stream.dataset: waf_threats
       when.equals:
         log_type: "waf_threat"
 
-    - index: "caddy-waf-access-%{+yyyy.MM.dd}"
+    # Access Logs Data Stream
+    - data_stream.namespace: caddy-waf
+      data_stream.dataset: access
       when.equals:
         log_type: "access"
 
-    - index: "caddy-waf-blocked-ip-events-%{+yyyy.MM.dd}"
+    # Blocked IP Events Data Stream
+    - data_stream.namespace: caddy-waf
+      data_stream.dataset: blocked_ips
       when.equals:
         log_type: "blocked_ip_event"
-  
+
   # Performance tuning
   worker: 2
   bulk_max_size: 2048
   compression_level: 3
   timeout: 90
-  
-  # NO pipeline - il parsing è già fatto da Filebeat
-  # pipeline: "caddy-waf-json"  # ← RIMOSSO
 
 # ================================
 # PROCESSORS
