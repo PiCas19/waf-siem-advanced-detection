@@ -121,6 +121,15 @@ setup.template.name: "logs-caddy-waf"
 setup.template.pattern: "logs-caddy-waf*"
 setup.template.overwrite: true
 setup.template.type: "composable"
+
+# Disable dynamic mapping to prevent field explosion and mapping conflicts
+setup.template.settings:
+  index:
+    mapping:
+      total_fields.limit: 2000
+      total_fields.ignore_dynamic_beyond_limit: true
+    dynamic: "strict"
+
 setup.ilm.enabled: true
 setup.ilm.check_exists: true
 setup.ilm.overwrite: true
