@@ -3,7 +3,7 @@
 # ================================== Template ==================================
 setup.template.enabled: true
 setup.template.name: "caddy-waf"
-setup.template.pattern: "caddy-waf-*"
+setup.template.pattern: "caddy-waf-*-*"
 setup.template.overwrite: true
 setup.template.type: "composable"
 setup.ilm.enabled: true
