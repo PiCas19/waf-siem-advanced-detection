@@ -113,8 +113,11 @@ export function useWebSocketStats() {
             const wafEvent = message.data;
 
             // Aggiorna stats
+            // threats_detected = only detected (not blocked)
+            // requests_blocked = only blocked
+            // total_requests = detected + blocked
             setStats((prevStats) => ({
-              threats_detected: prevStats.threats_detected + 1,
+              threats_detected: prevStats.threats_detected + (wafEvent.blocked ? 0 : 1),
               requests_blocked: prevStats.requests_blocked + (wafEvent.blocked ? 1 : 0),
               total_requests: prevStats.total_requests + 1,
             }));

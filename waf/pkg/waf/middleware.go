@@ -479,21 +479,26 @@ func (m *Middleware) handleBlockAction(w http.ResponseWriter, r *http.Request, t
 	return nil
 }
 
-// handleDropAction closes the connection immediately without response
+// handleDropAction closes the connection immediately without response (HTTP 444)
 func (m *Middleware) handleDropAction(w http.ResponseWriter, r *http.Request, threat *detector.Threat) error {
 	// Try to hijack the connection and close it
 	if hijacker, ok := w.(http.Hijacker); ok {
 		conn, _, err := hijacker.Hijack()
 		if err != nil {
-			// Fallback to block if hijacking fails
-			return m.handleBlockAction(w, r, threat)
+			// Fallback: use WriteHeader with status 444 (non-standard: Close Connection Without Response)
+			// and then close the connection
+			w.Header().Set("Connection", "close")
+			w.WriteHeader(444) // Non-standard status code for "Connection Closed Without Response"
+			return nil
 		}
 		// Close the connection without sending any response
 		conn.Close()
 		return nil
 	}
-	// If hijacking not available, fall back to block
-	return m.handleBlockAction(w, r, threat)
+	// If hijacking not available, close connection via header and status
+	w.Header().Set("Connection", "close")
+	w.WriteHeader(444) // Non-standard status code for "Connection Closed Without Response"
+	return nil
 }
 
 // handleRedirectAction returns HTTP 302 with Location header
