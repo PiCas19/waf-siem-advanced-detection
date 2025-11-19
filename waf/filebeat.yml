@@ -8,16 +8,15 @@ filebeat.inputs:
       - /var/log/caddy/waf_wan.log
       - /var/log/caddy/waf_lan.log
     encoding: utf-8
-    json.keys_under_root: true
-    json.overwrite_keys: true
-    json.add_error_key: false
     fields:
       log_type: waf_threat
     processors:
-      - rename:
-          fields:
-            message: raw_message
-          fail_on_error: false
+      - decode_json_fields:
+          fields: ["message"]
+          target: ""
+          overwrite_keys: true
+      - drop_fields:
+          fields: ["message"]
           ignore_missing: true
 
   - type: filestream
@@ -26,16 +25,15 @@ filebeat.inputs:
     paths:
       - /var/log/caddy/blocked_ip_events.log
     encoding: utf-8
-    json.keys_under_root: true
-    json.overwrite_keys: true
-    json.add_error_key: false
     fields:
       log_type: blocked_ip
     processors:
-      - rename:
-          fields:
-            message: raw_message
-          fail_on_error: false
+      - decode_json_fields:
+          fields: ["message"]
+          target: ""
+          overwrite_keys: true
+      - drop_fields:
+          fields: ["message"]
           ignore_missing: true
 
 # ================================== Output ===================================
