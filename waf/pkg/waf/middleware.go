@@ -370,17 +370,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 		w.Header().Set("X-WAF-Blocked", "true")
 		w.Header().Set("X-WAF-Threat", "IP_BLOCKLIST")
 		w.Header().Set("X-WAF-Severity", "critical")
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
-
-		response := fmt.Sprintf(`{
-			"error": "Request blocked by WAF",
-			"threat_type": "IP_BLOCKLIST",
-			"severity": "critical",
-			"description": "This IP address has been blocked"
-		}`)
-
-		w.Write([]byte(response))
 		return nil
 	}
 
@@ -485,17 +475,7 @@ func (m *Middleware) handleBlockAction(w http.ResponseWriter, r *http.Request, t
 	w.Header().Set("X-WAF-Blocked", "true")
 	w.Header().Set("X-WAF-Threat", threat.Type)
 	w.Header().Set("X-WAF-Severity", threat.Severity)
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusForbidden)
-
-	response := fmt.Sprintf(`{
-		"error": "Request blocked by WAF",
-		"threat_type": "%s",
-		"severity": "%s",
-		"description": "%s"
-	}`, threat.Type, threat.Severity, threat.Description)
-
-	w.Write([]byte(response))
 	return nil
 }
 
