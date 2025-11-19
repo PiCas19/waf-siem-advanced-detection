@@ -3,9 +3,8 @@
 # ================================== Template ==================================
 setup.template.enabled: true
 setup.template.name: "caddy-waf"
-setup.template.pattern: "caddy-waf-*-*"
+setup.template.pattern: "caddy-waf-*"
 setup.template.overwrite: true
-setup.template.type: "composable"
 setup.ilm.enabled: true
 setup.ilm.check_exists: true
 setup.ilm.overwrite: true
@@ -44,15 +43,7 @@ output.elasticsearch:
   ssl:
     enabled: true
     verification_mode: none
-
-  # Data Stream routing based on log_type
-  indices:
-    - index: "caddy-waf-waf-threats"
-      when.equals:
-        log_type: "waf_threat"
-    - index: "caddy-waf-blocked-ips"
-      when.equals:
-        log_type: "blocked_ip_event"
+  index: "caddy-waf-%{+yyyy.MM.dd}"
 
 # ================================== Logging ==================================
 logging.level: info
