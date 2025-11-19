@@ -10,11 +10,15 @@ filebeat.inputs:
     encoding: utf-8
     json.keys_under_root: true
     json.overwrite_keys: true
+    json.add_error_key: false
     fields:
       log_type: waf_threat
     processors:
-      - drop_fields:
-          fields: ["message"]
+      - rename:
+          fields:
+            message: raw_message
+          fail_on_error: false
+          ignore_missing: true
 
   - type: filestream
     id: blocked-ips
@@ -24,11 +28,15 @@ filebeat.inputs:
     encoding: utf-8
     json.keys_under_root: true
     json.overwrite_keys: true
+    json.add_error_key: false
     fields:
       log_type: blocked_ip
     processors:
-      - drop_fields:
-          fields: ["message"]
+      - rename:
+          fields:
+            message: raw_message
+          fail_on_error: false
+          ignore_missing: true
 
 # ================================== Output ===================================
 output.elasticsearch:
