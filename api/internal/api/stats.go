@@ -343,8 +343,12 @@ func WAFStatsHandler(c *gin.Context) {
 
 // verifyTurnstileToken verifies a Cloudflare Turnstile token
 func verifyTurnstileToken(token string) bool {
-	// Hardcoded Turnstile secret key
-	secretKey := "0x4AAAAAAB_vC3CDfh51vS4SmtGZp_M0xu0"
+	// Get Turnstile secret key from environment
+	secretKey := os.Getenv("TURNSTILE_SECRET_KEY")
+	if secretKey == "" {
+		fmt.Printf("[WARN] TURNSTILE_SECRET_KEY not set in environment\n")
+		return false
+	}
 
 	// Prepare request to Cloudflare Turnstile verification API
 	verifyURL := "https://challenges.cloudflare.com/turnstile/v0/siteverify"

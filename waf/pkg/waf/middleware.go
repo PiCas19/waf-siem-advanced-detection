@@ -519,11 +519,15 @@ func (m *Middleware) handleChallengeAction(w http.ResponseWriter, r *http.Reques
 	// Generate a challenge ID
 	challengeID := fmt.Sprintf("%d", time.Now().UnixNano())
 
-	// Hardcoded Turnstile site key
+	// Hardcoded Turnstile keys
 	turnstileSiteKey := "0x4AAAAAAB_vC04yTw3CJIFZ"
+	turnstileSecretKey := "0x4AAAAAAB_vC3CDfh51vS4SmtGZp_M0xu0"
+
+	// Set Turnstile secret key in environment for API verification
+	os.Setenv("TURNSTILE_SECRET_KEY", turnstileSecretKey)
 
 	// Return CAPTCHA challenge HTML (matching dashboard theme) with Cloudflare Turnstile
-	challengeHTML := fmt.Sprintf(`<!DOCTYPE html>
+	challengeHTML := `<!DOCTYPE html>
 <html>
 <head>
     <title>Security Challenge</title>
