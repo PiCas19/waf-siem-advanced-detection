@@ -15,9 +15,6 @@ filebeat.inputs:
           fields: ["message"]
           target: ""
           overwrite_keys: true
-      - drop_fields:
-          fields: ["message"]
-          ignore_missing: true
 
   - type: filestream
     id: blocked-ips
@@ -32,9 +29,6 @@ filebeat.inputs:
           fields: ["message"]
           target: ""
           overwrite_keys: true
-      - drop_fields:
-          fields: ["message"]
-          ignore_missing: true
 
 # ================================== Output ===================================
 output.elasticsearch:
