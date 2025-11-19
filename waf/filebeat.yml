@@ -1,259 +1,37 @@
-###########################
-# Filebeat for Caddy + WAF
-###########################
+###################### Filebeat Configuration - WAF Logs ########################
 
-# Filebeat data and log paths
-path.data: /var/lib/filebeat
-path.logs: /var/log/filebeat
-
-# ================================
-# INPUT: Caddy + WAF JSON logs
-# ================================
 filebeat.inputs:
-  # ==========================================
-  # INPUT 1: WAF Threat Logs (waf_wan.log + waf_lan.log)
-  # ==========================================
   - type: filestream
-    id: caddy-waf-threats
+    id: waf-threats
     enabled: true
-
     paths:
       - /var/log/caddy/waf_wan.log
       - /var/log/caddy/waf_lan.log
-
     parsers:
       - ndjson:
           target: ""
-          add_error_key: true
-          overwrite_keys: true
 
-    fields:
-      app: caddy-waf
-      log_type: waf_threat
-      environment: production
-    fields_under_root: true
-
-    ignore_older: 24h
-    scan_frequency: 10s
-    close_inactive: 5m
-    clean_inactive: 48h
-
-  # ==========================================
-  # INPUT 2: Blocked IP Events (blocked_ip_events.log)
-  # ==========================================
   - type: filestream
-    id: blocked-ip-events
+    id: blocked-ips
     enabled: true
-
     paths:
       - /var/log/caddy/blocked_ip_events.log
-
     parsers:
       - ndjson:
           target: ""
-          add_error_key: true
-          overwrite_keys: true
 
-    fields:
-      app: caddy-waf
-      log_type: blocked_ip_event
-      environment: production
-    fields_under_root: true
-
-    ignore_older: 24h
-    scan_frequency: 5s
-    close_inactive: 1m
-    clean_inactive: 48h
-
-# ================================
-# FILEBEAT MODULES (disabled)
-# ================================
-filebeat.config.modules:
-  path: ${path.config}/modules.d/*.yml
-  reload.enabled: false
-
-# ================================
-# TEMPLATE and ILM (index management)
-# ================================
-setup.template.enabled: true
-setup.template.name: "caddy-waf"
-setup.template.pattern: "caddy-waf-*"
-setup.template.overwrite: true
-setup.template.type: "composable"
-setup.ilm.enabled: true
-setup.ilm.check_exists: true
-setup.ilm.overwrite: true
-
-# ================================
-# OUTPUT: Direct Elasticsearch (Data Streams)
-# ================================
+# ================================== Output ===================================
 output.elasticsearch:
   hosts: ["https://10.246.50.82:9200"]
   username: "elastic"
   password: "KWZNH8hg3GQ64Sf"
-
-  # SSL configuration
   ssl:
     enabled: true
     verification_mode: none
 
-  # Data Stream routing dinamico basato sul tipo di log
-  pipeline: "_id"
-  index: "caddy-waf-%{[log_type]}-%{+yyyy.MM.dd}"
-
-  # Alternative: Use Data Streams with correct syntax
-  # indices:
-  #   - index: "logs-caddy-waf-threats-%{+yyyy.MM.dd}"
-  #     when.equals:
-  #       log_type: "waf_threat"
-  #   - index: "logs-caddy-access-%{+yyyy.MM.dd}"
-  #     when.equals:
-  #       log_type: "access"
-  #   - index: "logs-caddy-blocked-ips-%{+yyyy.MM.dd}"
-  #     when.equals:
-  #       log_type: "blocked_ip_event"
-
-  # Performance tuning
-  worker: 2
-  bulk_max_size: 2048
-  compression_level: 3
-  timeout: 90
-
-# ================================
-# PROCESSORS
-# ================================
-processors:
-  # 1. Add host metadata
-  - add_host_metadata:
-      when.not.has_fields: ['agent.name', 'host.name']
-  
-  # 2. Add cloud metadata if applicable
-  - add_cloud_metadata: ~
-  
-  # 3. Add process metadata
-  - add_process_metadata: ~
-  
-  # 4. Normalize timestamps
-  - timestamp:
-      field: timestamp
-      layouts:
-        - '2006-01-02T15:04:05.999999999Z07:00'
-        - '2006-01-02T15:04:05Z07:00'
-        - ISO8601
-      test:
-        - '2025-11-13T17:59:27.814988447+01:00'
-      ignore_missing: true
-      ignore_failure: false
-  
-  # ================================================
-  # 5. CLEAN WAF THREAT LOGS (keep only essentials)
-  # ================================================
-  - drop_fields:
-      when:
-        equals:
-          log_type: "waf_threat"
-      fields:
-        # Remove redundant timestamp fields
-        - ts
-        - timestamp  # Già convertito in @timestamp
-        
-        # Remove verbose request headers (se presenti)
-        - request.headers.Accept
-        - request.headers.Accept-Encoding
-        - request.headers.Accept-Language
-        - request.headers.Cache-Control
-        - request.headers.Connection
-        - request.headers.If-Modified-Since
-        - request.headers.If-None-Match
-        - request.headers.Origin
-        - request.headers.Pragma
-        - request.headers.Priority
-        - request.headers.Referer
-        - request.headers.Sec-Ch-Ua
-        - request.headers.Sec-Ch-Ua-Mobile
-        - request.headers.Sec-Ch-Ua-Platform
-        - request.headers.Sec-Fetch-Dest
-        - request.headers.Sec-Fetch-Mode
-        - request.headers.Sec-Fetch-Site
-        - request.headers.Sec-Fetch-User
-        - request.headers.Sec-Websocket-Extensions
-        - request.headers.Sec-Websocket-Key
-        - request.headers.Sec-Websocket-Version
-        - request.headers.Tailscale-Headers-Info
-        - request.headers.Tailscale-User-Login
-        - request.headers.Tailscale-User-Name
-        - request.headers.Tailscale-User-Profile-Pic
-        - request.headers.Upgrade
-        - request.headers.Upgrade-Insecure-Requests
-        - request.headers.X-Forwarded-For
-        - request.headers.X-Forwarded-Host
-        - request.headers.X-Forwarded-Proto
-        
-        # Remove request metadata not needed for threats
-        - request.remote_port
-        - request.proto
-        
-        # Remove ALL response headers for threat logs
-        - resp_headers
-        
-        # Remove redundant/unnecessary fields
-        - bytes_read
-        - user_id
-        - level
-        - logger
-        - msg
-        - message
-        - duration
-        - size
-        
-        # Remove Filebeat metadata
-        - agent.ephemeral_id
-        - log.offset
-        - log.file.inode
-        - log.file.device_id
-        - input.type
-        - ecs.version
-      ignore_missing: true
-  
-  # ================================================
-  # 6. CLEAN BLOCKED IP EVENTS (keep only essentials)
-  # ================================================
-  - drop_fields:
-      when:
-        equals:
-          log_type: "blocked_ip_event"
-      fields:
-        # Remove Filebeat metadata
-        - agent.ephemeral_id
-        - log.offset
-        - log.file.inode
-        - log.file.device_id
-        - input.type
-        - ecs.version
-      ignore_missing: true
-
-# ================================
-# LOCAL FILEBEAT LOGGING
-# ================================
+# ================================== Logging ==================================
 logging.level: info
 logging.to_files: true
 logging.files:
   path: /var/log/filebeat
   name: filebeat
-  keepfiles: 7
-  permissions: 0644
-  rotateeverybytes: 10485760  # 10 MB
-
-# ================================
-# MONITORING (optional)
-# ================================
-monitoring:
-  enabled: false
-
-# ================================
-# HTTP ENDPOINT (for debugging)
-# ================================
-http:
-  enabled: true
-  host: localhost
-  port: 5066
