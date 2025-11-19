@@ -1,6 +1,9 @@
+setup.template.name: caddy-waf
+setup.template.pattern: caddy-waf-*
+setup.ilm.enabled: true
+
 filebeat.inputs:
   - type: filestream
-    enabled: true
     paths:
       - /var/log/caddy/waf_wan.log
       - /var/log/caddy/waf_lan.log
@@ -13,5 +16,3 @@ output.elasticsearch:
   username: "elastic"
   password: "KWZNH8hg3GQ64Sf"
   ssl.verification_mode: none
-
-logging.level: info
