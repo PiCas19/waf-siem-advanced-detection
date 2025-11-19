@@ -1,20 +1,51 @@
-setup.template.enabled: true
-setup.template.name: caddy-waf
-setup.template.pattern: caddy-waf-*
-setup.template.type: composable
-setup.ilm.enabled: true
+###################### Filebeat Configuration - WAF Logs ########################
 
 filebeat.inputs:
   - type: filestream
+    id: waf-threats
+    enabled: true
     paths:
       - /var/log/caddy/waf_wan.log
       - /var/log/caddy/waf_lan.log
-      - /var/log/caddy/blocked_ip_events.log
-    parsers:
-      - ndjson:
+    json.keys_under_root: true
+    json.add_error_key: true
+    processors:
+      - add_fields:
+          target: ""
+          fields:
+            log_type: waf_threat
 
+  - type: filestream
+    id: blocked-ips
+    enabled: true
+    paths:
+      - /var/log/caddy/blocked_ip_events.log
+    json.keys_under_root: true
+    json.add_error_key: true
+    processors:
+      - add_fields:
+          target: ""
+          fields:
+            log_type: blocked_ip
+
+# ================================== Output ===================================
 output.elasticsearch:
   hosts: ["https://10.246.50.82:9200"]
   username: "elastic"
   password: "KWZNH8hg3GQ64Sf"
-  ssl.verification_mode: none
+  ssl:
+    enabled: true
+    verification_mode: none
+  index: "waf-%{+yyyy.MM.dd}"
+
+setup.template.name: "waf"
+setup.template.pattern: "waf-*"
+setup.template.enabled: true
+setup.template.overwrite: true
+
+# ================================== Logging ==================================
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
