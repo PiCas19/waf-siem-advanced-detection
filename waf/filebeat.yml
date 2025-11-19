@@ -12,6 +12,9 @@ filebeat.inputs:
     json.overwrite_keys: true
     fields:
       log_type: waf_threat
+    processors:
+      - drop_fields:
+          fields: ["message"]
 
   - type: filestream
     id: blocked-ips
@@ -23,6 +26,9 @@ filebeat.inputs:
     json.overwrite_keys: true
     fields:
       log_type: blocked_ip
+    processors:
+      - drop_fields:
+          fields: ["message"]
 
 # ================================== Output ===================================
 output.elasticsearch:
