@@ -369,7 +369,49 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 
 	// SECOND: Check blocklist - if blocked, handle immediately
 	if m.isIPBlocked(clientIP) {
-		// IP is on the blocklist, block it
+		// IP is on the blocklist, log and block it
+
+		// Log the blocked request
+		if m.logger != nil {
+			entry := logger.LogEntry{
+				ThreatType:        "IP_BLOCKLIST",
+				Severity:          "CRITICAL",
+				Description:       "Manually blocked IP",
+				ClientIP:          clientIP,
+				ClientIPSource:    string(enhancedIPInfo.SourceType),
+				ClientIPTrusted:   enhancedIPInfo.TrustScore > 50,
+				ClientIPVPNReport: enhancedIPInfo.TailscaleIP,
+				Method:            r.Method,
+				URL:               strings.ReplaceAll(strings.ReplaceAll(r.URL.String(), "\n", " "), "\r", " "),
+				UserAgent:         strings.ReplaceAll(strings.ReplaceAll(r.UserAgent(), "\n", " "), "\r", " "),
+				Payload:           "",
+				Blocked:           true,
+				BlockedBy:         "manual",
+			}
+			m.logger.Log(entry)
+		}
+
+		// Send event to API backend
+		if m.APIEndpoint != "" {
+			go func() {
+				threat := &detector.Threat{
+					Type:               "IP_BLOCKLIST",
+					Severity:           "CRITICAL",
+					Description:        "Manually blocked IP",
+					ClientIP:           clientIP,
+					ClientIPSource:     enhancedIPInfo.SourceType,
+					ClientIPTrusted:    enhancedIPInfo.TrustScore > 50,
+					ClientIPVPNReport:  enhancedIPInfo.TailscaleIP,
+					Payload:            "",
+					IsDefault:          false,
+					Action:             "block",
+					BlockAction:        "block",
+				}
+				m.sendEventToAPIManualBlock(r, clientIP, threat, enhancedIPInfo)
+			}()
+		}
+
+		// Block the request
 		w.Header().Set("X-WAF-Blocked", "true")
 		w.Header().Set("X-WAF-Threat", "IP_BLOCKLIST")
 		w.Header().Set("X-WAF-Severity", "critical")
@@ -770,6 +812,58 @@ func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *de
 		"ip_vpn_reported":  threat.ClientIPVPNReport,         // Whether this is a self-reported IP from Tailscale/VPN
 		"threat":           threat.Type,
 		"description":      threat.Description,               // Rule name/description for per-rule blocking
+		"method":           r.Method,
+		"path":             r.URL.Path,
+		"query":            r.URL.RawQuery,
+		"user_agent":       r.UserAgent(),
+		"payload":          threat.Payload,
+		"timestamp":        time.Now().Format(time.RFC3339),
+		"blocked":          blocked,
+		"blocked_by":       blockedBy,
+
+		// Enterprise-grade IP detection details
+		"ip_source_type":           enhancedIPInfo.SourceType,
+		"ip_classification":        enhancedIPInfo.SourceClassification,
+		"ip_header_signature_valid": enhancedIPInfo.HeaderSignatureValid,
+		"ip_is_dmz":                 enhancedIPInfo.DMZIP,
+		"ip_is_tailscale":           enhancedIPInfo.TailscaleIP,
+		"ip_trust_score":            enhancedIPInfo.TrustScore,
+		"ip_validation_details":     enhancedIPInfo.ValidationDetails,
+	}
+
+	jsonData, err := json.Marshal(eventPayload)
+	if err != nil {
+		return
+	}
+
+	req, err := http.NewRequest("POST", m.APIEndpoint+"/waf/event", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := m.httpClient.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+}
+
+// sendEventToAPIManualBlock sends a threat event to the backend API with blockedBy="manual"
+// Used when an IP is blocked from the blocklist (manually blocked by operator)
+func (m *Middleware) sendEventToAPIManualBlock(r *http.Request, clientIP string, threat *detector.Threat, enhancedIPInfo *ipextract.EnhancedClientIPInfo) {
+	// For manual blocks, always set blocked=true, blockedBy="manual"
+	blocked := true
+	blockedBy := "manual"
+
+	eventPayload := map[string]interface{}{
+		"ip":               clientIP,
+		"ip_source":        string(threat.ClientIPSource),
+		"ip_trusted":       threat.ClientIPTrusted,
+		"ip_vpn_reported":  threat.ClientIPVPNReport,
+		"threat":           threat.Type,
+		"description":      threat.Description,
 		"method":           r.Method,
 		"path":             r.URL.Path,
 		"query":            r.URL.RawQuery,
