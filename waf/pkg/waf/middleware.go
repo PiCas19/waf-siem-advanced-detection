@@ -399,7 +399,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 					Severity:           "CRITICAL",
 					Description:        "Manually blocked IP",
 					ClientIP:           clientIP,
-					ClientIPSource:     enhancedIPInfo.SourceType,
+					ClientIPSource:     ipextract.ClientIPSource(enhancedIPInfo.SourceType),
 					ClientIPTrusted:    enhancedIPInfo.TrustScore > 50,
 					ClientIPVPNReport:  enhancedIPInfo.TailscaleIP,
 					Payload:            "",
