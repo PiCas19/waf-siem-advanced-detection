@@ -19,6 +19,7 @@ type LogRepository interface {
 	Update(ctx context.Context, log *models.Log) error
 	Delete(ctx context.Context, id uint) error
 	UpdateByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error
+	UpdateDetectedByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error
 	FindPaginated(ctx context.Context, offset int, limit int) ([]models.Log, int64, error)
 }
 

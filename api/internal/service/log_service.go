@@ -122,3 +122,15 @@ func (s *LogService) UpdateLogsByIPAndDescription(ctx context.Context, ip string
 	}
 	return s.logRepo.UpdateByIPAndDescription(ctx, ip, description, updates)
 }
+
+// UpdateDetectedLogsByIPAndDescription updates only DETECTED (not blocked) logs matching IP and description
+// Used when manually blocking: we want to update only the detected threat, not the already-blocked ones
+func (s *LogService) UpdateDetectedLogsByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error {
+	if ip == "" || description == "" {
+		return fmt.Errorf("IP and description cannot be empty")
+	}
+	if len(updates) == 0 {
+		return fmt.Errorf("updates cannot be empty")
+	}
+	return s.logRepo.UpdateDetectedByIPAndDescription(ctx, ip, description, updates)
+}

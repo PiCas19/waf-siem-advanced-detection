@@ -153,12 +153,13 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 		})
 	}
 
-	// Update logs for this IP and threat type to mark as manually blocked
+	// Update DETECTED (not blocked) logs for this IP and threat type to mark as manually blocked
+	// This ensures we only update the detected threat, not the already-blocked ones
 	updates := map[string]interface{}{
 		"blocked":    true,
 		"blocked_by": "manual",
 	}
-	if err := logService.UpdateLogsByIPAndDescription(ctx, validatedIP, req.Threat, updates); err != nil {
+	if err := logService.UpdateDetectedLogsByIPAndDescription(ctx, validatedIP, req.Threat, updates); err != nil {
 		// Log the error but don't fail the request - block was already created successfully
 		logger.Log.WithError(err).Warn("Failed to update logs for blocked IP")
 	}
