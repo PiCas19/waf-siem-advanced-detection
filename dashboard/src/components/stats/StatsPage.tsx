@@ -226,7 +226,6 @@ const StatsPage: React.FC = () => {
   const [threatTypeData, setThreatTypeData] = useState<any[]>([]);
   const [recentAlerts, setRecentAlerts] = useState<WAFEvent[]>([]);
   const [processingKey, setProcessingKey] = useState<string | null>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0); // Trigger per refresh stats
 
   // Block duration modal state
   const [blockModalOpen, setBlockModalOpen] = useState(false);
@@ -446,7 +445,7 @@ const StatsPage: React.FC = () => {
       }
     };
     loadInitialData();
-  }, [refreshTrigger]); // Ricarica quando refreshTrigger cambia
+  }, []); // Load only on component mount, don't refresh on manual block/unblock
 
   // Inizializza timeline con dati dai logs storici
   const initializeTimeline = () => {
@@ -919,8 +918,8 @@ const StatsPage: React.FC = () => {
         showToast('Error blocking threat', 'error');
       } else {
         showToast('Threat blocked successfully', 'success');
-        // Trigger refresh degli stats dopo il blocco
-        setRefreshTrigger(prev => prev + 1);
+        // Don't trigger refresh - the optimistic update already set the manual block status
+        // Refreshing would overwrite it with data from API that doesn't have manual block info
       }
     } catch (e) {
       // rollback
@@ -958,8 +957,7 @@ const StatsPage: React.FC = () => {
         showToast('Error unblocking threat', 'error');
       } else {
         showToast('Threat unblocked successfully', 'success');
-        // Trigger refresh degli stats dopo lo sblocco
-        setRefreshTrigger(prev => prev + 1);
+        // Don't trigger refresh - the optimistic update already removed the manual block status
       }
     } catch (e) {
       // rollback
