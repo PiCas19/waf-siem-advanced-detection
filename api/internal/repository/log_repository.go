@@ -83,6 +83,14 @@ func (r *GormLogRepository) UpdateByIPAndDescription(ctx context.Context, ip str
 		Updates(updates).Error
 }
 
+// UpdateDetectedByIPAndDescription updates only DETECTED (not blocked) logs matching IP and description
+// This ensures that when manually blocking, we only update the detected threat, not the already-blocked ones
+func (r *GormLogRepository) UpdateDetectedByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error {
+	return r.db.WithContext(ctx).
+		Where("client_ip = ? AND (threat_type = ? OR description = ?) AND blocked = ?", ip, description, description, false).
+		Updates(updates).Error
+}
+
 func (r *GormLogRepository) FindPaginated(ctx context.Context, offset int, limit int) ([]models.Log, int64, error) {
 	var logs []models.Log
 	var total int64
