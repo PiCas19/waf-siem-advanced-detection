@@ -246,18 +246,25 @@ const StatsPage: React.FC = () => {
   useEffect(() => {
     const unsubscribe = onAlertReceived((alert: WAFEvent) => {
       setRecentAlerts(prevAlerts => {
-        // Check if we already have this alert locally with a manual block status
-        const existingAlert = prevAlerts.find(a => a.ip === alert.ip && (a.description || a.threat) === (alert.description || alert.threat));
+        // Check if we already have this alert locally
+        const existingIndex = prevAlerts.findIndex(a => a.ip === alert.ip && (a.description || a.threat) === (alert.description || alert.threat));
 
         // If we already have this alert locally and it's manually blocked, preserve the manual block status
-        if (existingAlert && existingAlert.blockedBy === 'manual' && existingAlert.blocked === true) {
-          alert = {
-            ...alert,
-            blocked: true,
-            blockedBy: 'manual'
-          };
+        if (existingIndex >= 0) {
+          const existingAlert = prevAlerts[existingIndex];
+          if (existingAlert.blockedBy === 'manual' && existingAlert.blocked === true) {
+            // Preserve manual block status - update the existing alert in place
+            const updated = [...prevAlerts];
+            updated[existingIndex] = {
+              ...alert,
+              blocked: true,
+              blockedBy: 'manual'
+            };
+            return updated;
+          }
         }
 
+        // New alert or existing alert without manual block - add to front
         return [alert, ...prevAlerts.slice(0, 999)];
       });
     });
