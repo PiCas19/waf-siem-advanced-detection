@@ -300,7 +300,9 @@ func (m *Middleware) reloadRulesBackground() {
 		case <-m.stopRuleReload:
 			return
 		case <-ticker.C:
-			_ = m.loadCustomRulesFromAPI() // Ignore errors, continue operation
+			if err := m.loadCustomRulesFromAPI(); err != nil {
+				fmt.Printf("[WAF] Rules reload error: %v\n", err)
+			}
 		}
 	}
 }
@@ -396,17 +398,22 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			// 3. Global block mode blocks everything
 
 			shouldHandle := false
-			if threat.IsDefault || m.BlockMode {
-				// Default rules and global block mode always trigger blocking
-				shouldHandle = true
-				// For default rules, default to "block" action if not specified
-				if threat.BlockAction == "" {
-					threat.BlockAction = "block"
+			if threat.IsDefault {
+				// Default rules: check block_mode
+				if m.BlockMode {
+					// Global block mode blocks all default threats
+					shouldHandle = true
+					// For default rules, default to "block" action if not specified
+					if threat.BlockAction == "" {
+						threat.BlockAction = "block"
+					}
 				}
+				// If block_mode is false, default rules are only logged (detected), not blocked
 			} else if threat.Action == "block" {
-				// Custom rules only trigger blocking if action is "block"
+				// Custom rules: block only if action is explicitly "block"
 				shouldHandle = true
 			}
+			// If custom rule has action="log", shouldHandle remains false (detected, not blocked)
 
 			// Log the threat with detailed IP source information AND blocking status
 			if m.logger != nil {
@@ -737,29 +744,24 @@ func (m *Middleware) blockRequest(w http.ResponseWriter, threat *detector.Threat
 // sendEventToAPI sends a threat event to the backend API
 func (m *Middleware) sendEventToAPI(r *http.Request, clientIP string, threat *detector.Threat, enhancedIPInfo *ipextract.EnhancedClientIPInfo) {
 	// Determine if the request is actually blocked:
-	// 1. Default rules always block (IsDefault: true)
-	// 2. Custom rules block if action is "block"
-	// 3. Global block mode blocks everything
-	blocked := m.BlockMode || threat.IsDefault
-	if !threat.IsDefault {
-		// For custom rules, only block if action is "block"
-		if threat.Action == "block" {
-			blocked = true
-		} else {
-			// If custom rule action is "log" or other, don't block
-			blocked = false
-		}
-	}
-
-	// Determine blocked_by field for dashboard display
+	// 1. Default rules: block only if block_mode is true
+	// 2. Custom rules: block only if action is "block"
+	blocked := false
 	blockedBy := ""
-	if blocked {
-		if m.BlockMode || threat.IsDefault {
-			blockedBy = "auto" // Blocked by default/global rule
-		} else if threat.Action == "block" {
-			blockedBy = "auto" // Blocked by custom rule with action "block"
+
+	if threat.IsDefault {
+		// For default rules, check block_mode setting
+		if m.BlockMode {
+			blocked = true
+			blockedBy = "auto" // Blocked by global rule
 		}
+		// If block_mode is false, default rules are only detected, not blocked
+	} else if threat.Action == "block" {
+		// For custom rules, block only if action is "block"
+		blocked = true
+		blockedBy = "auto" // Blocked by custom rule with action "block"
 	}
+	// If custom rule has action="log", it's detected but not blocked
 
 	eventPayload := map[string]interface{}{
 		"ip":               clientIP,
