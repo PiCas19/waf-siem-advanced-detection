@@ -72,7 +72,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		}
 
 		// Logs endpoints - accessible to analyst and above
-		protected.GET("/logs", NewGetLogsHandler(logService, auditLogService))
+		protected.GET("/logs", NewGetLogsHandler(logService, auditLogService, blocklistService))
 
 		// Audit logs endpoints
 		protected.GET("/audit-logs", NewGetAuditLogsHandler(auditLogService))
