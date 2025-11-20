@@ -226,6 +226,7 @@ const StatsPage: React.FC = () => {
   const [threatTypeData, setThreatTypeData] = useState<any[]>([]);
   const [recentAlerts, setRecentAlerts] = useState<WAFEvent[]>([]);
   const [processingKey, setProcessingKey] = useState<string | null>(null);
+  const [localStats, setLocalStats] = useState({ threats_detected: 0, requests_blocked: 0, total_requests: 0 });
 
   // Block duration modal state
   const [blockModalOpen, setBlockModalOpen] = useState(false);
@@ -240,6 +241,19 @@ const StatsPage: React.FC = () => {
   const canBlockThreats = user && hasPermission(user.role as any, 'threats_block');
   const canUnblockThreats = user && hasPermission(user.role as any, 'threats_unblock');
   const canReportFalsePositives = user && hasPermission(user.role as any, 'false_positives_report');
+
+  // Calcola stats locali basati su recentAlerts (aggiorna in tempo reale quando clicchi Block/Unblock)
+  useEffect(() => {
+    const threatsDetected = recentAlerts.filter(alert => !alert.blocked).length;
+    const requestsBlocked = recentAlerts.filter(alert => alert.blocked).length;
+    const totalRequests = recentAlerts.length;
+
+    setLocalStats({
+      threats_detected: threatsDetected,
+      requests_blocked: requestsBlocked,
+      total_requests: totalRequests,
+    });
+  }, [recentAlerts]);
 
   // Registra callback per aggiornamenti real-time degli alert
   useEffect(() => {
@@ -339,16 +353,23 @@ const StatsPage: React.FC = () => {
   const [timelineFilter, setTimelineFilter] = useState<TimeFilter>('1h');
 
   const [threatDistFilter, setThreatDistFilter] = useState<TimeFilter>('24h');
+  const [threatDistBlockedFilter, setThreatDistBlockedFilter] = useState<'all' | 'detected' | 'blocked'>('all');
 
   const [alertsTimeFilter, setAlertsTimeFilter] = useState<TimeFilter>('24h');
   const [alertsThreatFilter, setAlertsThreatFilter] = useState<string>('all');
+  const [alertsBlockedFilter, setAlertsBlockedFilter] = useState<'all' | 'detected' | 'blocked'>('all');
 
   // Filtri per i tre nuovi grafici
   const [maliciousIPsFilter, setMaliciousIPsFilter] = useState<TimeFilter>('24h');
+  const [maliciousIPsBlockedFilter, setMaliciousIPsBlockedFilter] = useState<'all' | 'detected' | 'blocked'>('all');
+
   const [geolocationFilter, setGeolocationFilter] = useState<TimeFilter>('24h');
   const [geolocationCountryFilter, setGeolocationCountryFilter] = useState<string>('all');
+  const [geolocationBlockedFilter, setGeolocationBlockedFilter] = useState<'all' | 'detected' | 'blocked'>('all');
+
   const [threatLevelFilter, setThreatLevelFilter] = useState<TimeFilter>('24h');
   const [threatLevelSeverityFilter, setThreatLevelSeverityFilter] = useState<string>('all');
+  const [threatLevelBlockedFilter, setThreatLevelBlockedFilter] = useState<'all' | 'detected' | 'blocked'>('all');
 
   // Dati per i tre nuovi grafici
   const [maliciousIPsData, setMaliciousIPsData] = useState<any[]>([]);
@@ -520,9 +541,11 @@ const StatsPage: React.FC = () => {
         : startTime.toLocaleDateString('it-IT', { month: 'short', day: 'numeric' }) || 'Data';
 
       // Conta i logs in questo intervallo
+      // "Threats Detected" = detected only (blocked === false)
+      // "Blocked" = blocked only (blocked === true)
       const threatsInInterval = filteredAlerts.filter(alert => {
         const alertTime = new Date(alert.timestamp).getTime();
-        return alertTime >= startTime.getTime() && alertTime < endTime.getTime();
+        return alertTime >= startTime.getTime() && alertTime < endTime.getTime() && !alert.blocked;
       }).length;
 
       const blockedInInterval = filteredAlerts.filter(alert => {
@@ -551,6 +574,13 @@ const StatsPage: React.FC = () => {
       return now.getTime() - alertTime < timeMs;
     });
 
+    // Filtra per blocked/detected
+    if (threatDistBlockedFilter === 'detected') {
+      filtered = filtered.filter(alert => !alert.blocked);
+    } else if (threatDistBlockedFilter === 'blocked') {
+      filtered = filtered.filter(alert => alert.blocked);
+    }
+
     const threatCounts = filtered.reduce((acc: any[], alert) => {
       if (!alert || !alert.threat) return acc;
       const existing = acc.find(t => t && t.name === alert.threat);
@@ -568,7 +598,7 @@ const StatsPage: React.FC = () => {
     }, []);
 
     setThreatTypeData(threatCounts && threatCounts.length > 0 ? threatCounts : []);
-  }, [recentAlerts, threatDistFilter]);
+  }, [recentAlerts, threatDistFilter, threatDistBlockedFilter]);
 
   // Calcola Top 10 Malicious IPs
   useEffect(() => {
@@ -580,6 +610,13 @@ const StatsPage: React.FC = () => {
       const alertTime = new Date(alert.timestamp).getTime();
       return now.getTime() - alertTime < timeMs;
     });
+
+    // Filtra per blocked/detected
+    if (maliciousIPsBlockedFilter === 'detected') {
+      filtered = filtered.filter(alert => !alert.blocked);
+    } else if (maliciousIPsBlockedFilter === 'blocked') {
+      filtered = filtered.filter(alert => alert.blocked);
+    }
 
     // Conta occorrenze per IP
     const ipCounts = filtered.reduce((acc: any[], alert) => {
@@ -604,7 +641,7 @@ const StatsPage: React.FC = () => {
       .slice(0, 10);
 
     setMaliciousIPsData(top10 && top10.length > 0 ? top10 : []);
-  }, [recentAlerts, maliciousIPsFilter]);
+  }, [recentAlerts, maliciousIPsFilter, maliciousIPsBlockedFilter]);
 
   // Calcola Geolocation Data (paese di provenienza) usando API backend
   useEffect(() => {
@@ -625,10 +662,17 @@ const StatsPage: React.FC = () => {
           const timeMs = getTimeMs(geolocationFilter);
 
           // Filtra gli alert nel timeframe
-          const filteredAlerts = recentAlerts.filter(alert => {
+          let filteredAlerts = recentAlerts.filter(alert => {
             const alertTime = new Date(alert.timestamp).getTime();
             return now.getTime() - alertTime < timeMs;
           });
+
+          // Filtra per blocked/detected
+          if (geolocationBlockedFilter === 'detected') {
+            filteredAlerts = filteredAlerts.filter(alert => !alert.blocked);
+          } else if (geolocationBlockedFilter === 'blocked') {
+            filteredAlerts = filteredAlerts.filter(alert => alert.blocked);
+          }
 
           // Riconta per paese basato sui dati del backend
           const countryCounts: { [key: string]: number } = {};
@@ -674,7 +718,7 @@ const StatsPage: React.FC = () => {
     };
 
     fetchGeolocation();
-  }, [recentAlerts, geolocationFilter, geolocationCountryFilter, setAvailableCountries]);
+  }, [recentAlerts, geolocationFilter, geolocationCountryFilter, geolocationBlockedFilter, setAvailableCountries]);
 
   // Prepara i dati per la mappa Leaflet
   useEffect(() => {
@@ -705,6 +749,13 @@ const StatsPage: React.FC = () => {
       const alertTime = new Date(alert.timestamp).getTime();
       return now.getTime() - alertTime < timeMs;
     });
+
+    // Filtra per blocked/detected
+    if (threatLevelBlockedFilter === 'detected') {
+      filtered = filtered.filter(alert => !alert.blocked);
+    } else if (threatLevelBlockedFilter === 'blocked') {
+      filtered = filtered.filter(alert => alert.blocked);
+    }
 
     // Mappiamo threat types a severity levels
     const threatSeverityMap: { [key: string]: string } = {
@@ -757,7 +808,7 @@ const StatsPage: React.FC = () => {
     }
 
     setThreatLevelData(threatLevelDistribution && threatLevelDistribution.length > 0 ? threatLevelDistribution : []);
-  }, [recentAlerts, threatLevelFilter, threatLevelSeverityFilter, setAvailableSeverities]);
+  }, [recentAlerts, threatLevelFilter, threatLevelSeverityFilter, threatLevelBlockedFilter, setAvailableSeverities]);
 
   // Funzione per eseguire la ricerca elastica su All Alerts
   const searchAllAlerts = (alerts: WAFEvent[], query: string): WAFEvent[] => {
@@ -815,12 +866,19 @@ const StatsPage: React.FC = () => {
     });
   };
 
-  // Filtra per All Alerts Table (timeframe + threat type + ricerca + ordinamento)
+  // Filtra per All Alerts Table (timeframe + threat type + blocked/detected + ricerca + ordinamento)
   useEffect(() => {
     let filtered = [...recentAlerts];
 
     if (alertsThreatFilter !== 'all') {
       filtered = filtered.filter(alert => alert.threat === alertsThreatFilter);
+    }
+
+    // Filtra per blocked/detected
+    if (alertsBlockedFilter === 'detected') {
+      filtered = filtered.filter(alert => !alert.blocked);
+    } else if (alertsBlockedFilter === 'blocked') {
+      filtered = filtered.filter(alert => alert.blocked);
     }
 
     const now = new Date();
@@ -838,7 +896,7 @@ const StatsPage: React.FC = () => {
 
     setAllAlertsPage(1); // Reset pagination
     setFilteredAlertsByAllAlerts(filtered);
-  }, [recentAlerts, alertsTimeFilter, alertsThreatFilter, allAlertsSearchQuery, allAlertsSortColumn, allAlertsSortOrder]);
+  }, [recentAlerts, alertsTimeFilter, alertsThreatFilter, alertsBlockedFilter, allAlertsSearchQuery, allAlertsSortColumn, allAlertsSortOrder]);
 
   // Util: chiave composta per azioni su alert specifico/gruppo
   const getAlertKey = (ip?: string, description?: string) => `${ip || ''}::${description || ''}`;
@@ -1042,25 +1100,25 @@ const StatsPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-gradient-to-br from-red-500/10 to-red-500/5 border border-red-500/20 rounded-lg p-6">
           <h3 className="text-gray-400 text-sm font-medium mb-2">Threats Detected</h3>
-          <p className="text-3xl font-bold text-red-400">{stats.threats_detected}</p>
+          <p className="text-3xl font-bold text-red-400">{localStats.threats_detected}</p>
           <p className="text-xs text-gray-500 mt-2">{detectionRate}% of all requests</p>
         </div>
 
         <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border border-yellow-500/20 rounded-lg p-6">
           <h3 className="text-gray-400 text-sm font-medium mb-2">Requests Blocked</h3>
-          <p className="text-3xl font-bold text-yellow-400">{stats.requests_blocked}</p>
+          <p className="text-3xl font-bold text-yellow-400">{localStats.requests_blocked}</p>
           <p className="text-xs text-gray-500 mt-2">{blockRate}% of all requests</p>
         </div>
 
         <div className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20 rounded-lg p-6">
           <h3 className="text-gray-400 text-sm font-medium mb-2">Total Requests</h3>
-          <p className="text-3xl font-bold text-blue-400">{stats.total_requests}</p>
+          <p className="text-3xl font-bold text-blue-400">{localStats.total_requests}</p>
           <p className="text-xs text-gray-500 mt-2">Last 24 hours</p>
         </div>
 
         <div className="bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20 rounded-lg p-6">
           <h3 className="text-gray-400 text-sm font-medium mb-2">Allowed Requests</h3>
-          <p className="text-3xl font-bold text-green-400">{stats.total_requests - stats.requests_blocked}</p>
+          <p className="text-3xl font-bold text-green-400">{localStats.total_requests - localStats.requests_blocked}</p>
           <p className="text-xs text-gray-500 mt-2">Requests passed through</p>
         </div>
       </div>
@@ -1143,22 +1201,33 @@ const StatsPage: React.FC = () => {
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Threat Types Distribution</h2>
-            <select
-              value={threatDistFilter}
-              onChange={(e) => setThreatDistFilter(e.target.value as TimeFilter)}
-              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="today">Today</option>
-              <option value="week">This week</option>
-              <option value="15m">Last 15 minutes</option>
-              <option value="30m">Last 30 minutes</option>
-              <option value="1h">Last 1 hour</option>
-              <option value="24h">Last 24 hours</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-              <option value="1y">Last 1 year</option>
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={threatDistBlockedFilter}
+                onChange={(e) => setThreatDistBlockedFilter(e.target.value as 'all' | 'detected' | 'blocked')}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="all">All Status</option>
+                <option value="detected">Detected</option>
+                <option value="blocked">Blocked</option>
+              </select>
+              <select
+                value={threatDistFilter}
+                onChange={(e) => setThreatDistFilter(e.target.value as TimeFilter)}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="today">Today</option>
+                <option value="week">This week</option>
+                <option value="15m">Last 15 minutes</option>
+                <option value="30m">Last 30 minutes</option>
+                <option value="1h">Last 1 hour</option>
+                <option value="24h">Last 24 hours</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="1y">Last 1 year</option>
+              </select>
+            </div>
           </div>
           {threatTypeData && threatTypeData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
@@ -1186,22 +1255,33 @@ const StatsPage: React.FC = () => {
         <div className="lg:col-span-2 bg-gray-800 border border-gray-700 rounded-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Top 10 Malicious IPs</h2>
-            <select
-              value={maliciousIPsFilter}
-              onChange={(e) => setMaliciousIPsFilter(e.target.value as TimeFilter)}
-              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="today">Today</option>
-              <option value="week">This week</option>
-              <option value="15m">Last 15 minutes</option>
-              <option value="30m">Last 30 minutes</option>
-              <option value="1h">Last 1 hour</option>
-              <option value="24h">Last 24 hours</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-              <option value="90d">Last 90 days</option>
-              <option value="1y">Last 1 year</option>
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={maliciousIPsBlockedFilter}
+                onChange={(e) => setMaliciousIPsBlockedFilter(e.target.value as 'all' | 'detected' | 'blocked')}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="all">All Status</option>
+                <option value="detected">Detected</option>
+                <option value="blocked">Blocked</option>
+              </select>
+              <select
+                value={maliciousIPsFilter}
+                onChange={(e) => setMaliciousIPsFilter(e.target.value as TimeFilter)}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="today">Today</option>
+                <option value="week">This week</option>
+                <option value="15m">Last 15 minutes</option>
+                <option value="30m">Last 30 minutes</option>
+                <option value="1h">Last 1 hour</option>
+                <option value="24h">Last 24 hours</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="1y">Last 1 year</option>
+              </select>
+            </div>
           </div>
           {maliciousIPsData && maliciousIPsData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
@@ -1235,6 +1315,15 @@ const StatsPage: React.FC = () => {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-white">Attack Hotspots</h2>
             <div className="flex gap-2">
+              <select
+                value={geolocationBlockedFilter}
+                onChange={(e) => setGeolocationBlockedFilter(e.target.value as 'all' | 'detected' | 'blocked')}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="all">All Status</option>
+                <option value="detected">Detected</option>
+                <option value="blocked">Blocked</option>
+              </select>
               <select
                 value={geolocationCountryFilter}
                 onChange={(e) => setGeolocationCountryFilter(e.target.value)}
@@ -1366,6 +1455,15 @@ const StatsPage: React.FC = () => {
           <h2 className="text-lg font-semibold text-white mb-3">Threat Level Distribution</h2>
           <div className="flex gap-2 mb-4">
             <select
+              value={threatLevelBlockedFilter}
+              onChange={(e) => setThreatLevelBlockedFilter(e.target.value as 'all' | 'detected' | 'blocked')}
+              className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="all">All Status</option>
+              <option value="detected">Detected</option>
+              <option value="blocked">Blocked</option>
+            </select>
+            <select
               value={threatLevelSeverityFilter}
               onChange={(e) => setThreatLevelSeverityFilter(e.target.value)}
               className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
@@ -1454,6 +1552,16 @@ const StatsPage: React.FC = () => {
                 {allUniqueThreats.map(threat => (
                   <option key={threat} value={threat}>{threat}</option>
                 ))}
+              </select>
+
+              <select
+                value={alertsBlockedFilter}
+                onChange={(e) => setAlertsBlockedFilter(e.target.value as 'all' | 'detected' | 'blocked')}
+                className="bg-gray-700 text-white rounded px-3 py-2 text-sm border border-gray-600 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="all">All Status</option>
+                <option value="detected">Detected Only</option>
+                <option value="blocked">Blocked Only</option>
               </select>
             </div>
           </div>
