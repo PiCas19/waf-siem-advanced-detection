@@ -55,8 +55,10 @@ func NewGetLogsHandler(logService *service.LogService, auditLogService *service.
 		}
 
 		// Create a map of blocked IPs for quick lookup: "ip::threat" -> true
+		// Store both by Description (from dashboard) and alternative keys for matching
 		blockedMap := make(map[string]bool)
 		for _, blocked := range blockedIPsList {
+			// Primary key: IP + Description (as saved from dashboard)
 			key := blocked.IPAddress + "::" + blocked.Description
 			blockedMap[key] = true
 		}
