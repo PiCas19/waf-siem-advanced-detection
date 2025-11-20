@@ -246,47 +246,20 @@ const StatsPage: React.FC = () => {
   useEffect(() => {
     const unsubscribe = onAlertReceived((alert: WAFEvent) => {
       setRecentAlerts(prevAlerts => {
-        // Check if we already have this EXACT alert locally (including blocked status)
-        // Only match if it's the same IP, threat, AND blocked status (to keep separate rows)
-        const alertKey = `${alert.ip}::${alert.description || alert.threat}::${alert.blocked}::${alert.blockedBy}`;
-        const existingIndex = prevAlerts.findIndex(a => {
-          const existingKey = `${a.ip}::${a.description || a.threat}::${a.blocked}::${a.blockedBy}`;
-          return existingKey === alertKey;
+        // Check if we already have a manually blocked alert for this IP and threat
+        // If so, preserve the manual block status and don't add the new alert
+        const manualBlockKey = `${alert.ip}::${alert.description || alert.threat}`;
+        const existingManualBlockIndex = prevAlerts.findIndex(a => {
+          const existingKey = `${a.ip}::${a.description || a.threat}`;
+          return existingKey === manualBlockKey && a.blockedBy === 'manual' && a.blocked === true;
         });
 
-        // If we already have this exact alert (same IP, threat, blocked status), update it in place
-        // This prevents duplicates for the same threat state
-        if (existingIndex >= 0) {
-          const existingAlert = prevAlerts[existingIndex];
-          const updated = [...prevAlerts];
-
-          // Preserve manual block status if it was previously set
-          if (existingAlert.blockedBy === 'manual' && existingAlert.blocked === true) {
-            updated[existingIndex] = {
-              ...alert,
-              blocked: true,
-              blockedBy: 'manual'
-            };
-          } else {
-            // Update with new data but keep other enrichment fields
-            updated[existingIndex] = {
-              ...alert,
-              // Preserve any enrichment data that already exists
-              ip_reputation: alert.ip_reputation || existingAlert.ip_reputation,
-              threat_level: alert.threat_level || existingAlert.threat_level,
-              country: alert.country || existingAlert.country,
-              asn: alert.asn || existingAlert.asn,
-              is_malicious: alert.is_malicious !== undefined ? alert.is_malicious : existingAlert.is_malicious,
-              threat_source: alert.threat_source || existingAlert.threat_source,
-              abuse_reports: alert.abuse_reports || existingAlert.abuse_reports,
-              is_on_blocklist: alert.is_on_blocklist !== undefined ? alert.is_on_blocklist : existingAlert.is_on_blocklist,
-              blocklist_name: alert.blocklist_name || existingAlert.blocklist_name,
-            };
-          }
-          return updated;
+        // If we found a manually blocked alert, preserve that status and don't add duplicate
+        if (existingManualBlockIndex >= 0) {
+          return prevAlerts;
         }
 
-        // New alert (different blocked status or blockedBy) - add as separate row
+        // Otherwise, add this alert as a new row (allows BLOCKED and DETECTED to coexist as separate rows)
         return [alert, ...prevAlerts.slice(0, 999)];
       });
     });
