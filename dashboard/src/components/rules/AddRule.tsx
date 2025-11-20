@@ -14,6 +14,7 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
     pattern: '',
     description: '',
     threatType: 'SQL Injection',
+    severity: 'medium' as 'low' | 'medium' | 'high' | 'critical',
     mode: 'block' as 'block' | 'detect',
     blockAction: 'none' as 'none' | 'block' | 'drop' | 'redirect' | 'challenge',
     redirectUrl: '',
@@ -53,6 +54,7 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
       pattern: formData.pattern,
       description: formData.description,
       type: formData.threatType,
+      severity: formData.severity,
       action: formData.mode === 'detect' ? 'log' : 'block',
       block_enabled: formData.mode === 'block' && formData.blockAction === 'block',
       drop_enabled: formData.mode === 'block' && formData.blockAction === 'drop',
@@ -80,6 +82,7 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
           pattern: '',
           description: '',
           threatType: 'SQL Injection',
+          severity: 'medium',
           mode: 'block',
           blockAction: 'none',
           redirectUrl: '',
@@ -138,7 +141,7 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Threat Type */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -154,6 +157,23 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
                   {type}
                 </option>
               ))}
+            </select>
+          </div>
+
+          {/* Severity */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Severity Level
+            </label>
+            <select
+              value={formData.severity}
+              onChange={(e) => setFormData({ ...formData, severity: e.target.value as 'low' | 'medium' | 'high' | 'critical' })}
+              className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
             </select>
           </div>
 
