@@ -152,17 +152,6 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 			"entry":   blockedIP,
 		})
 	}
-
-	// Update DETECTED (not blocked) logs for this IP and threat type to mark as manually blocked
-	// This ensures we only update the detected threat, not the already-blocked ones
-	updates := map[string]interface{}{
-		"blocked":    true,
-		"blocked_by": "manual",
-	}
-	if err := logService.UpdateDetectedLogsByIPAndDescription(ctx, validatedIP, req.Threat, updates); err != nil {
-		// Log the error but don't fail the request - block was already created successfully
-		logger.Log.WithError(err).Warn("Failed to update logs for blocked IP")
-	}
 }
 
 // UnblockIPWithService - Unblocks an IP for a specific rule/description
@@ -187,40 +176,6 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 	if err := blocklistService.UnblockIP(ctx, ip); err != nil {
 		c.JSON(500, gin.H{"error": "Failed to delete blocked IP"})
 		return
-	}
-
-	// Update logs for this IP and threat type to remove "manual" BlockedBy status
-	// For default threats (XSS, SQLi, etc.), restore blocked_by="auto" since they're always blocked by rules
-	// For custom rules, set blocked_by="" and blocked=false
-	defaultThreats := []string{"XSS", "SQL_INJECTION", "LFI", "RFI", "COMMAND_INJECTION",
-		"XXE", "LDAP_INJECTION", "SSTI", "HTTP_RESPONSE_SPLITTING", "PROTOTYPE_POLLUTION",
-		"PATH_TRAVERSAL", "SSRF", "NOSQL_INJECTION"}
-
-	isDefault := false
-	for _, dt := range defaultThreats {
-		if threat == dt {
-			isDefault = true
-			break
-		}
-	}
-
-	if isDefault {
-		// For default threats, restore blocked_by="auto"
-		updates := map[string]interface{}{"blocked_by": "auto"}
-		if err := logService.UpdateLogsByIPAndDescription(ctx, ip, threat, updates); err != nil {
-			// Log the error but don't fail the request - IP was already unblocked successfully
-			logger.Log.WithError(err).Warn("Failed to update logs for unblocked IP")
-		}
-	} else {
-		// For custom rules, set blocked_by="" and blocked=false
-		updates := map[string]interface{}{
-			"blocked":    false,
-			"blocked_by": "",
-		}
-		if err := logService.UpdateLogsByIPAndDescription(ctx, ip, threat, updates); err != nil {
-			// Log the error but don't fail the request - IP was already unblocked successfully
-			logger.Log.WithError(err).Warn("Failed to update logs for unblocked IP")
-		}
 	}
 
 	c.JSON(200, gin.H{"message": "IP unblocked successfully", "ip": ip, "threat": threat})
