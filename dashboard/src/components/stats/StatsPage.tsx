@@ -246,15 +246,16 @@ const StatsPage: React.FC = () => {
   useEffect(() => {
     const unsubscribe = onAlertReceived((alert: WAFEvent) => {
       setRecentAlerts(prevAlerts => {
-        // Check if we already have this alert locally (by IP and threat/description)
-        const alertKey = `${alert.ip}::${alert.description || alert.threat}`;
+        // Check if we already have this EXACT alert locally (including blocked status)
+        // Only match if it's the same IP, threat, AND blocked status (to keep separate rows)
+        const alertKey = `${alert.ip}::${alert.description || alert.threat}::${alert.blocked}::${alert.blockedBy}`;
         const existingIndex = prevAlerts.findIndex(a => {
-          const existingKey = `${a.ip}::${a.description || a.threat}`;
+          const existingKey = `${a.ip}::${a.description || a.threat}::${a.blocked}::${a.blockedBy}`;
           return existingKey === alertKey;
         });
 
-        // If we already have this alert, update it in place to avoid duplicates
-        // and preserve the manual block status if it was set
+        // If we already have this exact alert (same IP, threat, blocked status), update it in place
+        // This prevents duplicates for the same threat state
         if (existingIndex >= 0) {
           const existingAlert = prevAlerts[existingIndex];
           const updated = [...prevAlerts];
@@ -285,7 +286,7 @@ const StatsPage: React.FC = () => {
           return updated;
         }
 
-        // New alert - add to front
+        // New alert (different blocked status or blockedBy) - add as separate row
         return [alert, ...prevAlerts.slice(0, 999)];
       });
     });
