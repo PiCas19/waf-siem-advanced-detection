@@ -168,7 +168,7 @@ export default function AddRule({ onRuleAdded, onCancel }: AddRuleProps) {
             <select
               value={formData.severity}
               onChange={(e) => setFormData({ ...formData, severity: e.target.value as 'low' | 'medium' | 'high' | 'critical' })}
-              className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+              className="w-full px-4 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none cursor-pointer appearance-none"
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>

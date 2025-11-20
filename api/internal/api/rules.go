@@ -93,6 +93,13 @@ func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		rule.Enabled = true
 		rule.CreatedBy = userID.(uint)
 
+		// Ensure severity has a default value
+		if rule.Severity == "" {
+			rule.Severity = "medium"
+		}
+
+		fmt.Printf("[DEBUG] Creating rule: Name=%s, Type=%s, Severity=%s, Action=%s\n", rule.Name, rule.Type, rule.Severity, rule.Action)
+
 		// If rule is in "detect" mode, disable all action types
 		if rule.Action == "log" {
 			rule.BlockEnabled = false
@@ -109,14 +116,15 @@ func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		}
 
 		details := map[string]interface{}{
-			"type":   rule.Type,
-			"action": rule.Action,
-			"pattern": rule.Pattern,
+			"type":     rule.Type,
+			"severity": rule.Severity,
+			"action":   rule.Action,
+			"pattern":  rule.Pattern,
 		}
 
 		LogRuleAction(db, userID.(uint), userEmail.(string), "CREATE_RULE", fmt.Sprintf("%d", rule.ID), rule.Name, details, clientIP.(string))
 
-		fmt.Printf("[INFO] Rule created: ID=%d, Name=%s, Type=%s, Action=%s\n", rule.ID, rule.Name, rule.Type, rule.Action)
+		fmt.Printf("[INFO] Rule created: ID=%d, Name=%s, Type=%s, Severity=%s, Action=%s\n", rule.ID, rule.Name, rule.Type, rule.Severity, rule.Action)
 
 		c.JSON(201, gin.H{
 			"message": "Rule created successfully",
@@ -177,9 +185,10 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		}
 
 		details := map[string]interface{}{
-			"type":   rule.Type,
-			"action": rule.Action,
-			"pattern": rule.Pattern,
+			"type":     rule.Type,
+			"severity": rule.Severity,
+			"action":   rule.Action,
+			"pattern":  rule.Pattern,
 		}
 
 		LogRuleAction(db, userID.(uint), userEmail.(string), "UPDATE_RULE", ruleID, rule.Name, details, clientIP.(string))
