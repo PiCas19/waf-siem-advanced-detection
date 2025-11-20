@@ -292,7 +292,7 @@ func (m *Middleware) loadCustomRulesFromAPI() error {
 
 // reloadRulesBackground periodically reloads custom rules from API
 func (m *Middleware) reloadRulesBackground() {
-	ticker := time.NewTicker(60 * time.Second) // Reload every 60 seconds
+	ticker := time.NewTicker(10 * time.Second) // Reload every 10 seconds
 	defer ticker.Stop()
 
 	for {

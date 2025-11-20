@@ -245,7 +245,21 @@ const StatsPage: React.FC = () => {
   // Registra callback per aggiornamenti real-time degli alert
   useEffect(() => {
     const unsubscribe = onAlertReceived((alert: WAFEvent) => {
-      setRecentAlerts(prevAlerts => [alert, ...prevAlerts.slice(0, 999)]);
+      setRecentAlerts(prevAlerts => {
+        // Check if we already have this alert locally with a manual block status
+        const existingAlert = prevAlerts.find(a => a.ip === alert.ip && (a.description || a.threat) === (alert.description || alert.threat));
+
+        // If we already have this alert locally and it's manually blocked, preserve the manual block status
+        if (existingAlert && existingAlert.blockedBy === 'manual' && existingAlert.blocked === true) {
+          alert = {
+            ...alert,
+            blocked: true,
+            blockedBy: 'manual'
+          };
+        }
+
+        return [alert, ...prevAlerts.slice(0, 999)];
+      });
     });
 
     return unsubscribe;
