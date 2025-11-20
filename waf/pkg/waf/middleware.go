@@ -388,7 +388,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 				Blocked:           true,
 				BlockedBy:         "manual",
 			}
-			m.logger.Log(entry)
+			if err := m.logger.Log(entry); err != nil {
+				fmt.Printf("[ERROR] Failed to log manual block for IP %s: %v\n", clientIP, err)
+			}
 		}
 
 		// Send event to API backend
@@ -1099,7 +1101,7 @@ func (m *Middleware) loadWhitelistFromAPI() error {
 
 // reloadListsBackground periodically reloads blocklist/whitelist from API
 func (m *Middleware) reloadListsBackground() {
-	ticker := time.NewTicker(30 * time.Second) // Reload every 30 seconds
+	ticker := time.NewTicker(10 * time.Second) // Reload every 10 seconds
 	defer ticker.Stop()
 
 	for {
