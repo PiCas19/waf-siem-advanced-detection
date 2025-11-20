@@ -29,7 +29,7 @@ func isDefaultThreatType(threatType string) bool {
 }
 
 // NewGetLogsHandler returns security and audit logs with service layer
-func NewGetLogsHandler(logService *service.LogService, auditLogService *service.AuditLogService) gin.HandlerFunc {
+func NewGetLogsHandler(logService *service.LogService, auditLogService *service.AuditLogService, blocklistService *service.BlocklistService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := context.Background()
 
@@ -47,12 +47,38 @@ func NewGetLogsHandler(logService *service.LogService, auditLogService *service.
 			auditLogs = []models.AuditLog{}
 		}
 
-		// Normalize blockedBy for default threats
+		// Fetch all manually blocked IPs
+		var blockedIPsList []models.BlockedIP
+		blocklistResult, err := blocklistService.GetActiveBlockedIPs(ctx)
+		if err == nil {
+			blockedIPsList = blocklistResult // If successful, use the result
+		}
+
+		// Create a map of blocked IPs for quick lookup: "ip::threat" -> true
+		blockedMap := make(map[string]bool)
+		for _, blocked := range blockedIPsList {
+			key := blocked.IPAddress + "::" + blocked.Description
+			blockedMap[key] = true
+		}
+
+		// Normalize blockedBy for default threats and check manual blocks
 		// Default threats should always show blockedBy="auto" even if manually blocked
+		// Custom threats should show blockedBy="manual" if in the blocklist
 		// Also ensure Severity is always set
 		for i := range logs {
 			if isDefaultThreatType(logs[i].ThreatType) {
 				logs[i].BlockedBy = "auto"
+			} else {
+				// For custom threats, check if they're in the blocklist
+				key := logs[i].ClientIP + "::" + (logs[i].Description)
+				if logs[i].Description == "" {
+					key = logs[i].ClientIP + "::" + logs[i].ThreatType
+				}
+
+				if blockedMap[key] {
+					logs[i].BlockedBy = "manual"
+					logs[i].Blocked = true
+				}
 			}
 
 			// Ensure severity is always set (for backwards compatibility with old logs)
