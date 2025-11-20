@@ -73,19 +73,15 @@ export default function RulesContainer() {
           },
         });
 
-        console.log(`[DEBUG] Delete response status: ${response.status}, ok: ${response.ok}`);
-
         if (response.ok) {
           setCustomRules(customRules.filter(r => r.id !== id));
           setShowDetailsModal(false);
           showToast('Rule deleted successfully', 'success', 4000);
         } else {
           const errorData = await response.json();
-          console.error('[ERROR] Delete failed:', errorData);
           showToast('Error deleting rule: ' + (errorData.error || 'Unknown error'), 'error', 4000);
         }
       } catch (error) {
-        console.error('[ERROR] Delete exception:', error);
         showToast('Error deleting rule', 'error', 4000);
       }
     }

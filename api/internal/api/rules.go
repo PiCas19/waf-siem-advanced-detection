@@ -98,8 +98,6 @@ func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 			rule.Severity = "medium"
 		}
 
-		fmt.Printf("[DEBUG] Creating rule: Name=%s, Type=%s, Severity=%s, Action=%s\n", rule.Name, rule.Type, rule.Severity, rule.Action)
-
 		// If rule is in "detect" mode, disable all action types
 		if rule.Action == "log" {
 			rule.BlockEnabled = false
@@ -123,8 +121,6 @@ func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		}
 
 		LogRuleAction(db, userID.(uint), userEmail.(string), "CREATE_RULE", fmt.Sprintf("%d", rule.ID), rule.Name, details, clientIP.(string))
-
-		fmt.Printf("[INFO] Rule created: ID=%d, Name=%s, Type=%s, Severity=%s, Action=%s\n", rule.ID, rule.Name, rule.Type, rule.Severity, rule.Action)
 
 		c.JSON(201, gin.H{
 			"message": "Rule created successfully",
@@ -193,8 +189,6 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 
 		LogRuleAction(db, userID.(uint), userEmail.(string), "UPDATE_RULE", ruleID, rule.Name, details, clientIP.(string))
 
-		fmt.Printf("[INFO] Rule updated: ID=%d, Name=%s\n", rule.ID, rule.Name)
-
 		c.JSON(200, gin.H{
 			"message": "Rule updated successfully",
 			"rule":    rule,
@@ -238,8 +232,6 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 
 		LogRuleAction(db, userID.(uint), userEmail.(string), "DELETE_RULE", ruleID, ruleName, nil, clientIP.(string))
 
-		fmt.Printf("[INFO] Rule deleted: ID=%s\n", ruleID)
-
 		c.JSON(200, gin.H{"message": "Rule deleted successfully"})
 	}
 }
@@ -274,8 +266,6 @@ func NewToggleRuleHandler(ruleService *service.RuleService) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": "failed to toggle rule"})
 			return
 		}
-
-		fmt.Printf("[INFO] Rule toggled: ID=%d, Enabled=%v\n", rule.ID, enabled)
 
 		c.JSON(200, gin.H{
 			"message": "Rule toggled successfully",
