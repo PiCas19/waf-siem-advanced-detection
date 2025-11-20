@@ -79,7 +79,7 @@ func (r *GormLogRepository) Delete(ctx context.Context, id uint) error {
 
 func (r *GormLogRepository) UpdateByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error {
 	return r.db.WithContext(ctx).
-		Where("client_ip = ? AND description = ?", ip, description).
+		Where("client_ip = ? AND (threat_type = ? OR description = ?)", ip, description, description).
 		Updates(updates).Error
 }
 
