@@ -246,25 +246,46 @@ const StatsPage: React.FC = () => {
   useEffect(() => {
     const unsubscribe = onAlertReceived((alert: WAFEvent) => {
       setRecentAlerts(prevAlerts => {
-        // Check if we already have this alert locally
-        const existingIndex = prevAlerts.findIndex(a => a.ip === alert.ip && (a.description || a.threat) === (alert.description || alert.threat));
+        // Check if we already have this alert locally (by IP and threat/description)
+        const alertKey = `${alert.ip}::${alert.description || alert.threat}`;
+        const existingIndex = prevAlerts.findIndex(a => {
+          const existingKey = `${a.ip}::${a.description || a.threat}`;
+          return existingKey === alertKey;
+        });
 
-        // If we already have this alert locally and it's manually blocked, preserve the manual block status
+        // If we already have this alert, update it in place to avoid duplicates
+        // and preserve the manual block status if it was set
         if (existingIndex >= 0) {
           const existingAlert = prevAlerts[existingIndex];
+          const updated = [...prevAlerts];
+
+          // Preserve manual block status if it was previously set
           if (existingAlert.blockedBy === 'manual' && existingAlert.blocked === true) {
-            // Preserve manual block status - update the existing alert in place
-            const updated = [...prevAlerts];
             updated[existingIndex] = {
               ...alert,
               blocked: true,
               blockedBy: 'manual'
             };
-            return updated;
+          } else {
+            // Update with new data but keep other enrichment fields
+            updated[existingIndex] = {
+              ...alert,
+              // Preserve any enrichment data that already exists
+              ip_reputation: alert.ip_reputation || existingAlert.ip_reputation,
+              threat_level: alert.threat_level || existingAlert.threat_level,
+              country: alert.country || existingAlert.country,
+              asn: alert.asn || existingAlert.asn,
+              is_malicious: alert.is_malicious !== undefined ? alert.is_malicious : existingAlert.is_malicious,
+              threat_source: alert.threat_source || existingAlert.threat_source,
+              abuse_reports: alert.abuse_reports || existingAlert.abuse_reports,
+              is_on_blocklist: alert.is_on_blocklist !== undefined ? alert.is_on_blocklist : existingAlert.is_on_blocklist,
+              blocklist_name: alert.blocklist_name || existingAlert.blocklist_name,
+            };
           }
+          return updated;
         }
 
-        // New alert or existing alert without manual block - add to front
+        // New alert - add to front
         return [alert, ...prevAlerts.slice(0, 999)];
       });
     });
