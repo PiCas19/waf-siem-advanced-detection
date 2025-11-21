@@ -384,7 +384,7 @@ func logUnblockToWAF(ip, threat, severity, url, userAgent, payload string) {
 			UserAgent:       userAgent,
 			Payload:         payload,
 			Blocked:         false,
-			BlockedBy:       "",
+			BlockedBy:       "manual",
 		}
 
 		if err := wafLogger.Log(entry); err != nil {
