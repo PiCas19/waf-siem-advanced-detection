@@ -369,58 +369,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	}
 
 	// SECOND: Check blocklist - if blocked, handle immediately
-	if m.isIPBlocked(clientIP) {
-		// IP is on the blocklist, log and block it
-
-		// Extract request payload
-		payload := extractRequestPayload(r)
-
-		// Log the blocked request
-		if m.logger != nil {
-			entry := logger.LogEntry{
-				ThreatType:        "IP_BLOCKLIST",
-				Severity:          "CRITICAL",
-				Description:       "Manually blocked IP",
-				ClientIP:          clientIP,
-				ClientIPSource:    string(enhancedIPInfo.SourceType),
-				ClientIPTrusted:   enhancedIPInfo.TrustScore > 50,
-				ClientIPVPNReport: enhancedIPInfo.TailscaleIP,
-				Method:            r.Method,
-				URL:               strings.ReplaceAll(strings.ReplaceAll(r.URL.String(), "\n", " "), "\r", " "),
-				UserAgent:         strings.ReplaceAll(strings.ReplaceAll(r.UserAgent(), "\n", " "), "\r", " "),
-				Payload:           payload,
-				Blocked:           true,
-				BlockedBy:         "manual",
-			}
-			if err := m.logger.Log(entry); err != nil {
-				fmt.Printf("[ERROR] Failed to log manual block for IP %s: %v\n", clientIP, err)
-			}
-		}
-
-		// Send event to API backend
-		if m.APIEndpoint != "" {
-			go func() {
-				threat := &detector.Threat{
-					Type:               "IP_BLOCKLIST",
-					Severity:           "CRITICAL",
-					Description:        "Manually blocked IP",
-					ClientIP:           clientIP,
-					ClientIPSource:     ipextract.ClientIPSource(enhancedIPInfo.SourceType),
-					ClientIPTrusted:    enhancedIPInfo.TrustScore > 50,
-					ClientIPVPNReport:  enhancedIPInfo.TailscaleIP,
-					Payload:            payload,
-					IsDefault:          false,
-					Action:             "block",
-					BlockAction:        "block",
-				}
-				m.sendEventToAPIManualBlock(r, clientIP, threat, enhancedIPInfo)
-			}()
-		}
-
-		// Block the request
-		w.Header().Set("X-WAF-Blocked", "true")
-		w.Header().Set("X-WAF-Threat", "IP_BLOCKLIST")
-		w.Header().Set("X-WAF-Severity", "critical")
+	isBlocked, _ := m.isIPBlocked(clientIP, "")
+	if isBlocked {
+		// IP is on the blocklist, return 403 with no response body
 		w.WriteHeader(http.StatusForbidden)
 		return nil
 	}
@@ -1127,12 +1078,35 @@ func (m *Middleware) isIPWhitelisted(ip string) bool {
 }
 
 // isIPBlocked checks if an IP is in the blocklist cache
-// Returns true if IP is blocked, false otherwise
-func (m *Middleware) isIPBlocked(ip string) bool {
+// isIPBlocked checks if an IP is blocked for a specific threat description
+// If threatDescription is provided, checks IP+Description combination
+// If threatDescription is empty, checks if IP is blocked for any reason
+// Returns (isBlocked, blocklistEntry)
+func (m *Middleware) isIPBlocked(ip string, threatDescription string) (bool, *BlocklistEntry) {
 	m.blocklistLock.RLock()
 	defer m.blocklistLock.RUnlock()
-	_, exists := m.blocklist[ip]
-	return exists
+
+	entries, exists := m.blocklist[ip]
+	if !exists {
+		return false, nil
+	}
+
+	// If no specific threat description, check if blocked for any reason
+	if threatDescription == "" {
+		if len(entries) > 0 {
+			return true, &entries[0]
+		}
+		return false, nil
+	}
+
+	// Check if blocked specifically for this threat description
+	for i := range entries {
+		if entries[i].Description == threatDescription {
+			return true, &entries[i]
+		}
+	}
+
+	return false, nil
 }
 
 // extractRequestPayload reads the request body without consuming it
