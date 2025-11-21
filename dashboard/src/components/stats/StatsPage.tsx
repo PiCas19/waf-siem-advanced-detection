@@ -273,7 +273,9 @@ const StatsPage: React.FC = () => {
         }
 
         // Otherwise, add this alert as a new row (allows BLOCKED and DETECTED to coexist as separate rows)
-        return [alert, ...prevAlerts.slice(0, 999)];
+        const newAlerts = [alert, ...prevAlerts.slice(0, 999)];
+        // Force state update to trigger re-renders
+        return newAlerts;
       });
     });
 
