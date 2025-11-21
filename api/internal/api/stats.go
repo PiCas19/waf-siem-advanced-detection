@@ -222,6 +222,9 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		if ruleFromDB != nil {
 			severity = ruleFromDB.Severity
 			payload = ruleFromDB.Pattern // Pattern from rule
+			fmt.Printf("[DEBUG] Found rule in DB: Name=%s, Severity=%s, Payload length=%d\n", ruleFromDB.Name, severity, len(payload))
+		} else {
+			fmt.Printf("[DEBUG] No rule found in DB for threat=%s, using default severity\n", event.Threat)
 		}
 
 		// Update in-memory stats
