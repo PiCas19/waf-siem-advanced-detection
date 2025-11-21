@@ -55,6 +55,9 @@ func NewLogManualBlockHandler() gin.HandlerFunc {
 			ThreatType  string `json:"threat_type" binding:"required"`
 			Severity    string `json:"severity"`
 			Description string `json:"description"`
+			Payload     string `json:"payload"`
+			URL         string `json:"url"`
+			UserAgent   string `json:"user_agent"`
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -63,7 +66,7 @@ func NewLogManualBlockHandler() gin.HandlerFunc {
 		}
 
 		// Log the manual block to WAF logs
-		LogManualBlockToWAFLog(req.IP, req.ThreatType, req.Severity, req.Description)
+		LogManualBlockToWAFLog(req.IP, req.ThreatType, req.Severity, req.Description, req.Payload, req.URL, req.UserAgent)
 
 		c.JSON(200, gin.H{"message": "Manual block logged successfully"})
 	}
@@ -138,6 +141,29 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 		durationStr = fmt.Sprintf("%d hours", req.DurationHours)
 	}
 
+	// Get the most recent log for this IP and threat to extract payload, url, user-agent
+	logs, err := logService.GetLogsByIP(ctx, validatedIP)
+	var payload, url, userAgent, severity, description string
+	if err == nil && len(logs) > 0 {
+		// Find the most recent log matching the threat type
+		for _, log := range logs {
+			if log.ThreatType == req.Threat || log.Description == req.Threat {
+				payload = log.Payload
+				url = log.URL
+				userAgent = log.UserAgent
+				severity = log.Severity
+				description = log.Description
+				break
+			}
+		}
+	}
+
+	// If we didn't find specific threat info, use defaults
+	if description == "" {
+		description = req.Threat
+		severity = GetSeverityFromThreatType(req.Threat)
+	}
+
 	if err == nil && existingBlock != nil {
 		// Update existing block
 		blockedIP.ID = existingBlock.ID
@@ -163,12 +189,11 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 		if ue, ok := userEmail.(string); ok {
 			userEmailStr = ue
 		}
-		// Get severity and description for the threat
-		severity := GetSeverityFromThreatType(req.Threat)
-		description := req.Threat
-		reason := req.Reason
 
-		emitBlockedIPEvent(req.IP, req.Threat, severity, description, reason, durationStr, userEmailStr, c.ClientIP(), "success")
+		emitBlockedIPEvent(req.IP, req.Threat, severity, description, req.Reason, durationStr, userEmailStr, c.ClientIP(), "success")
+
+		// Log the manual block to WAF logs with complete threat info
+		LogManualBlockToWAFLog(validatedIP, req.Threat, severity, description, payload, url, userAgent)
 
 		c.JSON(201, gin.H{
 			"message": "IP blocked successfully",
@@ -200,6 +225,32 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 		c.JSON(500, gin.H{"error": "Failed to delete blocked IP"})
 		return
 	}
+
+	// Get the most recent log for this IP and threat to extract payload, url, user-agent
+	logs, err := logService.GetLogsByIP(ctx, ip)
+	var payload, url, userAgent, severity, description string
+	if err == nil && len(logs) > 0 {
+		// Find the most recent log matching the threat type
+		for _, log := range logs {
+			if log.ThreatType == threat || log.Description == threat {
+				payload = log.Payload
+				url = log.URL
+				userAgent = log.UserAgent
+				severity = log.Severity
+				description = log.Description
+				break
+			}
+		}
+	}
+
+	// If we didn't find specific threat info, use defaults
+	if description == "" {
+		description = threat
+		severity = GetSeverityFromThreatType(threat)
+	}
+
+	// Log the manual unblock to WAF logs
+	LogManualUnblockToWAFLog(ip, threat, severity, description, payload, url, userAgent)
 
 	c.JSON(200, gin.H{"message": "IP unblocked successfully", "ip": ip, "threat": threat})
 }
@@ -306,7 +357,7 @@ func emitBlockedIPEvent(ip, threatType, severity, description, reason, duration,
 }
 
 // LogManualBlockToWAFLog writes a manual block entry to waf_wan.log and waf_lan.log
-func LogManualBlockToWAFLog(ip, threatType, severity, description string) {
+func LogManualBlockToWAFLog(ip, threatType, severity, description, payload, url, userAgent string) {
 	logsDir := "/var/log/caddy"
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		log.Printf("[ERROR] Failed to create logs directory: %v\n", err)
@@ -321,9 +372,9 @@ func LogManualBlockToWAFLog(ip, threatType, severity, description string) {
 		"description":  description,
 		"client_ip":    ip,
 		"method":       "MANUAL_BLOCK",
-		"url":          "",
-		"user_agent":   "",
-		"payload":      "",
+		"url":          url,
+		"user_agent":   userAgent,
+		"payload":      payload,
 		"blocked":      true,
 		"blocked_by":   "manual",
 	}
@@ -353,4 +404,54 @@ func LogManualBlockToWAFLog(ip, threatType, severity, description string) {
 	}
 
 	log.Printf("[INFO] Manual block entry written to WAF logs: %s (threat: %s)\n", ip, threatType)
+}
+
+// LogManualUnblockToWAFLog writes a manual unblock entry to waf_wan.log and waf_lan.log
+func LogManualUnblockToWAFLog(ip, threatType, severity, description, payload, url, userAgent string) {
+	logsDir := "/var/log/caddy"
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		log.Printf("[ERROR] Failed to create logs directory: %v\n", err)
+		return
+	}
+
+	// Create log entry structure (simple JSON)
+	entry := map[string]interface{}{
+		"timestamp":    time.Now(),
+		"threat_type":  threatType,
+		"severity":     severity,
+		"description":  description,
+		"client_ip":    ip,
+		"method":       "MANUAL_UNBLOCK",
+		"url":          url,
+		"user_agent":   userAgent,
+		"payload":      payload,
+		"blocked":      false,
+		"blocked_by":   "",
+	}
+
+	// Marshal to JSON
+	data, err := json.Marshal(entry)
+	if err != nil {
+		log.Printf("[ERROR] Failed to marshal log entry: %v\n", err)
+		return
+	}
+
+	// Write to both waf_wan.log and waf_lan.log
+	for _, logFile := range []string{
+		logsDir + "/waf_wan.log",
+		logsDir + "/waf_lan.log",
+	} {
+		f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Printf("[ERROR] Failed to open log file %s: %v\n", logFile, err)
+			continue
+		}
+
+		if _, err := f.Write(append(data, '\n')); err != nil {
+			log.Printf("[ERROR] Failed to write to log file %s: %v\n", logFile, err)
+		}
+		f.Close()
+	}
+
+	log.Printf("[INFO] Manual unblock entry written to WAF logs: %s (threat: %s)\n", ip, threatType)
 }
