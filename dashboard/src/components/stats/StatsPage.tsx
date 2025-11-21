@@ -963,6 +963,7 @@ const StatsPage: React.FC = () => {
           const token = localStorage.getItem('authToken');
           const alert = recentAlerts.find(a => a.ip === pendingBlockIP && (a.description || a.threat) === pendingBlockDescription);
           if (alert) {
+            console.log('Alert for manual block logging:', alert);
             await fetch('/api/logs/manual-block', {
               method: 'POST',
               headers: {
@@ -972,7 +973,7 @@ const StatsPage: React.FC = () => {
               body: JSON.stringify({
                 ip: pendingBlockIP,
                 threat_type: alert.threat || pendingBlockDescription,
-                severity: 'medium',
+                severity: alert.threat_level || 'medium',
                 description: pendingBlockDescription,
                 url: alert.url || alert.path || '',
                 user_agent: alert.user_agent || '',
