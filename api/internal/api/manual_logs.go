@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/logger"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 )
 
 // LogManualBlockRequest represents a manual block event to be logged to WAF logs
@@ -80,7 +80,7 @@ func writeToWAFLogsManualBlock(req LogManualBlockRequest) error {
 	}
 
 	for _, logFilePath := range logFiles {
-		wafLogger, err := logger.NewLogger(logFilePath)
+		wafLogger, err := logger.NewWAFLogger(logFilePath)
 		if err != nil {
 			log.Printf("[WARN] Failed to initialize WAF logger for %s: %v\n", logFilePath, err)
 			continue
@@ -121,7 +121,7 @@ func writeToWAFLogsManualUnblock(req LogManualUnblockRequest) error {
 	}
 
 	for _, logFilePath := range logFiles {
-		wafLogger, err := logger.NewLogger(logFilePath)
+		wafLogger, err := logger.NewWAFLogger(logFilePath)
 		if err != nil {
 			log.Printf("[WARN] Failed to initialize WAF logger for %s: %v\n", logFilePath, err)
 			continue
