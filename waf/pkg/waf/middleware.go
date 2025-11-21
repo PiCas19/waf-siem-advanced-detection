@@ -382,7 +382,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 
 	if threat != nil {
 		// Check if this specific threat type is manually blocked for this IP
-		isManuallyBlocked, blockEntry := m.isIPBlocked(clientIP, threat.Type)
+		isManuallyBlocked, _ := m.isIPBlocked(clientIP, threat.Type)
 		if isManuallyBlocked {
 			// Log the threat as blocked by manual block
 			if m.logger != nil {
