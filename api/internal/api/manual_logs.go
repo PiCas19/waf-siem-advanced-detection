@@ -95,6 +95,9 @@ func writeToWAFLogsManualBlock(req LogManualBlockRequest) error {
 			ClientIP:        req.IP,
 			ClientIPSource:  "manual-block",
 			Method:          "MANUAL_BLOCK",
+			URL:             "",
+			UserAgent:       "",
+			Payload:         "",
 			Blocked:         true,
 			BlockedBy:       "manual",
 		}
@@ -129,15 +132,18 @@ func writeToWAFLogsManualUnblock(req LogManualUnblockRequest) error {
 		defer wafLogger.Close()
 
 		entry := logger.LogEntry{
-			Timestamp:      time.Now(),
-			ThreatType:     req.ThreatType,
-			Severity:       req.Severity,
-			Description:    req.Description,
-			ClientIP:       req.IP,
-			ClientIPSource: "manual-unblock",
-			Method:         "MANUAL_UNBLOCK",
-			Blocked:        false,
-			BlockedBy:      "",
+			Timestamp:       time.Now(),
+			ThreatType:      req.ThreatType,
+			Severity:        req.Severity,
+			Description:     req.Description,
+			ClientIP:        req.IP,
+			ClientIPSource:  "manual-unblock",
+			Method:          "MANUAL_UNBLOCK",
+			URL:             "",
+			UserAgent:       "",
+			Payload:         "",
+			Blocked:         false,
+			BlockedBy:       "",
 		}
 
 		if err := wafLogger.Log(entry); err != nil {
