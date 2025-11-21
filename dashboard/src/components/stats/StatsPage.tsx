@@ -25,6 +25,7 @@ interface WAFEvent {
   blocked: boolean;
   blockedBy?: string; // "auto" = automatically blocked by rule, "manual" = manually blocked by operator, "" = not blocked
   description?: string; // Rule name/description for per-rule blocking
+  payload?: string; // Detected threat payload
   // Da API logs endpoint
   id?: number;
   client_ip?: string;
