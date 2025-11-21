@@ -258,7 +258,9 @@ const StatsPage: React.FC = () => {
   // Registra callback per aggiornamenti real-time degli alert
   useEffect(() => {
     const unsubscribe = onAlertReceived((alert: WAFEvent) => {
+      console.log('📨 Alert received:', alert);
       setRecentAlerts(prevAlerts => {
+        console.log('📊 Previous alerts count:', prevAlerts.length);
         // Check if we already have a manually blocked alert for this IP and threat
         // If so, preserve the manual block status and don't add the new alert
         const manualBlockKey = `${alert.ip}::${alert.description || alert.threat}`;
@@ -269,11 +271,13 @@ const StatsPage: React.FC = () => {
 
         // If we found a manually blocked alert, preserve that status and don't add duplicate
         if (existingManualBlockIndex >= 0) {
+          console.log('⏭️ Skipping duplicate manual block');
           return prevAlerts;
         }
 
         // Otherwise, add this alert as a new row (allows BLOCKED and DETECTED to coexist as separate rows)
         const newAlerts = [alert, ...prevAlerts.slice(0, 999)];
+        console.log('✅ Updated alerts count:', newAlerts.length);
         // Force state update to trigger re-renders
         return newAlerts;
       });
