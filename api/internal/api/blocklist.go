@@ -177,6 +177,16 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 		return
 	}
 
+	// Emit unblocking event to SIEM
+	userEmail, _ := c.Get("user_email")
+	userEmailStr := "unknown"
+	if ue, ok := userEmail.(string); ok {
+		userEmailStr = ue
+	}
+
+	severity := GetSeverityFromThreatType(threat)
+	emitUnblockedIPEvent(ip, threat, severity, threat, userEmailStr, c.ClientIP(), "success")
+
 	c.JSON(200, gin.H{"message": "IP unblocked successfully", "ip": ip, "threat": threat})
 }
 
@@ -279,4 +289,46 @@ func emitBlockedIPEvent(ip, threatType, severity, description, reason, duration,
 	}
 
 	log.Printf("[INFO] Blocked IP event emitted: %s (threat: %s, duration: %s)\n", ip, threatType, duration)
+}
+
+// emitUnblockedIPEvent emits an unblocking event to the SIEM via log file
+func emitUnblockedIPEvent(ip, threatType, severity, description, operator, operatorIP, status string) {
+	// Create logs directory if it doesn't exist
+	logsDir := "/var/log/caddy"
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		log.Printf("[ERROR] Failed to create logs directory: %v\n", err)
+		return
+	}
+
+	// Initialize event logger for blocked IP events
+	eventLogPath := logsDir + "/blocked_ip_events.log"
+	eventLogger, err := logger.NewEventLogger(eventLogPath)
+	if err != nil {
+		log.Printf("[ERROR] Failed to initialize event logger: %v\n", err)
+		return
+	}
+	defer eventLogger.Close()
+
+	// Create the event with all available fields
+	event := logger.BlockedIPEvent{
+		Timestamp:   time.Now(),
+		EventType:   "ip_unblocked_manual",
+		IP:          ip,
+		ThreatType:  threatType,
+		Severity:    severity,
+		Description: description,
+		Reason:      "Manually unblocked",
+		Duration:    "unblocked",
+		Operator:    operator,
+		OperatorIP:  operatorIP,
+		Status:      status,
+	}
+
+	// Log the event
+	if err := eventLogger.LogBlockedIPEvent(event); err != nil {
+		log.Printf("[ERROR] Failed to log unblocked IP event: %v\n", err)
+		return
+	}
+
+	log.Printf("[INFO] Unblocked IP event emitted: %s (threat: %s)\n", ip, threatType)
 }
