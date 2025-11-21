@@ -443,6 +443,7 @@ const StatsPage: React.FC = () => {
             blocked: log.blocked,
             blockedBy: log.blocked_by || '', // "auto", "manual", or ""
             user_agent: log.user_agent,
+            payload: log.payload || '',
             description: log.description || log.threat_type,
             // IP Trust Score field
             ip_trust_score: log.ip_trust_score || undefined,
