@@ -349,17 +349,50 @@ const BlocklistPage: React.FC = () => {
 
     // Optimistic update: rimuovi dalla lista locale
     const backupList = blocklist;
+    const entry = blocklist.find(e => e.ip_address === ip && e.description === description);
     setBlocklist(blocklist.filter(entry => !(entry.ip_address === ip && entry.description === description)));
 
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`/api/blocklist/${ip}?threat=${encodeURIComponent(description)}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: '',
+          user_agent: '',
+          payload: '',
+        }),
       });
 
       if (response.ok) {
         showToast('Entry removed successfully', 'success', 4000);
+
+        // Log the manual unblock to WAF logs
+        try {
+          const token = localStorage.getItem('authToken');
+          await fetch('/api/logs/manual-unblock', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ip: ip,
+              threat_type: description,
+              severity: 'medium',
+              description: description,
+              url: '',
+              user_agent: '',
+              payload: '',
+            }),
+          });
+        } catch (logError) {
+          console.error('Failed to log manual unblock to WAF logs:', logError);
+          // Don't fail the whole operation if logging fails
+        }
       } else {
         // Rollback on error
         setBlocklist(backupList);
