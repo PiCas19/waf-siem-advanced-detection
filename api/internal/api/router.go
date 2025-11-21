@@ -46,7 +46,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		// Forgot password endpoints (public - no auth required)
 		public.POST("/auth/forgot-password", authHandler.ForgotPassword)
 		public.POST("/auth/reset-password", authHandler.ResetPassword)
-		public.POST("/waf/event", NewWAFEventHandler(logService, auditLogService))
+		public.POST("/waf/event", NewWAFEventHandler(logService, auditLogService, ruleService, blocklistService))
 		// WAF endpoint to fetch custom rules
 		public.GET("/waf/custom-rules", NewGetCustomRulesHandler(ruleService))
 		// WAF endpoint to fetch blocklist/whitelist

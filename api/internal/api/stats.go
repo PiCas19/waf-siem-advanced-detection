@@ -157,8 +157,28 @@ func GetSeverityFromThreatType(threatType string) string {
 	return "Medium" // Default severity for unknown threats
 }
 
+// getRuleByThreatName retrieves a rule from database by threat name/description
+func getRuleByThreatName(ruleService *service.RuleService, threatName string) *models.Rule {
+	ctx := context.Background()
+
+	allRules, err := ruleService.GetAllRules(ctx)
+	if err != nil {
+		fmt.Printf("[WARN] Failed to fetch rules from database: %v\n", err)
+		return nil
+	}
+
+	for _, rule := range allRules {
+		if rule.Name == threatName || rule.Description == threatName {
+			return &rule
+		}
+	}
+
+	fmt.Printf("[WARN] No rule found in database for threat: %s\n", threatName)
+	return nil
+}
+
 // NewWAFEventHandler creates a handler for WAF events with dependency injection
-func NewWAFEventHandler(logService *service.LogService, auditLogService *service.AuditLogService) gin.HandlerFunc {
+func NewWAFEventHandler(logService *service.LogService, auditLogService *service.AuditLogService, ruleService *service.RuleService, blocklistService *service.BlocklistService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var event websocket.WAFEvent
 		if err := c.ShouldBindJSON(&event); err != nil {
@@ -182,6 +202,28 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		event.Timestamp = time.Now().Format("2006-01-02T15:04:05Z07:00")
 		fmt.Printf("[INFO] Received event with BlockedBy=%s for threat=%s (blocked=%v)\n", event.BlockedBy, event.Threat, event.Blocked)
 
+		// Check if this IP is manually blocked for this threat
+		ctx := context.Background()
+		blockedIP, err := blocklistService.GetBlockedIPByIPAndDescription(ctx, event.IP, event.Threat)
+		isManuallyBlocked := err == nil && blockedIP != nil
+
+		// If manually blocked, override blocking info
+		if isManuallyBlocked {
+			event.Blocked = true
+			event.BlockedBy = "manual"
+			fmt.Printf("[INFO] IP %s is manually blocked for threat %s\n", event.IP, event.Threat)
+		}
+
+		// Fetch rule from database to get severity and payload
+		ruleFromDB := getRuleByThreatName(ruleService, event.Threat)
+		severity := "Medium" // Default
+		payload := ""        // Default empty
+
+		if ruleFromDB != nil {
+			severity = ruleFromDB.Severity
+			payload = ruleFromDB.Pattern // Pattern from rule
+		}
+
 		// Update in-memory stats
 		statsMu.Lock()
 	// ThreatsDetected = only detected threats (not blocked)
@@ -202,7 +244,7 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		stats.Recent = append(stats.Recent, event)
 		statsMu.Unlock()
 
-		// Create log model
+		// Create log model with severity and payload from database rule
 		log := models.Log{
 			ThreatType:        event.Threat,
 			Description:       event.Description,
@@ -210,11 +252,11 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 			Method:            event.Method,
 			URL:               event.Path,
 			UserAgent:         event.UA,
-			Payload:           event.Payload,
+			Payload:           payload,
 			CreatedAt:         time.Now(),
 			Blocked:           event.Blocked,
 			BlockedBy:         event.BlockedBy,
-			Severity:          GetSeverityFromThreatType(event.Threat),
+			Severity:          severity,
 			ClientIPSource:    event.IPSource,
 			ClientIPTrusted:   event.IPTrusted,
 			ClientIPVPNReport: event.IPVPNReport,
@@ -228,7 +270,6 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		}
 
 		// Save event using service layer
-		ctx := context.Background()
 		if err := logService.CreateLog(ctx, &log); err != nil {
 			fmt.Printf("[ERROR] Failed to save log: %v\n", err)
 			c.JSON(500, gin.H{"error": "failed to save event"})
