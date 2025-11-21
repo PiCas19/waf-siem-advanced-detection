@@ -59,7 +59,9 @@ func (h *WAFHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Log locally
-		h.logger.LogJSON(event)
+		if err := h.logger.LogJSON(event); err != nil {
+			fmt.Printf("[ERROR] Failed to log event: %v\n", err)
+		}
 
 		// Send to API endpoint asynchronously (non-blocking)
 		go h.sendEventToAPI(event)
