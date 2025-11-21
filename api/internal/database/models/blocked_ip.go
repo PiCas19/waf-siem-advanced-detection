@@ -18,6 +18,9 @@ type BlockedIP struct {
 	ExpiresAt   *time.Time `json:"expires_at"`
 	Permanent   bool      `gorm:"default:false" json:"permanent"`
 	AddedBy     uint      `json:"added_by"`
+	URL         string    `json:"url"`           // URL of the request that triggered the block
+	UserAgent   string    `json:"user_agent"`   // User agent of the request
+	Payload     string    `json:"payload"`      // Detected payload/threat content
 
 	// Composite unique index: same IP can be blocked for different rules
 	// :- (removed uniqueIndex from IPAddress, added composite index below)

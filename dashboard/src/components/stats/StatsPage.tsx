@@ -931,6 +931,7 @@ const StatsPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('authToken');
+      const alert = recentAlerts.find(a => a.ip === pendingBlockIP && (a.description || a.threat) === pendingBlockDescription);
       const resp = await fetch('/api/blocklist', {
         method: 'POST',
         headers: {
@@ -943,6 +944,9 @@ const StatsPage: React.FC = () => {
           reason: `Blocked threat: ${pendingBlockDescription}`,
           permanent: selectedDuration === 'permanent',
           duration_hours: durationHours,
+          url: alert?.url || alert?.path || '',
+          user_agent: alert?.user_agent || '',
+          payload: alert?.payload || '',
         }),
       });
 

@@ -59,6 +59,9 @@ interface BlockedEntry {
   created_at: string;
   expires_at: string | null;
   permanent: boolean;
+  url?: string;
+  user_agent?: string;
+  payload?: string;
 }
 
 interface WhitelistedEntry {
@@ -361,9 +364,9 @@ const BlocklistPage: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          url: '',
-          user_agent: '',
-          payload: '',
+          url: entry?.url || '',
+          user_agent: entry?.user_agent || '',
+          payload: entry?.payload || '',
         }),
       });
 
@@ -384,9 +387,9 @@ const BlocklistPage: React.FC = () => {
               threat_type: description,
               severity: 'medium',
               description: description,
-              url: '',
-              user_agent: '',
-              payload: '',
+              url: entry?.url || '',
+              user_agent: entry?.user_agent || '',
+              payload: entry?.payload || '',
             }),
           });
         } catch (logError) {
