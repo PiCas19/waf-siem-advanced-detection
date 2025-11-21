@@ -70,7 +70,9 @@ func NewGetLogsHandler(logService *service.LogService, auditLogService *service.
 		for i := range logs {
 			if isDefaultThreatType(logs[i].ThreatType) {
 				logs[i].BlockedBy = "auto"
-			} else {
+			} else if logs[i].BlockedBy != "auto" {
+				// For custom threats, only override BlockedBy if it's not already "auto"
+				// This preserves auto-blocked threats from being marked as manual
 				// For custom threats, check if they're in the blocklist
 				key := logs[i].ClientIP + "::" + (logs[i].Description)
 				if logs[i].Description == "" {
