@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -371,6 +372,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	if m.isIPBlocked(clientIP) {
 		// IP is on the blocklist, log and block it
 
+		// Extract request payload
+		payload := extractRequestPayload(r)
+
 		// Log the blocked request
 		if m.logger != nil {
 			entry := logger.LogEntry{
@@ -384,7 +388,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 				Method:            r.Method,
 				URL:               strings.ReplaceAll(strings.ReplaceAll(r.URL.String(), "\n", " "), "\r", " "),
 				UserAgent:         strings.ReplaceAll(strings.ReplaceAll(r.UserAgent(), "\n", " "), "\r", " "),
-				Payload:           "",
+				Payload:           payload,
 				Blocked:           true,
 				BlockedBy:         "manual",
 			}
@@ -404,7 +408,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 					ClientIPSource:     ipextract.ClientIPSource(enhancedIPInfo.SourceType),
 					ClientIPTrusted:    enhancedIPInfo.TrustScore > 50,
 					ClientIPVPNReport:  enhancedIPInfo.TailscaleIP,
-					Payload:            "",
+					Payload:            payload,
 					IsDefault:          false,
 					Action:             "block",
 					BlockAction:        "block",
@@ -1129,6 +1133,41 @@ func (m *Middleware) isIPBlocked(ip string) bool {
 	defer m.blocklistLock.RUnlock()
 	_, exists := m.blocklist[ip]
 	return exists
+}
+
+// extractRequestPayload reads the request body without consuming it
+// This is useful for logging and inspection purposes
+func extractRequestPayload(r *http.Request) string {
+	if r.Body == nil {
+		return ""
+	}
+
+	// Only read body for POST, PUT, PATCH requests
+	if r.Method != "POST" && r.Method != "PUT" && r.Method != "PATCH" {
+		return ""
+	}
+
+	// Read the body
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		fmt.Printf("[WARN] Failed to read request body: %v\n", err)
+		return ""
+	}
+
+	// Restore the body so it can be read again
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+	// Convert to string and limit size to prevent logging huge payloads
+	payload := string(bodyBytes)
+	const maxPayloadSize = 4096
+	if len(payload) > maxPayloadSize {
+		payload = payload[:maxPayloadSize] + "...(truncated)"
+	}
+
+	// Sanitize newlines and carriage returns
+	payload = strings.ReplaceAll(strings.ReplaceAll(payload, "\n", " "), "\r", " ")
+
+	return payload
 }
 
 // Interface guards
