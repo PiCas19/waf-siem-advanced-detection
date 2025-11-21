@@ -33,21 +33,21 @@ func GetBlocklist(blocklistService *service.BlocklistService) gin.HandlerFunc {
 }
 
 // NewBlockIPHandler - Factory function to create a handler for blocking IPs
-func NewBlockIPHandler(blocklistService *service.BlocklistService, logService *service.LogService) gin.HandlerFunc {
+func NewBlockIPHandler(blocklistService *service.BlocklistService, logService *service.LogService, ruleService *service.RuleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		BlockIPWithService(blocklistService, logService, c)
+		BlockIPWithService(blocklistService, logService, ruleService, c)
 	}
 }
 
 // NewUnblockIPHandler - Factory function to create a handler for unblocking IPs
-func NewUnblockIPHandler(blocklistService *service.BlocklistService, logService *service.LogService) gin.HandlerFunc {
+func NewUnblockIPHandler(blocklistService *service.BlocklistService, logService *service.LogService, ruleService *service.RuleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		UnblockIPWithService(blocklistService, logService, c)
+		UnblockIPWithService(blocklistService, logService, ruleService, c)
 	}
 }
 
 // BlockIPWithService - Blocks an IP for a specific rule/description
-func BlockIPWithService(blocklistService *service.BlocklistService, logService *service.LogService, c *gin.Context) {
+func BlockIPWithService(blocklistService *service.BlocklistService, logService *service.LogService, ruleService *service.RuleService, c *gin.Context) {
 	var req struct {
 		IP            string `json:"ip" binding:"required"`
 		Threat        string `json:"threat" binding:"required"` // Rule name/description (e.g., "Detect API Enumeration", "XSS")
@@ -121,8 +121,8 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 		durationStr = fmt.Sprintf("%d hours", req.DurationHours)
 	}
 
-	// Get severity for the threat
-	severity := GetSeverityFromThreatType(req.Threat)
+	// Get severity from the rule in the database
+	severity := GetRuleSeverity(ruleService, req.Threat)
 
 	if err == nil && existingBlock != nil {
 		// Update existing block
@@ -143,6 +143,13 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 			return
 		}
 
+		// Fetch the created block to get the actual stored values
+		createdBlock, err := blocklistService.GetBlockedIPByIPAndDescription(ctx, validatedIP, req.Threat)
+		if err != nil || createdBlock == nil {
+			c.JSON(500, gin.H{"error": "Failed to retrieve created block"})
+			return
+		}
+
 		// Emit blocking event to SIEM
 		userEmail, _ := c.Get("user_email")
 		userEmailStr := "unknown"
@@ -154,13 +161,13 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 
 		c.JSON(201, gin.H{
 			"message": "IP blocked successfully",
-			"entry":   blockedIP,
+			"entry":   createdBlock,
 		})
 	}
 }
 
 // UnblockIPWithService - Unblocks an IP for a specific rule/description
-func UnblockIPWithService(blocklistService *service.BlocklistService, logService *service.LogService, c *gin.Context) {
+func UnblockIPWithService(blocklistService *service.BlocklistService, logService *service.LogService, ruleService *service.RuleService, c *gin.Context) {
 	ip := c.Param("ip")
 	threat := c.Query("threat") // Get rule name from query string
 
@@ -183,14 +190,6 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 		return
 	}
 
-	// Parse optional body for logging details (URL, User Agent, Payload)
-	var unblockDetails struct {
-		URL       string `json:"url"`
-		UserAgent string `json:"user_agent"`
-		Payload   string `json:"payload"`
-	}
-	c.ShouldBindJSON(&unblockDetails)
-
 	// Emit unblocking event to SIEM
 	userEmail, _ := c.Get("user_email")
 	userEmailStr := "unknown"
@@ -198,11 +197,11 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 		userEmailStr = ue
 	}
 
-	severity := GetSeverityFromThreatType(threat)
+	severity := GetRuleSeverity(ruleService, threat)
 	emitUnblockedIPEvent(ip, threat, severity, threat, userEmailStr, c.ClientIP(), "success")
 
-	// Log to WAF logs with request details
-	logUnblockToWAF(ip, threat, severity, unblockDetails.URL, unblockDetails.UserAgent, unblockDetails.Payload)
+	// Log to WAF logs using data from the database BlockedIP record
+	logUnblockToWAF(ip, threat, severity, blockedIP.URL, blockedIP.UserAgent, blockedIP.Payload)
 
 	c.JSON(200, gin.H{"message": "IP unblocked successfully", "ip": ip, "threat": threat})
 }
@@ -264,6 +263,30 @@ func NewGetWhitelistForWAF(whitelistService *service.WhitelistService) func(*gin
 			"count":           len(whitelisted),
 		})
 	}
+}
+
+// GetRuleSeverity retrieves the severity from the rule in the database
+// Falls back to GetSeverityFromThreatType if rule not found
+func GetRuleSeverity(ruleService *service.RuleService, ruleName string) string {
+	ctx := context.Background()
+
+	// Try to find the rule by name
+	allRules, err := ruleService.GetAllRules(ctx)
+	if err != nil {
+		// Fall back to deriving severity from threat type
+		return GetSeverityFromThreatType(ruleName)
+	}
+
+	for _, rule := range allRules {
+		if rule.Name == ruleName {
+			if rule.Severity != "" {
+				return rule.Severity
+			}
+		}
+	}
+
+	// Fall back to deriving severity from threat type if not found
+	return GetSeverityFromThreatType(ruleName)
 }
 
 // emitBlockedIPEvent emits a blocking event to the SIEM via log file
