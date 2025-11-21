@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -43,6 +44,28 @@ func NewBlockIPHandler(blocklistService *service.BlocklistService, logService *s
 func NewUnblockIPHandler(blocklistService *service.BlocklistService, logService *service.LogService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		UnblockIPWithService(blocklistService, logService, c)
+	}
+}
+
+// NewLogManualBlockHandler - Factory function to create a handler for logging manual blocks to WAF logs
+func NewLogManualBlockHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			IP          string `json:"ip" binding:"required"`
+			ThreatType  string `json:"threat_type" binding:"required"`
+			Severity    string `json:"severity"`
+			Description string `json:"description"`
+		}
+
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid request"})
+			return
+		}
+
+		// Log the manual block to WAF logs
+		LogManualBlockToWAFLog(req.IP, req.ThreatType, req.Severity, req.Description)
+
+		c.JSON(200, gin.H{"message": "Manual block logged successfully"})
 	}
 }
 
@@ -280,4 +303,54 @@ func emitBlockedIPEvent(ip, threatType, severity, description, reason, duration,
 	}
 
 	log.Printf("[INFO] Blocked IP event emitted: %s (threat: %s, duration: %s)\n", ip, threatType, duration)
+}
+
+// LogManualBlockToWAFLog writes a manual block entry to waf_wan.log and waf_lan.log
+func LogManualBlockToWAFLog(ip, threatType, severity, description string) {
+	logsDir := "/var/log/caddy"
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		log.Printf("[ERROR] Failed to create logs directory: %v\n", err)
+		return
+	}
+
+	// Create log entry structure (simple JSON)
+	entry := map[string]interface{}{
+		"timestamp":    time.Now(),
+		"threat_type":  threatType,
+		"severity":     severity,
+		"description":  description,
+		"client_ip":    ip,
+		"method":       "MANUAL_BLOCK",
+		"url":          "",
+		"user_agent":   "",
+		"payload":      "",
+		"blocked":      true,
+		"blocked_by":   "manual",
+	}
+
+	// Marshal to JSON
+	data, err := json.Marshal(entry)
+	if err != nil {
+		log.Printf("[ERROR] Failed to marshal log entry: %v\n", err)
+		return
+	}
+
+	// Write to both waf_wan.log and waf_lan.log
+	for _, logFile := range []string{
+		logsDir + "/waf_wan.log",
+		logsDir + "/waf_lan.log",
+	} {
+		f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Printf("[ERROR] Failed to open log file %s: %v\n", logFile, err)
+			continue
+		}
+
+		if _, err := f.Write(append(data, '\n')); err != nil {
+			log.Printf("[ERROR] Failed to write to log file %s: %v\n", logFile, err)
+		}
+		f.Close()
+	}
+
+	log.Printf("[INFO] Manual block entry written to WAF logs: %s (threat: %s)\n", ip, threatType)
 }
