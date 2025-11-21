@@ -54,6 +54,9 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 		Reason        string `json:"reason" binding:"required"`
 		Permanent     bool   `json:"permanent"`
 		DurationHours int    `json:"duration_hours"` // Custom duration in hours (-1 for permanent)
+		URL           string `json:"url"`            // URL of the request
+		UserAgent     string `json:"user_agent"`    // User agent of the request
+		Payload       string `json:"payload"`       // Threat payload
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -93,6 +96,9 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 		Description: req.Threat,
 		Reason:      req.Reason,
 		Permanent:   req.Permanent || req.DurationHours == -1,
+		URL:         req.URL,
+		UserAgent:   req.UserAgent,
+		Payload:     req.Payload,
 	}
 
 	// Calculate expiration based on duration
