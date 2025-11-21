@@ -157,8 +157,9 @@ func GetSeverityFromThreatType(threatType string) string {
 	return "Medium" // Default severity for unknown threats
 }
 
-// getRuleByThreatName retrieves a rule from database by threat name/description
-func getRuleByThreatName(ruleService *service.RuleService, threatName string) *models.Rule {
+// getRuleByThreatName retrieves a rule from database by threat type
+// The WAF sends threat.Type which corresponds to rule.Type (e.g., "XSS", "SQL_INJECTION")
+func getRuleByThreatName(ruleService *service.RuleService, threatType string) *models.Rule {
 	ctx := context.Background()
 
 	allRules, err := ruleService.GetAllRules(ctx)
@@ -167,13 +168,21 @@ func getRuleByThreatName(ruleService *service.RuleService, threatName string) *m
 		return nil
 	}
 
+	// Search by Type first (primary match - what WAF sends)
 	for _, rule := range allRules {
-		if rule.Name == threatName || rule.Description == threatName {
+		if rule.Type == threatType {
 			return &rule
 		}
 	}
 
-	fmt.Printf("[WARN] No rule found in database for threat: %s\n", threatName)
+	// Fallback: search by Name or Description
+	for _, rule := range allRules {
+		if rule.Name == threatType || rule.Description == threatType {
+			return &rule
+		}
+	}
+
+	fmt.Printf("[WARN] No rule found in database for threat type: %s\n", threatType)
 	return nil
 }
 
