@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/dto"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 	"gorm.io/gorm"
 )
@@ -145,35 +146,81 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 			return
 		}
 
-		var updatedRule models.Rule
-		if err := c.ShouldBindJSON(&updatedRule); err != nil {
+		// Fetch existing rule first to preserve immutable fields
+		existingRule, err := ruleService.GetRuleByID(ctx, uint(id))
+		if err != nil {
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Rule not found", nil, clientIP.(string), err.Error())
+			if err.Error() == "rule not found" {
+				c.JSON(404, gin.H{"error": "Rule not found"})
+			} else {
+				c.JSON(500, gin.H{"error": "failed to retrieve rule"})
+			}
+			return
+		}
+
+		// Bind only the mutable fields from the request
+		var updateRequest dto.UpdateRuleRequest
+		if err := c.ShouldBindJSON(&updateRequest); err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Invalid request data format", nil, clientIP.(string), "Invalid JSON format")
 			c.JSON(400, gin.H{"error": "Invalid rule data"})
 			return
 		}
 
-		updatedRule.ID = uint(id)
+		// Build update map with only provided fields
+		updates := make(map[string]interface{})
 
-		// If rule is in "detect" mode, disable all action types
-		if updatedRule.Action == "log" {
-			updatedRule.BlockEnabled = false
-			updatedRule.DropEnabled = false
-			updatedRule.RedirectEnabled = false
-			updatedRule.ChallengeEnabled = false
+		if updateRequest.Name != "" {
+			updates["name"] = updateRequest.Name
+			existingRule.Name = updateRequest.Name
+		}
+		if updateRequest.Pattern != "" {
+			updates["pattern"] = updateRequest.Pattern
+			existingRule.Pattern = updateRequest.Pattern
+		}
+		if updateRequest.Description != "" {
+			updates["description"] = updateRequest.Description
+			existingRule.Description = updateRequest.Description
+		}
+		if updateRequest.Action != "" {
+			updates["action"] = updateRequest.Action
+			existingRule.Action = updateRequest.Action
 		}
 
-		if err := ruleService.UpdateRule(ctx, &updatedRule); err != nil {
+		// Always include boolean fields as they can be toggled
+		updates["enabled"] = updateRequest.Enabled
+		updates["block_enabled"] = updateRequest.BlockEnabled
+		updates["drop_enabled"] = updateRequest.DropEnabled
+		updates["redirect_enabled"] = updateRequest.RedirectEnabled
+		updates["challenge_enabled"] = updateRequest.ChallengeEnabled
+
+		existingRule.Enabled = updateRequest.Enabled
+		existingRule.BlockEnabled = updateRequest.BlockEnabled
+		existingRule.DropEnabled = updateRequest.DropEnabled
+		existingRule.RedirectEnabled = updateRequest.RedirectEnabled
+		existingRule.ChallengeEnabled = updateRequest.ChallengeEnabled
+
+		// If rule is in "detect" mode, disable all action types
+		if updateRequest.Action == "log" {
+			updates["block_enabled"] = false
+			updates["drop_enabled"] = false
+			updates["redirect_enabled"] = false
+			updates["challenge_enabled"] = false
+
+			existingRule.BlockEnabled = false
+			existingRule.DropEnabled = false
+			existingRule.RedirectEnabled = false
+			existingRule.ChallengeEnabled = false
+		}
+
+		// Update only specified fields in database
+		if err := db.WithContext(ctx).Model(&models.Rule{}).Where("id = ?", uint(id)).Updates(updates).Error; err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Failed to update rule", nil, clientIP.(string), err.Error())
-			if err.Error() == "rule not found" {
-				c.JSON(404, gin.H{"error": "Rule not found"})
-			} else {
-				fmt.Printf("[ERROR] Failed to update rule: %v\n", err)
-				c.JSON(500, gin.H{"error": "failed to update rule"})
-			}
+			fmt.Printf("[ERROR] Failed to update rule: %v\n", err)
+			c.JSON(500, gin.H{"error": "failed to update rule"})
 			return
 		}
 
-		// Fetch updated rule
+		// Fetch updated rule to ensure all fields are correct
 		rule, err := ruleService.GetRuleByID(ctx, uint(id))
 		if err != nil {
 			c.JSON(500, gin.H{"error": "failed to retrieve updated rule"})
