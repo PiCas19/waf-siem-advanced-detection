@@ -3,6 +3,7 @@ package logger
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -30,6 +31,13 @@ type EventLogger struct {
 
 // NewEventLogger creates a new event logger instance
 func NewEventLogger(filename string) (*EventLogger, error) {
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(filename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, err
+	}
+
+	// Open/create the log file
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, err

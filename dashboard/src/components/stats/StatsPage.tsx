@@ -920,8 +920,8 @@ const StatsPage: React.FC = () => {
       durationHours = selectedDuration as number;
     }
 
-    // Optimistic update: marca come blocked
-    setRecentAlerts(prev => prev.map(a => (a.ip === pendingBlockIP && (a.description || a.threat) === pendingBlockDescription ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
+    // Optimistic update: marca come blocked (only if it was not already blocked)
+    setRecentAlerts(prev => prev.map(a => (a.ip === pendingBlockIP && (a.description || a.threat) === pendingBlockDescription && !a.blocked ? { ...a, blocked: true, blockedBy: 'manual' } : a)));
 
     try {
       const token = localStorage.getItem('authToken');
