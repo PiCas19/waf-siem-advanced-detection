@@ -57,6 +57,7 @@ type BlocklistEntry struct {
 	IPAddress   string
 	Description string
 	Reason      string
+	Payload     string
 	Permanent   bool
 	ExpiresAt   *time.Time
 }
