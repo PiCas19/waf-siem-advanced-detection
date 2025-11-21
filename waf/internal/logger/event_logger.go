@@ -2,6 +2,7 @@ package logger
 
 import (
 	"encoding/json"
+	"os"
 	"time"
 )
 
@@ -41,7 +42,14 @@ func (l *Logger) LogBlockedIPEvent(event BlockedIPEvent) error {
 		return err
 	}
 
+	// Open file, write, and close (handles file recreation if deleted)
+	f, err := os.OpenFile(l.filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
 	// Write to file
-	_, err = l.file.Write(append(data, '\n'))
+	_, err = f.Write(append(data, '\n'))
 	return err
 }
