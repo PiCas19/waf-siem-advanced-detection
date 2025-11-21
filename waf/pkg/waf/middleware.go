@@ -381,6 +381,37 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	threat := m.detector.Inspect(r)
 
 	if threat != nil {
+		// Check if this specific threat type is manually blocked for this IP
+		isManuallyBlocked, blockEntry := m.isIPBlocked(clientIP, threat.Type)
+		if isManuallyBlocked {
+			// Log the threat as blocked by manual block
+			if m.logger != nil {
+				entry := logger.LogEntry{
+					ThreatType:        threat.Type,
+					Severity:          threat.Severity,
+					Description:       threat.Description,
+					ClientIP:          threat.ClientIP,
+					ClientIPSource:    string(threat.ClientIPSource),
+					ClientIPTrusted:   threat.ClientIPTrusted,
+					ClientIPVPNReport: threat.ClientIPVPNReport,
+					Method:            r.Method,
+					URL:               strings.ReplaceAll(strings.ReplaceAll(r.URL.String(), "\n", " "), "\r", " "),
+					UserAgent:         strings.ReplaceAll(strings.ReplaceAll(r.UserAgent(), "\n", " "), "\r", " "),
+					Payload:           strings.ReplaceAll(strings.ReplaceAll(threat.Payload, "\n", " "), "\r", " "),
+					Blocked:           true,
+					BlockedBy:         "manual", // Blocked by manual block
+				}
+				m.logger.Log(entry)
+			}
+			// Send event to API backend
+			if m.APIEndpoint != "" {
+				go m.sendEventToAPI(r, clientIP, threat, enhancedIPInfo)
+			}
+			// This threat type is manually blocked for this IP, return 403 with no response body
+			w.WriteHeader(http.StatusForbidden)
+			return nil
+		}
+
 		// Create a fingerprint of this request to detect retries
 		// Fingerprint = MD5(IP + method + path + threat_type) - WITHOUT payload
 		// This prevents duplicate logging when same threat type is detected in multiple request parameters
