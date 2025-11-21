@@ -7,7 +7,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
-	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/dto"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 	"gorm.io/gorm"
 )
@@ -158,8 +157,18 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 			return
 		}
 
-		// Bind only the mutable fields from the request
-		var updateRequest dto.UpdateRuleRequest
+		// Bind only the mutable fields from the request (without ID as it's from URI)
+		var updateRequest struct {
+			Name              string `json:"name"`
+			Pattern           string `json:"pattern"`
+			Description       string `json:"description"`
+			Action            string `json:"action"`
+			Enabled           bool   `json:"enabled"`
+			BlockEnabled      bool   `json:"block_enabled"`
+			DropEnabled       bool   `json:"drop_enabled"`
+			RedirectEnabled   bool   `json:"redirect_enabled"`
+			ChallengeEnabled  bool   `json:"challenge_enabled"`
+		}
 		if err := c.ShouldBindJSON(&updateRequest); err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Invalid request data format", nil, clientIP.(string), "Invalid JSON format")
 			c.JSON(400, gin.H{"error": "Invalid rule data"})
