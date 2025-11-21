@@ -969,6 +969,9 @@ const StatsPage: React.FC = () => {
                 threat_type: alert.threat || pendingBlockDescription,
                 severity: 'medium',
                 description: pendingBlockDescription,
+                url: alert.url || alert.path || '',
+                user_agent: alert.user_agent || '',
+                payload: alert.payload || '',
               }),
             });
           }
@@ -1009,12 +1012,19 @@ const StatsPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('authToken');
+      const alert = recentAlerts.find(a => a.ip === ip && (a.description || a.threat) === description);
+
       const resp = await fetch(`/api/blocklist/${ip}?threat=${encodeURIComponent(description)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          url: alert?.url || alert?.path || '',
+          user_agent: alert?.user_agent || '',
+          payload: alert?.payload || '',
+        }),
       });
 
       if (!resp.ok) {
@@ -1023,6 +1033,32 @@ const StatsPage: React.FC = () => {
         showToast('Error unblocking threat', 'error');
       } else {
         showToast('Threat unblocked successfully', 'success');
+
+        // Log the manual unblock to WAF logs
+        try {
+          const token = localStorage.getItem('authToken');
+          if (alert) {
+            await fetch('/api/logs/manual-unblock', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                ip: ip,
+                threat_type: alert.threat || description,
+                severity: alert.threat_level || 'medium',
+                description: description,
+                url: alert.url || alert.path || '',
+                user_agent: alert.user_agent || '',
+                payload: alert.payload || '',
+              }),
+            });
+          }
+        } catch (logError) {
+          console.error('Failed to log manual unblock to WAF logs:', logError);
+          // Don't fail the whole operation if logging fails
+        }
         // Don't trigger refresh - the optimistic update already removed the manual block status
       }
     } catch (e) {

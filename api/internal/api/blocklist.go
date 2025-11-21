@@ -177,6 +177,14 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 		return
 	}
 
+	// Parse optional body for logging details (URL, User Agent, Payload)
+	var unblockDetails struct {
+		URL       string `json:"url"`
+		UserAgent string `json:"user_agent"`
+		Payload   string `json:"payload"`
+	}
+	c.ShouldBindJSON(&unblockDetails)
+
 	// Emit unblocking event to SIEM
 	userEmail, _ := c.Get("user_email")
 	userEmailStr := "unknown"
@@ -187,8 +195,8 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 	severity := GetSeverityFromThreatType(threat)
 	emitUnblockedIPEvent(ip, threat, severity, threat, userEmailStr, c.ClientIP(), "success")
 
-	// Log to WAF logs
-	logUnblockToWAF(ip, threat, severity)
+	// Log to WAF logs with request details
+	logUnblockToWAF(ip, threat, severity, unblockDetails.URL, unblockDetails.UserAgent, unblockDetails.Payload)
 
 	c.JSON(200, gin.H{"message": "IP unblocked successfully", "ip": ip, "threat": threat})
 }
@@ -337,7 +345,7 @@ func emitUnblockedIPEvent(ip, threatType, severity, description, operator, opera
 }
 
 // logUnblockToWAF logs a manual unblock event to WAF log files
-func logUnblockToWAF(ip, threat, severity string) {
+func logUnblockToWAF(ip, threat, severity, url, userAgent, payload string) {
 	logsDir := "/var/log/caddy"
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		log.Printf("[WARN] Failed to create logs directory: %v\n", err)
@@ -366,9 +374,9 @@ func logUnblockToWAF(ip, threat, severity string) {
 			ClientIP:        ip,
 			ClientIPSource:  "manual-unblock",
 			Method:          "MANUAL_UNBLOCK",
-			URL:             "",
-			UserAgent:       "",
-			Payload:         "",
+			URL:             url,
+			UserAgent:       userAgent,
+			Payload:         payload,
 			Blocked:         false,
 			BlockedBy:       "",
 		}
