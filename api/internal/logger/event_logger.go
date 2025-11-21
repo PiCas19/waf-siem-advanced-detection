@@ -25,8 +25,8 @@ type BlockedIPEvent struct {
 
 // EventLogger handles logging of security events
 type EventLogger struct {
-	file  *os.File
-	mutex sync.Mutex
+	filename string
+	mutex    sync.Mutex
 }
 
 // NewEventLogger creates a new event logger instance
@@ -37,13 +37,14 @@ func NewEventLogger(filename string) (*EventLogger, error) {
 		return nil, err
 	}
 
-	// Open/create the log file
+	// Verify we can write to the file (open and close immediately)
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, err
 	}
+	f.Close() // Close immediately - we'll open on each write
 
-	return &EventLogger{file: f}, nil
+	return &EventLogger{filename: filename}, nil
 }
 
 // LogBlockedIPEvent scrive un evento di blocco manuale nel file di log
@@ -67,14 +68,25 @@ func (l *EventLogger) LogBlockedIPEvent(event BlockedIPEvent) error {
 		return err
 	}
 
+	// Create directory if it doesn't exist (in case it was deleted)
+	dir := filepath.Dir(l.filename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	// Open file, write, and close (handles file recreation if deleted)
+	f, err := os.OpenFile(l.filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
 	// Write to file
-	_, err = l.file.Write(append(data, '\n'))
+	_, err = f.Write(append(data, '\n'))
 	return err
 }
 
-// Close closes the log file
+// Close is a no-op for this implementation (file is closed after each write)
 func (l *EventLogger) Close() error {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-	return l.file.Close()
+	return nil
 }
