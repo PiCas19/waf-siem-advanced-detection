@@ -187,6 +187,9 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 	severity := GetSeverityFromThreatType(threat)
 	emitUnblockedIPEvent(ip, threat, severity, threat, userEmailStr, c.ClientIP(), "success")
 
+	// Log to WAF logs
+	logUnblockToWAF(ip, threat, severity)
+
 	c.JSON(200, gin.H{"message": "IP unblocked successfully", "ip": ip, "threat": threat})
 }
 
@@ -331,4 +334,47 @@ func emitUnblockedIPEvent(ip, threatType, severity, description, operator, opera
 	}
 
 	log.Printf("[INFO] Unblocked IP event emitted: %s (threat: %s)\n", ip, threatType)
+}
+
+// logUnblockToWAF logs a manual unblock event to WAF log files
+func logUnblockToWAF(ip, threat, severity string) {
+	logsDir := "/var/log/caddy"
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		log.Printf("[WARN] Failed to create logs directory: %v\n", err)
+		return
+	}
+
+	// Write to both WAN and LAN log files
+	logFiles := []string{
+		logsDir + "/waf_wan.log",
+		logsDir + "/waf_lan.log",
+	}
+
+	for _, logFilePath := range logFiles {
+		wafLogger, err := logger.NewWAFLogger(logFilePath)
+		if err != nil {
+			log.Printf("[WARN] Failed to initialize WAF logger for %s: %v\n", logFilePath, err)
+			continue
+		}
+		defer wafLogger.Close()
+
+		entry := logger.LogEntry{
+			Timestamp:       time.Now(),
+			ThreatType:      threat,
+			Severity:        severity,
+			Description:     threat,
+			ClientIP:        ip,
+			ClientIPSource:  "manual-unblock",
+			Method:          "MANUAL_UNBLOCK",
+			URL:             "",
+			UserAgent:       "",
+			Payload:         "",
+			Blocked:         false,
+			BlockedBy:       "",
+		}
+
+		if err := wafLogger.Log(entry); err != nil {
+			log.Printf("[WARN] Failed to log manual unblock to WAF file %s: %v\n", logFilePath, err)
+		}
+	}
 }

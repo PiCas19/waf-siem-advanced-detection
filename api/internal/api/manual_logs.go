@@ -16,6 +16,9 @@ type LogManualBlockRequest struct {
 	ThreatType  string `json:"threat_type" binding:"required"`
 	Severity    string `json:"severity"`
 	Description string `json:"description"`
+	URL         string `json:"url"`
+	UserAgent   string `json:"user_agent"`
+	Payload     string `json:"payload"`
 }
 
 // LogManualUnblockRequest represents a manual unblock event to be logged to WAF logs
@@ -24,6 +27,9 @@ type LogManualUnblockRequest struct {
 	ThreatType  string `json:"threat_type" binding:"required"`
 	Severity    string `json:"severity"`
 	Description string `json:"description"`
+	URL         string `json:"url"`
+	UserAgent   string `json:"user_agent"`
+	Payload     string `json:"payload"`
 }
 
 // NewLogManualBlockHandler handles logging of manual block events to WAF logs
@@ -95,9 +101,9 @@ func writeToWAFLogsManualBlock(req LogManualBlockRequest) error {
 			ClientIP:        req.IP,
 			ClientIPSource:  "manual-block",
 			Method:          "MANUAL_BLOCK",
-			URL:             "",
-			UserAgent:       "",
-			Payload:         "",
+			URL:             req.URL,
+			UserAgent:       req.UserAgent,
+			Payload:         req.Payload,
 			Blocked:         true,
 			BlockedBy:       "manual",
 		}
@@ -139,9 +145,9 @@ func writeToWAFLogsManualUnblock(req LogManualUnblockRequest) error {
 			ClientIP:        req.IP,
 			ClientIPSource:  "manual-unblock",
 			Method:          "MANUAL_UNBLOCK",
-			URL:             "",
-			UserAgent:       "",
-			Payload:         "",
+			URL:             req.URL,
+			UserAgent:       req.UserAgent,
+			Payload:         req.Payload,
 			Blocked:         false,
 			BlockedBy:       "",
 		}
