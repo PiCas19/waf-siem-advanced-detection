@@ -469,6 +469,7 @@ const StatsPage: React.FC = () => {
             enriched_at: log.enriched_at || null,
           }));
           setRecentAlerts(mappedLogs);
+          console.log('📊 Loaded', mappedLogs.length, 'threats from logs:', mappedLogs.map(l => `${l.ip}::${l.description || l.threat}`));
 
           // Load manually blocked threats from custom rules (not from logs)
           // A threat is "manually blocked" if there's a custom rule with is_manual_block=true
@@ -489,13 +490,17 @@ const StatsPage: React.FC = () => {
               console.log('📋 Loaded', customRules.length, 'custom rules and', defaultRules.length, 'default rules (total:', allRules.length, ')');
 
               const manuallyBlocked = new Map<string, number>();
+              console.log('🔍 Checking', customRules.length, 'custom rules for is_manual_block flag');
               customRules.forEach((rule: any) => {
+                console.log('  📌 Rule:', rule.name, '| is_manual_block:', rule.is_manual_block, '| type:', typeof rule.is_manual_block);
                 if (rule.is_manual_block) {
                   console.log('🔒 Found manual block rule:', rule.name, '(ID:', rule.id, ')');
                   // Extract threat description from rule name: "Manual Block: {description}"
                   // Match with logs to find which threats are manually blocked
+                  console.log('  🔎 Searching through', mappedLogs.length, 'logs to match this rule');
                   mappedLogs.forEach((log: WAFEvent) => {
-                    if (rule.name === `Manual Block: ${log.description || log.threat}`) {
+                    const expectedName = `Manual Block: ${log.description || log.threat}`;
+                    if (rule.name === expectedName) {
                       const key = `${log.ip}::${log.description || log.threat}`;
                       console.log('✅ Matched manual block rule to threat:', key, '-> Rule ID:', rule.id);
                       manuallyBlocked.set(key, rule.id);
@@ -503,7 +508,7 @@ const StatsPage: React.FC = () => {
                   });
                 }
               });
-              console.log('📋 Manually blocked threats:', manuallyBlocked.size);
+              console.log('📋 Total manually blocked threats found:', manuallyBlocked.size);
               setManuallyBlockedThreats(manuallyBlocked);
 
               // Update alerts to mark manually blocked threats with blockedBy='manual'
@@ -979,6 +984,9 @@ const StatsPage: React.FC = () => {
 
       // Crea una regola custom per bloccare questa minaccia
       // La regola blocca basandosi sul payload della minaccia
+      const ruleName = `Manual Block: ${description}`;
+      console.log('🛑 Creating manual block rule with name:', ruleName, 'for IP:', ip);
+
       const createRuleResp = await fetch('/api/rules', {
         method: 'POST',
         headers: {
@@ -986,7 +994,7 @@ const StatsPage: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: `Manual Block: ${description}`,
+          name: ruleName,
           pattern: alert.payload || '',
           type: 'Other', // Keep threat_type as "Other" (not MANUAL_*) to maintain original threat display
           severity: alert.threat_level || 'Medium',
@@ -1007,9 +1015,11 @@ const StatsPage: React.FC = () => {
       // Get the created rule to track it
       const createRuleData = await createRuleResp.json();
       const ruleId = createRuleData.id || createRuleData.rule?.id;
+      console.log('✅ Manual block rule created with ID:', ruleId, 'Full response:', createRuleData);
 
       // Track this manually blocked threat to filter out future auto-blocked matches
       const manualBlockKey = `${ip}::${description}`;
+      console.log('📌 Tracking manually blocked threat with key:', manualBlockKey, 'Rule ID:', ruleId);
       setManuallyBlockedThreats(prev => new Map(prev).set(manualBlockKey, ruleId));
 
       // Update the threat log to mark it as manually blocked

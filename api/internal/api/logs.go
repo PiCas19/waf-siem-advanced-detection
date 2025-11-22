@@ -126,10 +126,22 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 			"blocked_by": req.BlockedBy,
 		}
 
-		if err := logService.UpdateLogsByIPAndDescription(ctx, req.IP, req.Description, updates); err != nil {
-			log.Printf("[ERROR] Failed to update threat log: %v\n", err)
-			c.JSON(500, gin.H{"error": "Failed to update threat block status"})
-			return
+		// For manual blocking: only update detected (unblocked) threats to avoid double-updating
+		// For unblocking: update all threats with this IP+description
+		if req.Blocked && req.BlockedBy == "manual" {
+			// Manually blocking: update only detected threats (blocked=false)
+			if err := logService.UpdateDetectedLogsByIPAndDescription(ctx, req.IP, req.Description, updates); err != nil {
+				log.Printf("[ERROR] Failed to update detected threat log: %v\n", err)
+				c.JSON(500, gin.H{"error": "Failed to update threat block status"})
+				return
+			}
+		} else {
+			// Unblocking: update all threats with this IP+description, regardless of current blocked status
+			if err := logService.UpdateLogsByIPAndDescription(ctx, req.IP, req.Description, updates); err != nil {
+				log.Printf("[ERROR] Failed to update threat log: %v\n", err)
+				c.JSON(500, gin.H{"error": "Failed to update threat block status"})
+				return
+			}
 		}
 
 		log.Printf("[INFO] Threat log updated successfully\n")
