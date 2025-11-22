@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 	"gorm.io/gorm"
 )
@@ -78,17 +79,47 @@ func (r *GormLogRepository) Delete(ctx context.Context, id uint) error {
 }
 
 func (r *GormLogRepository) UpdateByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error {
-	return r.db.WithContext(ctx).
-		Where("client_ip = ? AND (threat_type = ? OR description = ?)", ip, description, description).
-		Updates(updates).Error
+	query := r.db.WithContext(ctx).
+		Where("client_ip = ? AND (threat_type = ? OR description = ?)", ip, description, description)
+
+	result := query.Updates(updates)
+
+	// Log for debugging
+	fmt.Printf("[INFO] UpdateByIPAndDescription: IP=%s, description=%s, RowsAffected=%d\n", ip, description, result.RowsAffected)
+	if result.RowsAffected == 0 {
+		fmt.Printf("[WARN] UpdateByIPAndDescription: No rows updated. Checking what logs exist for this IP...\n")
+		// Check what logs exist for this IP
+		var existingLogs []models.Log
+		r.db.WithContext(ctx).Where("client_ip = ?", ip).Find(&existingLogs)
+		fmt.Printf("[WARN] Found %d logs for IP %s:\n", len(existingLogs), ip)
+		for _, log := range existingLogs {
+			fmt.Printf("  - threat_type=%s, description=%s, blocked=%v\n", log.ThreatType, log.Description, log.Blocked)
+		}
+	}
+
+	return result.Error
 }
 
 // UpdateDetectedByIPAndDescription updates only DETECTED (not blocked) logs matching IP and description
 // This ensures that when manually blocking, we only update the detected threat, not the already-blocked ones
 func (r *GormLogRepository) UpdateDetectedByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error {
-	return r.db.WithContext(ctx).
-		Where("client_ip = ? AND (threat_type = ? OR description = ?) AND blocked = ?", ip, description, description, false).
-		Updates(updates).Error
+	query := r.db.WithContext(ctx).
+		Where("client_ip = ? AND (threat_type = ? OR description = ?) AND blocked = ?", ip, description, description, false)
+
+	result := query.Updates(updates)
+
+	// Log for debugging
+	if result.RowsAffected == 0 {
+		fmt.Printf("[WARN] UpdateDetectedByIPAndDescription: No rows updated for IP=%s, description=%s. Checking what exists...\n", ip, description)
+		// Check what logs exist for this IP
+		var existingLogs []models.Log
+		r.db.WithContext(ctx).Where("client_ip = ?", ip).Find(&existingLogs)
+		for _, log := range existingLogs {
+			fmt.Printf("  Existing log: threat_type=%s, description=%s, blocked=%v\n", log.ThreatType, log.Description, log.Blocked)
+		}
+	}
+
+	return result.Error
 }
 
 func (r *GormLogRepository) FindPaginated(ctx context.Context, offset int, limit int) ([]models.Log, int64, error) {
