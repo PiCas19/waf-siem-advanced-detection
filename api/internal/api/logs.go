@@ -99,12 +99,15 @@ func NewGetLogsHandler(logService *service.LogService, auditLogService *service.
 	}
 }
 
-// NewDeleteManualBlockLogHandler deletes the manual block log entry when unblocking a threat
-func NewDeleteManualBlockLogHandler(logService *service.LogService) gin.HandlerFunc {
+// NewUpdateThreatBlockStatusHandler updates the block status of a threat log
+// Used for manual blocking (sets blocked=true, blocked_by="manual") and unblocking
+func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			IP          string `json:"ip" binding:"required"`
 			Description string `json:"description" binding:"required"`
+			Blocked     bool   `json:"blocked"` // true to block, false to unblock
+			BlockedBy   string `json:"blocked_by"` // "manual" or ""
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -114,13 +117,17 @@ func NewDeleteManualBlockLogHandler(logService *service.LogService) gin.HandlerF
 
 		ctx := context.Background()
 
-		// Delete the manual block log entry (the one with blocked_by="manual" and method="MANUAL_BLOCK")
-		// This removes the "Blocked manually" status from the threat
-		if err := logService.DeleteManualBlockLog(ctx, req.IP, req.Description); err != nil {
-			c.JSON(500, gin.H{"error": "Failed to delete manual block log"})
+		// Update the threat log with the new block status
+		updates := map[string]interface{}{
+			"blocked":    req.Blocked,
+			"blocked_by": req.BlockedBy,
+		}
+
+		if err := logService.UpdateLogsByIPAndDescription(ctx, req.IP, req.Description, updates); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update threat block status"})
 			return
 		}
 
-		c.JSON(200, gin.H{"message": "Manual block log deleted successfully"})
+		c.JSON(200, gin.H{"message": "Threat block status updated successfully"})
 	}
 }

@@ -959,31 +959,24 @@ const StatsPage: React.FC = () => {
       const manualBlockKey = `${ip}::${description}`;
       setManuallyBlockedThreats(prev => new Map(prev).set(manualBlockKey, ruleId));
 
-      // NON aggiungere al blocklist generale!
-      // Il blocklist è solo per bloccare completamente un IP per un determinato periodo
-      // Qui stiamo solo creando una regola custom che blocca questa minaccia specifica
-
-      // Log the manual block to database for persistence
+      // Update the threat log to mark it as manually blocked
       try {
-        await fetch('/api/logs/manual-block', {
-          method: 'POST',
+        await fetch('/api/logs/threat-status', {
+          method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             ip: ip,
-            threat_type: alert.threat || description,
-            severity: alert.threat_level || 'Medium',
             description: description,
-            url: alert.url || alert.path || '',
-            user_agent: alert.user_agent || '',
-            payload: alert.payload || '',
+            blocked: true,
+            blocked_by: 'manual',
           }),
         });
       } catch (logError) {
-        console.error('Failed to log manual block to database:', logError);
-        // Don't fail the whole operation if logging fails
+        console.error('Failed to update threat block status:', logError);
+        // Don't fail the whole operation if update fails
       }
 
       showToast('Threat blocked successfully', 'success');
@@ -1064,72 +1057,35 @@ const StatsPage: React.FC = () => {
         // Don't fail the whole operation if rule search/delete fails
       }
 
-      // Also remove from blocklist if it exists
-      const resp = await fetch(`/api/blocklist/${ip}?threat=${encodeURIComponent(description)}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          url: alert?.url || alert?.path || '',
-          user_agent: alert?.user_agent || '',
-          payload: alert?.payload || '',
-        }),
-      });
+      // Update the threat log to mark it as unblocked (back to detected)
+      try {
+        const updateResp = await fetch('/api/logs/threat-status', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ip: ip,
+            description: description,
+            blocked: false,
+            blocked_by: '',
+          }),
+        });
 
-      if (!resp.ok) {
+        if (updateResp.ok) {
+          showToast('Threat unblocked successfully', 'success');
+          // Don't trigger refresh - the optimistic update already removed the manual block status
+        } else {
+          // rollback
+          setRecentAlerts(originalAlerts);
+          showToast('Error unblocking threat', 'error');
+        }
+      } catch (updateError) {
+        console.error('Failed to update threat unblock status:', updateError);
         // rollback
         setRecentAlerts(originalAlerts);
         showToast('Error unblocking threat', 'error');
-      } else {
-        showToast('Threat unblocked successfully', 'success');
-
-        // Log the manual unblock to WAF logs
-        try {
-          const token = localStorage.getItem('authToken');
-          if (alert) {
-            await fetch('/api/logs/manual-unblock', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                ip: ip,
-                threat_type: alert.threat || description,
-                severity: alert.threat_level || 'medium',
-                description: description,
-                url: alert.url || alert.path || '',
-                user_agent: alert.user_agent || '',
-                payload: alert.payload || '',
-              }),
-            });
-          }
-        } catch (logError) {
-          console.error('Failed to log manual unblock to database:', logError);
-          // Don't fail the whole operation if logging fails
-        }
-
-        // Delete the manual block log entry from database
-        try {
-          const token = localStorage.getItem('authToken');
-          await fetch('/api/logs/manual-block', {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              ip: ip,
-              description: description,
-            }),
-          });
-        } catch (deleteError) {
-          console.error('Failed to delete manual block log:', deleteError);
-          // Don't fail the whole operation if deletion fails
-        }
-        // Don't trigger refresh - the optimistic update already removed the manual block status
       }
     } catch (e) {
       // rollback
