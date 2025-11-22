@@ -974,7 +974,7 @@ const StatsPage: React.FC = () => {
 
       // Update the threat log to mark it as manually blocked
       try {
-        await fetch('/api/logs/threat-status', {
+        const updateResp = await fetch('/api/logs/threat-status', {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -987,6 +987,12 @@ const StatsPage: React.FC = () => {
             blocked_by: 'manual',
           }),
         });
+
+        if (!updateResp.ok) {
+          console.error('Failed to update threat block status:', updateResp.status, updateResp.statusText);
+        } else {
+          console.log('✅ Threat log updated successfully:', { ip, description, blocked: true, blocked_by: 'manual' });
+        }
       } catch (logError) {
         console.error('Failed to update threat block status:', logError);
         // Don't fail the whole operation if update fails
