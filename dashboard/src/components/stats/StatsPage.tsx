@@ -479,27 +479,37 @@ const StatsPage: React.FC = () => {
               },
             });
 
+            console.log('📋 Rules response status:', rulesResp.status);
+
             if (rulesResp.ok) {
               const rulesData = await rulesResp.json();
-              const rules = rulesData.rules || [];
+              const customRules = rulesData.custom_rules || [];
+              const defaultRules = rulesData.default_rules || [];
+              const allRules = [...defaultRules, ...customRules];
+              console.log('📋 Loaded', customRules.length, 'custom rules and', defaultRules.length, 'default rules (total:', allRules.length, ')');
 
               const manuallyBlocked = new Map<string, number>();
-              rules.forEach((rule: any) => {
+              customRules.forEach((rule: any) => {
                 if (rule.is_manual_block) {
+                  console.log('🔒 Found manual block rule:', rule.name, '(ID:', rule.id, ')');
                   // Extract threat description from rule name: "Manual Block: {description}"
                   // Match with logs to find which threats are manually blocked
                   mappedLogs.forEach((log: WAFEvent) => {
                     if (rule.name === `Manual Block: ${log.description || log.threat}`) {
                       const key = `${log.ip}::${log.description || log.threat}`;
+                      console.log('✅ Matched manual block rule to threat:', key, '-> Rule ID:', rule.id);
                       manuallyBlocked.set(key, rule.id);
                     }
                   });
                 }
               });
+              console.log('📋 Manually blocked threats:', manuallyBlocked.size);
               setManuallyBlockedThreats(manuallyBlocked);
+            } else {
+              console.error('❌ Failed to fetch rules:', rulesResp.status, rulesResp.statusText);
             }
           } catch (rulesError) {
-            console.error('Failed to load manual block rules:', rulesError);
+            console.error('❌ Failed to load manual block rules:', rulesError);
             // Don't fail if rules can't be loaded, just won't restore manually blocked state
           }
         } else {
