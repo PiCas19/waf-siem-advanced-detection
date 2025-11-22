@@ -56,7 +56,30 @@ func (crd *CustomRuleDetector) UpdateRules(rules []*CustomRule) error {
 	return nil
 }
 
-// DetectManualBlock checks if a value matches any MANUAL BLOCK custom rule (highest priority)
+// DetectBlocked checks if a value matches any CUSTOM RULE with action="block" (PRIORITY 2)
+// These are custom rules that have blocking enabled
+func (crd *CustomRuleDetector) DetectBlocked(value string) (matched *CustomRule) {
+	crd.mu.RLock()
+	defer crd.mu.RUnlock()
+
+	for _, rule := range crd.rules {
+		// Skip manual block rules and disabled rules
+		if !rule.Enabled || rule.IsManualBlock {
+			continue
+		}
+		// Only return rules with action="block" (not "log")
+		if rule.Action != "block" {
+			continue
+		}
+		if rule.regex != nil && rule.regex.MatchString(value) {
+			return rule
+		}
+	}
+	return nil
+}
+
+// DetectManualBlock checks if a value matches any MANUAL BLOCK custom rule (PRIORITY 3)
+// Manual block rules created by user from dashboard BLOCK action
 func (crd *CustomRuleDetector) DetectManualBlock(value string) (matched *CustomRule) {
 	crd.mu.RLock()
 	defer crd.mu.RUnlock()
@@ -72,7 +95,29 @@ func (crd *CustomRuleDetector) DetectManualBlock(value string) (matched *CustomR
 	return nil
 }
 
-// Detect checks if a value matches any custom rule (excluding manual block rules - they're checked separately)
+// DetectDetected checks if a value matches any CUSTOM RULE with action="log" (PRIORITY 4)
+// These are custom rules that only detect/log, not block
+func (crd *CustomRuleDetector) DetectDetected(value string) (matched *CustomRule) {
+	crd.mu.RLock()
+	defer crd.mu.RUnlock()
+
+	for _, rule := range crd.rules {
+		// Skip manual block rules and disabled rules
+		if !rule.Enabled || rule.IsManualBlock {
+			continue
+		}
+		// Only return rules with action="log" (not "block")
+		if rule.Action != "log" {
+			continue
+		}
+		if rule.regex != nil && rule.regex.MatchString(value) {
+			return rule
+		}
+	}
+	return nil
+}
+
+// Detect checks if a value matches any custom rule (DEPRECATED - use specific methods instead)
 func (crd *CustomRuleDetector) Detect(value string) (matched *CustomRule) {
 	crd.mu.RLock()
 	defer crd.mu.RUnlock()
