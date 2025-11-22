@@ -284,7 +284,13 @@ export default function RulesList({
                           </button>
                           <button
                             onClick={() => onEdit(rule)}
-                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
+                            disabled={(rule as any).is_manual_block === true}
+                            className={`px-3 py-1 rounded text-xs font-medium transition ${
+                              (rule as any).is_manual_block === true
+                                ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                : 'bg-green-600 hover:bg-green-700 text-white'
+                            }`}
+                            title={(rule as any).is_manual_block === true ? 'Manual block rules cannot be edited. Delete and recreate if needed.' : ''}
                           >
                             Edit
                           </button>

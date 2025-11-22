@@ -205,6 +205,18 @@ export default function RulesContainer() {
             </div>
 
             <div className="space-y-4">
+              {/* Manual Block Indicator */}
+              {(selectedRule as any).is_manual_block && (
+                <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-3">
+                  <p className="text-blue-300 text-sm font-medium">
+                    🔒 Manual Block Rule
+                  </p>
+                  <p className="text-blue-200 text-xs mt-1">
+                    This rule was created by manually blocking a threat from the dashboard. It cannot be edited directly.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <p className="text-sm text-gray-400">Description</p>
                 <p className="text-gray-300 mt-1">{selectedRule.description}</p>
