@@ -211,17 +211,7 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		event.Timestamp = time.Now().Format("2006-01-02T15:04:05Z07:00")
 		fmt.Printf("[INFO] Received event with BlockedBy=%s for threat=%s (blocked=%v)\n", event.BlockedBy, event.Threat, event.Blocked)
 
-		// Check if this IP is manually blocked for this threat
 		ctx := context.Background()
-		blockedIP, err := blocklistService.GetBlockedIPByIPAndDescription(ctx, event.IP, event.Threat)
-		isManuallyBlocked := err == nil && blockedIP != nil
-
-		// If manually blocked, override blocking info
-		if isManuallyBlocked {
-			event.Blocked = true
-			event.BlockedBy = "manual"
-			fmt.Printf("[INFO] IP %s is manually blocked for threat %s\n", event.IP, event.Threat)
-		}
 
 		// Fetch rule from database to get severity and payload
 		ruleFromDB := getRuleByThreatName(ruleService, event.Threat)
