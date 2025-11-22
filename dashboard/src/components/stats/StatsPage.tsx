@@ -921,7 +921,7 @@ const StatsPage: React.FC = () => {
         body: JSON.stringify({
           name: `Manual Block: ${description}`,
           pattern: alert.payload || '',
-          type: `MANUAL_${alert.threat || description}`,
+          type: 'Other', // Keep threat_type as "Other" (not MANUAL_*) to maintain original threat display
           severity: alert.threat_level || 'Medium',
           enabled: true,
           block_enabled: true,
@@ -1007,9 +1007,10 @@ const StatsPage: React.FC = () => {
         if (rulesResp.ok) {
           const rulesData = await rulesResp.json();
           const rules = rulesData.rules || [];
+          // Find manual block rule by name (Manual Block: {description})
           const manualBlockRule = rules.find((r: any) =>
             r.is_manual_block === true &&
-            r.type === `MANUAL_${description || alert?.threat}`
+            r.name === `Manual Block: ${description || alert?.threat}`
           );
 
           if (manualBlockRule) {
@@ -1829,9 +1830,9 @@ const StatsPage: React.FC = () => {
                               Blocked
                             </span>
                           ) : alert.blockedBy === 'manual' ? (
-                            <span className="px-3 py-1 bg-red-500/20 text-red-300 rounded text-xs font-medium inline-flex items-center gap-1">
+                            <span className="px-3 py-1 bg-orange-500/20 text-orange-300 rounded text-xs font-medium inline-flex items-center gap-1">
                               <Lock size={12} />
-                              Blocked
+                              Blocked manually
                             </span>
                           ) : (
                             <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium inline-flex items-center gap-1">
