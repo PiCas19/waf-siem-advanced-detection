@@ -131,6 +131,12 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 		}
 	}
 
+	// RULE DETECTION PRIORITY ORDER:
+	// 1. DEFAULT rules (XSS, SQLi, LFI, RFI, etc.) - highest priority
+	// 2. CUSTOM rules with action="block" - user-created blocking rules
+	// 3. MANUAL BLOCK rules - created by dashboard BLOCK action
+	// 4. DETECTED rules with action="log" - detection-only rules (lowest priority)
+
 	// PRIORITY 1: Check default detectors FIRST - they have highest priority
 	if detected, desc := d.xss.Detect(value); detected {
 		return createThreat("XSS", desc, "HIGH")
