@@ -1080,12 +1080,14 @@ const StatsPage: React.FC = () => {
 
         if (rulesResp.ok) {
           const rulesData = await rulesResp.json();
-          const rules = rulesData.rules || [];
+          const customRules = rulesData.custom_rules || [];
+          console.log('🔍 Searching for manual block rule in', customRules.length, 'custom rules');
           // Find manual block rule by name (Manual Block: {description})
-          const manualBlockRule = rules.find((r: any) =>
+          const manualBlockRule = customRules.find((r: any) =>
             r.is_manual_block === true &&
             r.name === `Manual Block: ${description || alert?.threat}`
           );
+          console.log(manualBlockRule ? '✅ Found manual block rule to delete:' : '❌ Manual block rule not found:', manualBlockRule?.name);
 
           if (manualBlockRule) {
             // Delete the manual block rule
