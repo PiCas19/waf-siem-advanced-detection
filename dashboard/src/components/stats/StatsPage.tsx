@@ -911,9 +911,7 @@ const StatsPage: React.FC = () => {
       }
 
       // Crea una regola custom per bloccare questa minaccia
-      // La regola blocca basandosi su: threat_type, method, URL, payload, IP, user_agent
-      const threatKey = `${alert.threat || description}::${alert.method}::${alert.url || alert.path}`;
-
+      // La regola blocca basandosi sul payload della minaccia
       const createRuleResp = await fetch('/api/rules', {
         method: 'POST',
         headers: {
