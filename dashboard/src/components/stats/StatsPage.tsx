@@ -996,6 +996,46 @@ const StatsPage: React.FC = () => {
       const token = localStorage.getItem('authToken');
       const alert = recentAlerts.find(a => a.ip === ip && (a.description || a.threat) === description);
 
+      // Find and delete the manual block rule
+      // Manual block rules are created with type=MANUAL_${description} and is_manual_block=true
+      try {
+        const rulesResp = await fetch('/api/rules', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (rulesResp.ok) {
+          const rulesData = await rulesResp.json();
+          const rules = rulesData.rules || [];
+          const manualBlockRule = rules.find((r: any) =>
+            r.is_manual_block === true &&
+            r.type === `MANUAL_${description || alert?.threat}`
+          );
+
+          if (manualBlockRule) {
+            // Delete the manual block rule
+            const deleteResp = await fetch(`/api/rules/${manualBlockRule.id}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (!deleteResp.ok) {
+              console.warn('Failed to delete manual block rule:', deleteResp.statusText);
+              // Don't fail the whole operation if rule deletion fails
+            }
+          }
+        }
+      } catch (ruleError) {
+        console.warn('Error finding/deleting manual block rule:', ruleError);
+        // Don't fail the whole operation if rule search/delete fails
+      }
+
+      // Also remove from blocklist if it exists
       const resp = await fetch(`/api/blocklist/${ip}?threat=${encodeURIComponent(description)}`, {
         method: 'DELETE',
         headers: {
