@@ -131,41 +131,7 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 		}
 	}
 
-	// PRIORITY 1: Check MANUAL BLOCK rules first - they have highest priority
-	// Manual block rules take precedence over everything else
-	if manualBlockRule := d.customRules.DetectManualBlock(value); manualBlockRule != nil {
-		blockAction := "none"
-		if manualBlockRule.BlockEnabled {
-			blockAction = "block"
-		} else if manualBlockRule.DropEnabled {
-			blockAction = "drop"
-		} else if manualBlockRule.RedirectEnabled {
-			blockAction = "redirect"
-		} else if manualBlockRule.ChallengeEnabled {
-			blockAction = "challenge"
-		}
-
-		return &Threat{
-			Type:              manualBlockRule.Type,
-			Description:       manualBlockRule.Name,
-			Severity:          manualBlockRule.Severity,
-			ClientIP:          ipInfo.IP,
-			ClientIPSource:    ipInfo.Source,
-			ClientIPTrusted:   ipInfo.IsTrusted,
-			ClientIPVPNReport: ipInfo.IsVPNTailscale,
-			Payload:           value,
-			IsDefault:         false,
-			Action:            manualBlockRule.Action,
-			BlockAction:       blockAction,
-			RedirectURL:       manualBlockRule.RedirectURL,
-			BlockEnabled:      manualBlockRule.BlockEnabled,
-			DropEnabled:       manualBlockRule.DropEnabled,
-			RedirectEnabled:   manualBlockRule.RedirectEnabled,
-			ChallengeEnabled:  manualBlockRule.ChallengeEnabled,
-		}
-	}
-
-	// PRIORITY 2: Check default detectors
+	// PRIORITY 1: Check default detectors FIRST - they have highest priority
 	if detected, desc := d.xss.Detect(value); detected {
 		return createThreat("XSS", desc, "HIGH")
 	}
@@ -206,9 +172,9 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 		return createThreat("PROTOTYPE_POLLUTION", desc, "HIGH")
 	}
 
-	// PRIORITY 3: Check custom rules (non-manual-block rules)
-	if customRule := d.customRules.Detect(value); customRule != nil {
-		// Determine BlockAction based on which flag is enabled
+	// PRIORITY 2: Check custom rules with action="block" (blocked custom rules)
+	// These are checked before manual block rules
+	if customRule := d.customRules.DetectBlocked(value); customRule != nil {
 		blockAction := "none"
 		if customRule.BlockEnabled {
 			blockAction = "block"
@@ -229,8 +195,75 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 			ClientIPTrusted:   ipInfo.IsTrusted,
 			ClientIPVPNReport: ipInfo.IsVPNTailscale,
 			Payload:           value,
-			IsDefault:         false, // Mark as custom rule
-			Action:            customRule.Action, // "log" or "block"
+			IsDefault:         false,
+			Action:            customRule.Action,
+			BlockAction:       blockAction,
+			RedirectURL:       customRule.RedirectURL,
+			BlockEnabled:      customRule.BlockEnabled,
+			DropEnabled:       customRule.DropEnabled,
+			RedirectEnabled:   customRule.RedirectEnabled,
+			ChallengeEnabled:  customRule.ChallengeEnabled,
+		}
+	}
+
+	// PRIORITY 3: Check MANUAL BLOCK rules (blocked manually by user)
+	if manualBlockRule := d.customRules.DetectManualBlock(value); manualBlockRule != nil {
+		blockAction := "none"
+		if manualBlockRule.BlockEnabled {
+			blockAction = "block"
+		} else if manualBlockRule.DropEnabled {
+			blockAction = "drop"
+		} else if manualBlockRule.RedirectEnabled {
+			blockAction = "redirect"
+		} else if manualBlockRule.ChallengeEnabled {
+			blockAction = "challenge"
+		}
+
+		return &Threat{
+			Type:              manualBlockRule.Type,
+			Description:       manualBlockRule.Name,
+			Severity:          manualBlockRule.Severity,
+			ClientIP:          ipInfo.IP,
+			ClientIPSource:    ipInfo.Source,
+			ClientIPTrusted:   ipInfo.IsTrusted,
+			ClientIPVPNReport: ipInfo.IsVPNTailscale,
+			Payload:           value,
+			IsDefault:         false,
+			Action:            manualBlockRule.Action,
+			BlockAction:       blockAction,
+			RedirectURL:       manualBlockRule.RedirectURL,
+			BlockEnabled:      manualBlockRule.BlockEnabled,
+			DropEnabled:       manualBlockRule.DropEnabled,
+			RedirectEnabled:   manualBlockRule.RedirectEnabled,
+			ChallengeEnabled:  manualBlockRule.ChallengeEnabled,
+		}
+	}
+
+	// PRIORITY 4: Check custom rules with action="log" (detected custom rules)
+	// These are checked last - only for detection, not blocking
+	if customRule := d.customRules.DetectDetected(value); customRule != nil {
+		blockAction := "none"
+		if customRule.BlockEnabled {
+			blockAction = "block"
+		} else if customRule.DropEnabled {
+			blockAction = "drop"
+		} else if customRule.RedirectEnabled {
+			blockAction = "redirect"
+		} else if customRule.ChallengeEnabled {
+			blockAction = "challenge"
+		}
+
+		return &Threat{
+			Type:              customRule.Type,
+			Description:       customRule.Name,
+			Severity:          customRule.Severity,
+			ClientIP:          ipInfo.IP,
+			ClientIPSource:    ipInfo.Source,
+			ClientIPTrusted:   ipInfo.IsTrusted,
+			ClientIPVPNReport: ipInfo.IsVPNTailscale,
+			Payload:           value,
+			IsDefault:         false,
+			Action:            customRule.Action,
 			BlockAction:       blockAction,
 			RedirectURL:       customRule.RedirectURL,
 			BlockEnabled:      customRule.BlockEnabled,
