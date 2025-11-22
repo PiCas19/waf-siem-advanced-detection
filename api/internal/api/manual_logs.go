@@ -1,13 +1,17 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
 
 // LogManualBlockRequest represents a manual block event to be logged to WAF logs
@@ -32,8 +36,8 @@ type LogManualUnblockRequest struct {
 	Payload     string `json:"payload"`
 }
 
-// NewLogManualBlockHandler handles logging of manual block events to WAF logs
-func NewLogManualBlockHandler() gin.HandlerFunc {
+// NewLogManualBlockHandler handles logging of manual block events to WAF logs and database
+func NewLogManualBlockHandler(logService *service.LogService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LogManualBlockRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -46,6 +50,27 @@ func NewLogManualBlockHandler() gin.HandlerFunc {
 			log.Printf("[ERROR] Failed to write manual block to WAF logs: %v\n", err)
 			c.JSON(500, gin.H{"error": "Failed to log event"})
 			return
+		}
+
+		// Also save to database for persistence
+		ctx := context.Background()
+		logEntry := &models.Log{
+			ThreatType:    req.ThreatType,
+			Severity:      req.Severity,
+			Description:   req.Description,
+			ClientIP:      req.IP,
+			Method:        "MANUAL_BLOCK",
+			URL:           req.URL,
+			UserAgent:     req.UserAgent,
+			Payload:       req.Payload,
+			Blocked:       true,
+			BlockedBy:     "manual",
+			CreatedAt:     time.Now(),
+		}
+
+		if err := logService.CreateLog(ctx, logEntry); err != nil {
+			log.Printf("[WARN] Failed to save manual block to database: %v\n", err)
+			// Don't fail the whole operation if database save fails
 		}
 
 		c.JSON(201, gin.H{"message": "Manual block logged successfully"})
