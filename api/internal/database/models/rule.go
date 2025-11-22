@@ -27,4 +27,7 @@ type Rule struct {
 	RedirectEnabled   bool   `gorm:"default:false" json:"redirect_enabled"`   // Redirect - Redirect to security page
 	ChallengeEnabled  bool   `gorm:"default:false" json:"challenge_enabled"`  // Challenge - Require CAPTCHA verification
 	RedirectURL       string `json:"redirect_url"`                             // URL to redirect to
+
+	// Manual block flag - created by manual block action, cannot be edited
+	IsManualBlock bool `gorm:"default:false" json:"is_manual_block"` // True if created by manual threat blocking
 }

@@ -157,6 +157,13 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 			return
 		}
 
+		// Check if this is a manual block rule - cannot be edited
+		if existingRule.IsManualBlock {
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Cannot edit manual block rule", nil, clientIP.(string), "Manual block rules cannot be edited")
+			c.JSON(403, gin.H{"error": "Manual block rules cannot be edited. Delete and recreate if needed."})
+			return
+		}
+
 		// Bind only the mutable fields from the request (without ID as it's from URI)
 		var updateRequest struct {
 			Name              string `json:"name"`

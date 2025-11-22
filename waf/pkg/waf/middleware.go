@@ -253,6 +253,7 @@ func (m *Middleware) loadCustomRulesFromAPI() error {
 		RedirectEnabled  bool   `json:"redirect_enabled"`
 		ChallengeEnabled bool   `json:"challenge_enabled"`
 		RedirectURL      string `json:"redirect_url"`
+		IsManualBlock    bool   `json:"is_manual_block"` // Manual block rules have priority
 	}
 
 	type APIResponse struct {
@@ -281,6 +282,7 @@ func (m *Middleware) loadCustomRulesFromAPI() error {
 			RedirectEnabled:  rule.RedirectEnabled,
 			ChallengeEnabled: rule.ChallengeEnabled,
 			RedirectURL:      rule.RedirectURL,
+			IsManualBlock:    rule.IsManualBlock,
 		})
 	}
 

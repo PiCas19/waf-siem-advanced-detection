@@ -19,6 +19,7 @@ type CustomRule struct {
 	RedirectEnabled   bool   // True if redirect action is selected
 	ChallengeEnabled  bool   // True if challenge action is selected
 	RedirectURL       string // URL to redirect to (if RedirectEnabled is true)
+	IsManualBlock     bool   // True if created by manual threat blocking - has priority over "log-only" detected rules
 	regex             *regexp.Regexp
 }
 
@@ -55,13 +56,29 @@ func (crd *CustomRuleDetector) UpdateRules(rules []*CustomRule) error {
 	return nil
 }
 
-// Detect checks if a value matches any custom rule
+// DetectManualBlock checks if a value matches any MANUAL BLOCK custom rule (highest priority)
+func (crd *CustomRuleDetector) DetectManualBlock(value string) (matched *CustomRule) {
+	crd.mu.RLock()
+	defer crd.mu.RUnlock()
+
+	for _, rule := range crd.rules {
+		if !rule.Enabled || !rule.IsManualBlock {
+			continue
+		}
+		if rule.regex != nil && rule.regex.MatchString(value) {
+			return rule
+		}
+	}
+	return nil
+}
+
+// Detect checks if a value matches any custom rule (excluding manual block rules - they're checked separately)
 func (crd *CustomRuleDetector) Detect(value string) (matched *CustomRule) {
 	crd.mu.RLock()
 	defer crd.mu.RUnlock()
 
 	for _, rule := range crd.rules {
-		if !rule.Enabled {
+		if !rule.Enabled || rule.IsManualBlock {
 			continue
 		}
 		if rule.regex != nil && rule.regex.MatchString(value) {
