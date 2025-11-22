@@ -1861,7 +1861,41 @@ const StatsPage: React.FC = () => {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex gap-1">
-                            {isDefaultThreat(alert.threat) ? (
+                            {alert.blockedBy === 'manual' ? (
+                              // Custom threat manually blocked by operator - show Unblock + Report FP buttons
+                              <>
+                                <button
+                                  onClick={() => handleUnblockThreat(alert.ip, alert.description || alert.threat)}
+                                  disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canUnblockThreats}
+                                  className={`px-2 py-1 rounded text-xs font-medium transition ${
+                                    !canUnblockThreats
+                                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                      : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-green-600 hover:bg-green-700 text-white'
+                                  }`}
+                                  title={!canUnblockThreats ? 'You do not have permission to unblock threats' : ''}
+                                >
+                                  {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Unblock'}
+                                </button>
+                                {!reportedFalsePositives.has(getAlertKey(alert.ip, alert.description || alert.threat)) && (
+                                  <button
+                                    onClick={() => handleReportFalsePositive(alert)}
+                                    disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canReportFalsePositives}
+                                    className={`px-2 py-1 rounded text-xs font-medium transition whitespace-nowrap ${
+                                      !canReportFalsePositives
+                                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                        : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                                    }`}
+                                    title={!canReportFalsePositives ? 'You do not have permission to report false positives' : 'Report this as a false positive'}
+                                  >
+                                    {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Report FP'}
+                                  </button>
+                                )}
+                              </>
+                            ) : isDefaultThreat(alert.threat) ? (
                               // Default threats (XSS, SQLi, etc.) are ALWAYS auto-blocked - show Report FP button only
                               reportedFalsePositives.has(getAlertKey(alert.ip, alert.description || alert.threat)) ? null : (
                                 <button
@@ -1897,40 +1931,6 @@ const StatsPage: React.FC = () => {
                                   {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Report FP'}
                                 </button>
                               )
-                            ) : alert.blockedBy === 'manual' ? (
-                              // Custom threat manually blocked by operator - show Unblock + Report FP buttons
-                              <>
-                                <button
-                                  onClick={() => handleUnblockThreat(alert.ip, alert.description || alert.threat)}
-                                  disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canUnblockThreats}
-                                  className={`px-2 py-1 rounded text-xs font-medium transition ${
-                                    !canUnblockThreats
-                                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                      : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
-                                      ? 'bg-blue-600 text-white'
-                                      : 'bg-green-600 hover:bg-green-700 text-white'
-                                  }`}
-                                  title={!canUnblockThreats ? 'You do not have permission to unblock threats' : ''}
-                                >
-                                  {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Unblock'}
-                                </button>
-                                {!reportedFalsePositives.has(getAlertKey(alert.ip, alert.description || alert.threat)) && (
-                                  <button
-                                    onClick={() => handleReportFalsePositive(alert)}
-                                    disabled={processingKey === getAlertKey(alert.ip, alert.description || alert.threat) || !canReportFalsePositives}
-                                    className={`px-2 py-1 rounded text-xs font-medium transition whitespace-nowrap ${
-                                      !canReportFalsePositives
-                                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                        : processingKey === getAlertKey(alert.ip, alert.description || alert.threat)
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                                    }`}
-                                    title={!canReportFalsePositives ? 'You do not have permission to report false positives' : 'Report this as a false positive'}
-                                  >
-                                    {processingKey === getAlertKey(alert.ip, alert.description || alert.threat) ? '...' : 'Report FP'}
-                                  </button>
-                                )}
-                              </>
                             ) : (
                               // Custom threat Detected (not blocked) - show Block + Report FP buttons
                               <>
