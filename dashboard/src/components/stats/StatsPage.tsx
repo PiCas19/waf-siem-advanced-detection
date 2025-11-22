@@ -229,6 +229,10 @@ const StatsPage: React.FC = () => {
   const [processingKey, setProcessingKey] = useState<string | null>(null);
   const [localStats, setLocalStats] = useState({ threats_detected: 0, requests_blocked: 0, total_requests: 0 });
 
+  // Track manually blocked threat types to filter incoming auto-blocked threats
+  // Map of "IP::threat_description" -> rule_id (for the manual block rule)
+  const [manuallyBlockedThreats, setManuallyBlockedThreats] = useState<Map<string, number>>(new Map());
+
   // Reported false positives state
   const [reportedFalsePositives, setReportedFalsePositives] = useState<Set<string>>(new Set());
 
@@ -266,8 +270,18 @@ const StatsPage: React.FC = () => {
 
         // If we found a manually blocked alert, preserve that status and don't add duplicate
         if (existingManualBlockIndex >= 0) {
-          console.log('⏭️ Skipping duplicate manual block');
+          console.log('⏭️ Skipping duplicate of manually blocked threat');
           return prevAlerts;
+        }
+
+        // Also skip auto-blocked threats that were blocked by a manual block rule
+        // These are threats that matched a rule created by clicking BLOCK on an earlier threat
+        if (alert.blocked && alert.blockedBy === 'auto') {
+          const isManuallyBlockedRule = manuallyBlockedThreats.has(manualBlockKey);
+          if (isManuallyBlockedRule) {
+            console.log('⏭️ Skipping auto-blocked threat from manual block rule');
+            return prevAlerts;
+          }
         }
 
         // Otherwise, add this alert as a new row (allows BLOCKED and DETECTED to coexist as separate rows)
@@ -279,7 +293,7 @@ const StatsPage: React.FC = () => {
     });
 
     return unsubscribe;
-  }, [onAlertReceived]);
+  }, [onAlertReceived, manuallyBlockedThreats]);
 
   // Listen for enrichment updates from the backend
   useEffect(() => {
@@ -937,11 +951,19 @@ const StatsPage: React.FC = () => {
         return;
       }
 
+      // Get the created rule to track it
+      const createRuleData = await createRuleResp.json();
+      const ruleId = createRuleData.id || createRuleData.rule?.id;
+
+      // Track this manually blocked threat to filter out future auto-blocked matches
+      const manualBlockKey = `${ip}::${description}`;
+      setManuallyBlockedThreats(prev => new Map(prev).set(manualBlockKey, ruleId));
+
       // NON aggiungere al blocklist generale!
       // Il blocklist è solo per bloccare completamente un IP per un determinato periodo
       // Qui stiamo solo creando una regola custom che blocca questa minaccia specifica
 
-      // Log the manual block to WAF logs
+      // Log the manual block to database for persistence
       try {
         await fetch('/api/logs/manual-block', {
           method: 'POST',
@@ -960,7 +982,7 @@ const StatsPage: React.FC = () => {
           }),
         });
       } catch (logError) {
-        console.error('Failed to log manual block to WAF logs:', logError);
+        console.error('Failed to log manual block to database:', logError);
         // Don't fail the whole operation if logging fails
       }
 
@@ -1026,6 +1048,14 @@ const StatsPage: React.FC = () => {
             if (!deleteResp.ok) {
               console.warn('Failed to delete manual block rule:', deleteResp.statusText);
               // Don't fail the whole operation if rule deletion fails
+            } else {
+              // Stop tracking this manually blocked threat
+              const manualBlockKey = `${ip}::${description}`;
+              setManuallyBlockedThreats(prev => {
+                const updated = new Map(prev);
+                updated.delete(manualBlockKey);
+                return updated;
+              });
             }
           }
         }
