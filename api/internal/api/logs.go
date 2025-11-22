@@ -98,3 +98,29 @@ func NewGetLogsHandler(logService *service.LogService, auditLogService *service.
 		})
 	}
 }
+
+// NewDeleteManualBlockLogHandler deletes the manual block log entry when unblocking a threat
+func NewDeleteManualBlockLogHandler(logService *service.LogService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			IP          string `json:"ip" binding:"required"`
+			Description string `json:"description" binding:"required"`
+		}
+
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid request"})
+			return
+		}
+
+		ctx := context.Background()
+
+		// Delete the manual block log entry (the one with blocked_by="manual" and method="MANUAL_BLOCK")
+		// This removes the "Blocked manually" status from the threat
+		if err := logService.DeleteManualBlockLog(ctx, req.IP, req.Description); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to delete manual block log"})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "Manual block log deleted successfully"})
+	}
+}

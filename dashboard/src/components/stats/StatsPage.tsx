@@ -1107,8 +1107,27 @@ const StatsPage: React.FC = () => {
             });
           }
         } catch (logError) {
-          console.error('Failed to log manual unblock to WAF logs:', logError);
+          console.error('Failed to log manual unblock to database:', logError);
           // Don't fail the whole operation if logging fails
+        }
+
+        // Delete the manual block log entry from database
+        try {
+          const token = localStorage.getItem('authToken');
+          await fetch('/api/logs/manual-block', {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ip: ip,
+              description: description,
+            }),
+          });
+        } catch (deleteError) {
+          console.error('Failed to delete manual block log:', deleteError);
+          // Don't fail the whole operation if deletion fails
         }
         // Don't trigger refresh - the optimistic update already removed the manual block status
       }
