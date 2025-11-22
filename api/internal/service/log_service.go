@@ -134,3 +134,12 @@ func (s *LogService) UpdateDetectedLogsByIPAndDescription(ctx context.Context, i
 	}
 	return s.logRepo.UpdateDetectedByIPAndDescription(ctx, ip, description, updates)
 }
+
+// DeleteManualBlockLog deletes the manual block log entry for a given IP and description
+// This removes the "Blocked manually" status when unblocking a threat
+func (s *LogService) DeleteManualBlockLog(ctx context.Context, ip string, description string) error {
+	if ip == "" || description == "" {
+		return fmt.Errorf("IP and description cannot be empty")
+	}
+	return s.logRepo.DeleteManualBlockLog(ctx, ip, description)
+}

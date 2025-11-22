@@ -75,6 +75,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		protected.GET("/logs", NewGetLogsHandler(logService, auditLogService, blocklistService))
 		protected.POST("/logs/manual-block", NewLogManualBlockHandler(logService, db))
 		protected.POST("/logs/manual-unblock", NewLogManualUnblockHandler())
+		protected.DELETE("/logs/manual-block", NewDeleteManualBlockLogHandler(logService))
 
 		// Audit logs endpoints
 		protected.GET("/audit-logs", NewGetAuditLogsHandler(auditLogService))

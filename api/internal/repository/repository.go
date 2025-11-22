@@ -21,6 +21,7 @@ type LogRepository interface {
 	UpdateByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error
 	UpdateDetectedByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error
 	FindPaginated(ctx context.Context, offset int, limit int) ([]models.Log, int64, error)
+	DeleteManualBlockLog(ctx context.Context, ip string, description string) error
 }
 
 // RuleRepository handles database operations for WAF rules

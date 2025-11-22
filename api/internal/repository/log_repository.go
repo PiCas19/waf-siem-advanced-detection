@@ -111,3 +111,12 @@ func (r *GormLogRepository) FindPaginated(ctx context.Context, offset int, limit
 
 	return logs, total, err
 }
+
+// DeleteManualBlockLog deletes the manual block log entry (blocked_by="manual" and method="MANUAL_BLOCK")
+// This removes the "Blocked manually" status when unblocking a threat
+func (r *GormLogRepository) DeleteManualBlockLog(ctx context.Context, ip string, description string) error {
+	return r.db.WithContext(ctx).
+		Where("client_ip = ? AND (threat_type = ? OR description = ?) AND blocked_by = ? AND method = ?",
+			ip, description, description, "manual", "MANUAL_BLOCK").
+		Delete(&models.Log{}).Error
+}
