@@ -469,6 +469,19 @@ const StatsPage: React.FC = () => {
             enriched_at: log.enriched_at || null,
           }));
           setRecentAlerts(mappedLogs);
+
+          // Load manually blocked threats to restore UI state after refresh
+          // Check which threats have been manually blocked (blocked_by="manual")
+          const manuallyBlocked = new Map<string, number>();
+          mappedLogs.forEach((log: WAFEvent) => {
+            if (log.blockedBy === 'manual') {
+              const key = `${log.ip}::${log.description || log.threat}`;
+              // We don't have the rule ID here, but we can use a placeholder (0)
+              // The important thing is to track which threats are manually blocked
+              manuallyBlocked.set(key, 0);
+            }
+          });
+          setManuallyBlockedThreats(manuallyBlocked);
         } else {
           // Fallback a stats.recent se logs endpoint fallisce
           setRecentAlerts(data.recent || []);
