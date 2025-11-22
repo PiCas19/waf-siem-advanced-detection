@@ -505,6 +505,16 @@ const StatsPage: React.FC = () => {
               });
               console.log('📋 Manually blocked threats:', manuallyBlocked.size);
               setManuallyBlockedThreats(manuallyBlocked);
+
+              // Update alerts to mark manually blocked threats with blockedBy='manual'
+              setRecentAlerts(prev => prev.map(alert => {
+                const key = `${alert.ip}::${alert.description || alert.threat}`;
+                if (manuallyBlocked.has(key)) {
+                  console.log('✨ Updating alert to blockedBy=manual:', key);
+                  return { ...alert, blockedBy: 'manual', blocked: true };
+                }
+                return alert;
+              }));
             } else {
               console.error('❌ Failed to fetch rules:', rulesResp.status, rulesResp.statusText);
             }
