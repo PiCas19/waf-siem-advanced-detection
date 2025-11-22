@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
@@ -117,6 +118,8 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 
 		ctx := context.Background()
 
+		log.Printf("[INFO] Updating threat log: IP=%s, Description=%s, Blocked=%v, BlockedBy=%s\n", req.IP, req.Description, req.Blocked, req.BlockedBy)
+
 		// Update the threat log with the new block status
 		updates := map[string]interface{}{
 			"blocked":    req.Blocked,
@@ -124,10 +127,12 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 		}
 
 		if err := logService.UpdateLogsByIPAndDescription(ctx, req.IP, req.Description, updates); err != nil {
+			log.Printf("[ERROR] Failed to update threat log: %v\n", err)
 			c.JSON(500, gin.H{"error": "Failed to update threat block status"})
 			return
 		}
 
+		log.Printf("[INFO] Threat log updated successfully\n")
 		c.JSON(200, gin.H{"message": "Threat block status updated successfully"})
 	}
 }
