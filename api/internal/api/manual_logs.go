@@ -2,19 +2,17 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
 
-// LogManualBlockRequest represents a manual block event to be logged to WAF logs
+// LogManualBlockRequest represents a manual block event to be logged to database only
+// (This is for threat blocking via dashboard, not for IP blocklist)
 type LogManualBlockRequest struct {
 	IP          string `json:"ip" binding:"required"`
 	ThreatType  string `json:"threat_type" binding:"required"`
@@ -25,7 +23,8 @@ type LogManualBlockRequest struct {
 	Payload     string `json:"payload"`
 }
 
-// LogManualUnblockRequest represents a manual unblock event to be logged to WAF logs
+// LogManualUnblockRequest represents a manual unblock event to be logged to database only
+// (This is for threat unblocking via dashboard, not for IP blocklist)
 type LogManualUnblockRequest struct {
 	IP          string `json:"ip" binding:"required"`
 	ThreatType  string `json:"threat_type" binding:"required"`
@@ -36,7 +35,8 @@ type LogManualUnblockRequest struct {
 	Payload     string `json:"payload"`
 }
 
-// NewLogManualBlockHandler handles logging of manual block events to WAF logs and database
+// NewLogManualBlockHandler handles logging of manual block events to database only
+// This is for threat blocking via dashboard (creates custom rule), not for IP blocklist
 func NewLogManualBlockHandler(logService *service.LogService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LogManualBlockRequest
@@ -45,14 +45,7 @@ func NewLogManualBlockHandler(logService *service.LogService, db *gorm.DB) gin.H
 			return
 		}
 
-		// Write to WAF log files
-		if err := writeToWAFLogsManualBlock(req); err != nil {
-			log.Printf("[ERROR] Failed to write manual block to WAF logs: %v\n", err)
-			c.JSON(500, gin.H{"error": "Failed to log event"})
-			return
-		}
-
-		// Also save to database for persistence
+		// Save to database for persistence
 		ctx := context.Background()
 		logEntry := &models.Log{
 			ThreatType:    req.ThreatType,
@@ -69,15 +62,17 @@ func NewLogManualBlockHandler(logService *service.LogService, db *gorm.DB) gin.H
 		}
 
 		if err := logService.CreateLog(ctx, logEntry); err != nil {
-			log.Printf("[WARN] Failed to save manual block to database: %v\n", err)
-			// Don't fail the whole operation if database save fails
+			log.Printf("[ERROR] Failed to save manual block to database: %v\n", err)
+			c.JSON(500, gin.H{"error": "Failed to log event"})
+			return
 		}
 
 		c.JSON(201, gin.H{"message": "Manual block logged successfully"})
 	}
 }
 
-// NewLogManualUnblockHandler handles logging of manual unblock events to WAF logs
+// NewLogManualUnblockHandler handles logging of manual unblock events to database only
+// This is for threat unblocking via dashboard (deletes custom rule), not for IP blocklist
 func NewLogManualUnblockHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LogManualUnblockRequest
@@ -86,101 +81,9 @@ func NewLogManualUnblockHandler() gin.HandlerFunc {
 			return
 		}
 
-		// Write to WAF log files
-		if err := writeToWAFLogsManualUnblock(req); err != nil {
-			log.Printf("[ERROR] Failed to write manual unblock to WAF logs: %v\n", err)
-			c.JSON(500, gin.H{"error": "Failed to log event"})
-			return
-		}
-
-		c.JSON(201, gin.H{"message": "Manual unblock logged successfully"})
+		// Note: Unblock is handled primarily by deleting the custom rule via /api/rules/{id}
+		// This endpoint is kept for consistency but doesn't need to log anything special
+		c.JSON(201, gin.H{"message": "Manual unblock processed successfully"})
 	}
 }
 
-// writeToWAFLogsManualBlock writes a manual block event to both WAF log files
-func writeToWAFLogsManualBlock(req LogManualBlockRequest) error {
-	logsDir := "/var/log/caddy"
-	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create logs directory: %v", err)
-	}
-
-	// Write to both WAN and LAN log files
-	logFiles := []string{
-		logsDir + "/waf_wan.log",
-		logsDir + "/waf_lan.log",
-	}
-
-	for _, logFilePath := range logFiles {
-		wafLogger, err := logger.NewWAFLogger(logFilePath)
-		if err != nil {
-			log.Printf("[WARN] Failed to initialize WAF logger for %s: %v\n", logFilePath, err)
-			continue
-		}
-		defer wafLogger.Close()
-
-		entry := logger.LogEntry{
-			Timestamp:       time.Now(),
-			ThreatType:      req.ThreatType,
-			Severity:        req.Severity,
-			Description:     req.Description,
-			ClientIP:        req.IP,
-			ClientIPSource:  "manual-block",
-			Method:          "MANUAL_BLOCK",
-			URL:             req.URL,
-			UserAgent:       req.UserAgent,
-			Payload:         req.Payload,
-			Blocked:         true,
-			BlockedBy:       "manual",
-		}
-
-		if err := wafLogger.Log(entry); err != nil {
-			log.Printf("[WARN] Failed to log manual block to WAF file %s: %v\n", logFilePath, err)
-		}
-	}
-
-	return nil
-}
-
-// writeToWAFLogsManualUnblock writes a manual unblock event to both WAF log files
-func writeToWAFLogsManualUnblock(req LogManualUnblockRequest) error {
-	logsDir := "/var/log/caddy"
-	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		return fmt.Errorf("failed to create logs directory: %v", err)
-	}
-
-	// Write to both WAN and LAN log files
-	logFiles := []string{
-		logsDir + "/waf_wan.log",
-		logsDir + "/waf_lan.log",
-	}
-
-	for _, logFilePath := range logFiles {
-		wafLogger, err := logger.NewWAFLogger(logFilePath)
-		if err != nil {
-			log.Printf("[WARN] Failed to initialize WAF logger for %s: %v\n", logFilePath, err)
-			continue
-		}
-		defer wafLogger.Close()
-
-		entry := logger.LogEntry{
-			Timestamp:       time.Now(),
-			ThreatType:      req.ThreatType,
-			Severity:        req.Severity,
-			Description:     req.Description,
-			ClientIP:        req.IP,
-			ClientIPSource:  "manual-unblock",
-			Method:          "MANUAL_UNBLOCK",
-			URL:             req.URL,
-			UserAgent:       req.UserAgent,
-			Payload:         req.Payload,
-			Blocked:         false,
-			BlockedBy:       "",
-		}
-
-		if err := wafLogger.Log(entry); err != nil {
-			log.Printf("[WARN] Failed to log manual unblock to WAF file %s: %v\n", logFilePath, err)
-		}
-	}
-
-	return nil
-}
