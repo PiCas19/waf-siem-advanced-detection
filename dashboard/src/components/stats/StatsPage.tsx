@@ -469,7 +469,7 @@ const StatsPage: React.FC = () => {
             enriched_at: log.enriched_at || null,
           }));
           setRecentAlerts(mappedLogs);
-          console.log('📊 Loaded', mappedLogs.length, 'threats from logs:', mappedLogs.map(l => `${l.ip}::${l.description || l.threat}`));
+          console.log('📊 Loaded', mappedLogs.length, 'threats from logs:', mappedLogs.map((l: WAFEvent) => `${l.ip}::${l.description || l.threat}`));
 
           // Load manually blocked threats from custom rules (not from logs)
           // A threat is "manually blocked" if there's a custom rule with is_manual_block=true
