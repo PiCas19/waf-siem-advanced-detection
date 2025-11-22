@@ -131,7 +131,41 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 		}
 	}
 
-	// Check default detectors first
+	// PRIORITY 1: Check MANUAL BLOCK rules first - they have highest priority
+	// Manual block rules take precedence over everything else
+	if manualBlockRule := d.customRules.DetectManualBlock(value); manualBlockRule != nil {
+		blockAction := "none"
+		if manualBlockRule.BlockEnabled {
+			blockAction = "block"
+		} else if manualBlockRule.DropEnabled {
+			blockAction = "drop"
+		} else if manualBlockRule.RedirectEnabled {
+			blockAction = "redirect"
+		} else if manualBlockRule.ChallengeEnabled {
+			blockAction = "challenge"
+		}
+
+		return &Threat{
+			Type:              manualBlockRule.Type,
+			Description:       manualBlockRule.Name,
+			Severity:          manualBlockRule.Severity,
+			ClientIP:          ipInfo.IP,
+			ClientIPSource:    ipInfo.Source,
+			ClientIPTrusted:   ipInfo.IsTrusted,
+			ClientIPVPNReport: ipInfo.IsVPNTailscale,
+			Payload:           value,
+			IsDefault:         false,
+			Action:            manualBlockRule.Action,
+			BlockAction:       blockAction,
+			RedirectURL:       manualBlockRule.RedirectURL,
+			BlockEnabled:      manualBlockRule.BlockEnabled,
+			DropEnabled:       manualBlockRule.DropEnabled,
+			RedirectEnabled:   manualBlockRule.RedirectEnabled,
+			ChallengeEnabled:  manualBlockRule.ChallengeEnabled,
+		}
+	}
+
+	// PRIORITY 2: Check default detectors
 	if detected, desc := d.xss.Detect(value); detected {
 		return createThreat("XSS", desc, "HIGH")
 	}
@@ -172,7 +206,7 @@ func (d *Detector) checkValue(r *http.Request, param, value string) *Threat {
 		return createThreat("PROTOTYPE_POLLUTION", desc, "HIGH")
 	}
 
-	// Check custom rules
+	// PRIORITY 3: Check custom rules (non-manual-block rules)
 	if customRule := d.customRules.Detect(value); customRule != nil {
 		// Determine BlockAction based on which flag is enabled
 		blockAction := "none"

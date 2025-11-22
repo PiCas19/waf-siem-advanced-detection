@@ -929,6 +929,7 @@ const StatsPage: React.FC = () => {
           block_enabled: true,
           action: 'block', // Action "block" will enable blocking
           description: `Manually blocked threat: ${description} from ${ip}`,
+          is_manual_block: true, // Mark as manual block rule - highest priority
         }),
       });
 
