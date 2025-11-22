@@ -470,18 +470,38 @@ const StatsPage: React.FC = () => {
           }));
           setRecentAlerts(mappedLogs);
 
-          // Load manually blocked threats to restore UI state after refresh
-          // Check which threats have been manually blocked (blocked_by="manual")
-          const manuallyBlocked = new Map<string, number>();
-          mappedLogs.forEach((log: WAFEvent) => {
-            if (log.blockedBy === 'manual') {
-              const key = `${log.ip}::${log.description || log.threat}`;
-              // We don't have the rule ID here, but we can use a placeholder (0)
-              // The important thing is to track which threats are manually blocked
-              manuallyBlocked.set(key, 0);
+          // Load manually blocked threats from custom rules (not from logs)
+          // A threat is "manually blocked" if there's a custom rule with is_manual_block=true
+          try {
+            const rulesResp = await fetch('/api/rules', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+            });
+
+            if (rulesResp.ok) {
+              const rulesData = await rulesResp.json();
+              const rules = rulesData.rules || [];
+
+              const manuallyBlocked = new Map<string, number>();
+              rules.forEach((rule: any) => {
+                if (rule.is_manual_block) {
+                  // Extract threat description from rule name: "Manual Block: {description}"
+                  // Match with logs to find which threats are manually blocked
+                  mappedLogs.forEach((log: WAFEvent) => {
+                    if (rule.name === `Manual Block: ${log.description || log.threat}`) {
+                      const key = `${log.ip}::${log.description || log.threat}`;
+                      manuallyBlocked.set(key, rule.id);
+                    }
+                  });
+                }
+              });
+              setManuallyBlockedThreats(manuallyBlocked);
             }
-          });
-          setManuallyBlockedThreats(manuallyBlocked);
+          } catch (rulesError) {
+            console.error('Failed to load manual block rules:', rulesError);
+            // Don't fail if rules can't be loaded, just won't restore manually blocked state
+          }
         } else {
           // Fallback a stats.recent se logs endpoint fallisce
           setRecentAlerts(data.recent || []);
