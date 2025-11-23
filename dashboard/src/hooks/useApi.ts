@@ -1,5 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
-
-export const useApi = <T>(key: string[], fn: () => Promise<T>) => {
-  return useQuery({ queryKey: key, queryFn: fn });
+export const useApi = <T>(_key: string[], _fn: () => Promise<T>) => {
+  // Hook disabled - using WebSocket for real-time updates instead
+  return { data: null, isLoading: false, error: null };
 };

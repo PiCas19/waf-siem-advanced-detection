@@ -1,11 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchLogs } from '@/services/api';
-
 export default function LogViewer() {
-  const { data: logs = [] } = useQuery({
-    queryKey: ['logs'],
-    queryFn: fetchLogs,
-  });
+  const logs: any[] = [];
 
   return (
     <div className="bg-gray-800 p-6 rounded-lg">
