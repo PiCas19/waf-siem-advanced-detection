@@ -107,7 +107,6 @@ export function useWebSocketStats() {
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('📩 WebSocket message received:', message.type);
 
           // Se ricevi un evento WAF, aggiorna gli stats e invia agli alert
           if (message.type === 'waf_event' && message.data) {
@@ -145,7 +144,6 @@ export function useWebSocketStats() {
             };
 
             // Chiama tutti i callback registrati
-            console.log(`🔔 Calling ${alertCallbacksRef.current.length} alert callbacks`);
             alertCallbacksRef.current.forEach(callback => callback(alert));
             setNewAlert(alert);
           }

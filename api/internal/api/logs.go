@@ -54,10 +54,28 @@ func logToWAFFile(ctx context.Context, logService *service.LogService, ip string
 		"blocked_by":            blockedBy,
 	}
 
-	// Find the WAF log file - look in logs directory
-	logDir := "logs"
-	if err := os.MkdirAll(logDir, 0755); err != nil {
-		return err
+	// Find the WAF log file - look in waf/logs directory (relative to project root or API executable)
+	// Try multiple possible paths:
+	// 1. ./waf/logs (if running from project root)
+	// 2. ../waf/logs (if running from api folder)
+	// 3. ./logs (fallback to current directory)
+	logDirCandidates := []string{
+		"waf/logs",
+		"../waf/logs",
+		"../../waf/logs",
+		"logs",
+	}
+
+	var logDir string
+	for _, candidate := range logDirCandidates {
+		if err := os.MkdirAll(candidate, 0755); err == nil {
+			logDir = candidate
+			break
+		}
+	}
+
+	if logDir == "" {
+		return fmt.Errorf("could not create logs directory")
 	}
 
 	// Get today's date for the log filename
