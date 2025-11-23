@@ -112,6 +112,7 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
+			log.Printf("[ERROR] ShouldBindJSON failed: %v\n", err)
 			c.JSON(400, gin.H{"error": "Invalid request"})
 			return
 		}
