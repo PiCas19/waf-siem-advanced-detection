@@ -15,19 +15,43 @@ import (
 )
 
 // logToWAFFile writes a manual block/unblock event to the WAF log file
-func logToWAFFile(ip string, description string, blocked bool, blockedBy string) error {
-	// WAF log entry format - similar to WAF logger
+// It retrieves the original threat data from database and writes complete log entry
+func logToWAFFile(ctx context.Context, logService *service.LogService, ip string, description string, blocked bool, blockedBy string) error {
+	// Find the original threat log to get all details
+	logs, err := logService.GetLogsByIP(ctx, ip)
+	if err != nil || len(logs) == 0 {
+		return fmt.Errorf("could not find threat log for IP %s", ip)
+	}
+
+	// Find the matching log entry by description or threat_type
+	var targetLog *models.Log
+	for i := range logs {
+		if logs[i].Description == description || logs[i].ThreatType == description {
+			targetLog = &logs[i]
+			break
+		}
+	}
+
+	if targetLog == nil {
+		return fmt.Errorf("could not find matching threat log")
+	}
+
+	// Create complete WAF log entry with all original data
 	logEntry := map[string]interface{}{
-		"timestamp":    time.Now().UTC().Format(time.RFC3339),
-		"client_ip":    ip,
-		"description":  description,
-		"blocked":      blocked,
-		"blocked_by":   blockedBy,
-		"method":       "MANUAL",
-		"url":          "",
-		"threat_type":  description,
-		"severity":     "medium",
-		"payload":      "",
+		"timestamp":             targetLog.CreatedAt.Format(time.RFC3339Nano),
+		"threat_type":           targetLog.ThreatType,
+		"severity":              targetLog.Severity,
+		"description":           targetLog.Description,
+		"client_ip":             targetLog.ClientIP,
+		"client_ip_source":      targetLog.ClientIPSource,
+		"client_ip_trusted":     targetLog.ClientIPTrusted,
+		"client_ip_vpn_report":  targetLog.ClientIPVPNReport,
+		"method":                targetLog.Method,
+		"url":                   targetLog.URL,
+		"user_agent":            targetLog.UserAgent,
+		"payload":               targetLog.Payload,
+		"blocked":               blocked,
+		"blocked_by":            blockedBy,
 	}
 
 	// Find the WAF log file - look in logs directory
@@ -180,8 +204,8 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 			return
 		}
 
-		// Log the manual block/unblock action to WAF log file
-		if err := logToWAFFile(req.IP, req.Description, req.Blocked, req.BlockedBy); err != nil {
+		// Log the manual block/unblock action to WAF log file with complete threat details
+		if err := logToWAFFile(ctx, logService, req.IP, req.Description, req.Blocked, req.BlockedBy); err != nil {
 			log.Printf("Warning: Failed to write to WAF log file: %v\n", err)
 			// Don't fail the request if logging fails
 		}
