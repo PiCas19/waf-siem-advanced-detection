@@ -2,12 +2,61 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
+
+// logToWAFFile writes a manual block/unblock event to the WAF log file
+func logToWAFFile(ip string, description string, blocked bool, blockedBy string) error {
+	// WAF log entry format - similar to WAF logger
+	logEntry := map[string]interface{}{
+		"timestamp":    time.Now().UTC().Format(time.RFC3339),
+		"client_ip":    ip,
+		"description":  description,
+		"blocked":      blocked,
+		"blocked_by":   blockedBy,
+		"method":       "MANUAL",
+		"url":          "",
+		"threat_type":  description,
+		"severity":     "medium",
+		"payload":      "",
+	}
+
+	// Find the WAF log file - look in logs directory
+	logDir := "logs"
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return err
+	}
+
+	// Get today's date for the log filename
+	dateStr := time.Now().Format("2006-01-02")
+	logFile := filepath.Join(logDir, fmt.Sprintf("waf_%s.log", dateStr))
+
+	// Marshal to JSON
+	data, err := json.Marshal(logEntry)
+	if err != nil {
+		return err
+	}
+
+	// Append to WAF log file
+	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Write to file
+	_, err = f.Write(append(data, '\n'))
+	return err
+}
 
 // isDefaultThreatType checks if a threat type is a default WAF rule
 func isDefaultThreatType(threatType string) bool {
@@ -132,10 +181,9 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 		}
 
 		// Log the manual block/unblock action to WAF log file
-		if req.Blocked {
-			log.Printf("[MANUAL_BLOCK] IP=%s, Description=%s, blocked=true, blocked_by=manual\n", req.IP, req.Description)
-		} else {
-			log.Printf("[MANUAL_UNBLOCK] IP=%s, Description=%s, blocked=false, blocked_by=\"\"\n", req.IP, req.Description)
+		if err := logToWAFFile(req.IP, req.Description, req.Blocked, req.BlockedBy); err != nil {
+			log.Printf("Warning: Failed to write to WAF log file: %v\n", err)
+			// Don't fail the request if logging fails
 		}
 
 		c.JSON(200, gin.H{"message": "Threat block status updated successfully"})
