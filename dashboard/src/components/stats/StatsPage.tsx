@@ -257,9 +257,7 @@ const StatsPage: React.FC = () => {
   // Registra callback per aggiornamenti real-time degli alert
   useEffect(() => {
     const unsubscribe = onAlertReceived((alert: WAFEvent) => {
-      console.log('📨 Alert received:', alert);
       setRecentAlerts(prevAlerts => {
-        console.log('📊 Previous alerts count:', prevAlerts.length);
         // Check if we already have a manually blocked alert for this IP and threat
         // If so, preserve the manual block status and don't add the new alert
         const manualBlockKey = `${alert.ip}::${alert.description || alert.threat}`;
@@ -270,7 +268,6 @@ const StatsPage: React.FC = () => {
 
         // If we found a manually blocked alert, preserve that status and don't add duplicate
         if (existingManualBlockIndex >= 0) {
-          console.log('⏭️ Skipping duplicate of manually blocked threat');
           return prevAlerts;
         }
 
@@ -279,14 +276,12 @@ const StatsPage: React.FC = () => {
         if (alert.blocked && alert.blockedBy === 'auto') {
           const isManuallyBlockedRule = manuallyBlockedThreats.has(manualBlockKey);
           if (isManuallyBlockedRule) {
-            console.log('⏭️ Skipping auto-blocked threat from manual block rule');
             return prevAlerts;
           }
         }
 
         // Otherwise, add this alert as a new row (allows BLOCKED and DETECTED to coexist as separate rows)
         const newAlerts = [alert, ...prevAlerts.slice(0, 999)];
-        console.log('✅ Updated alerts count:', newAlerts.length);
         // Force state update to trigger re-renders
         return newAlerts;
       });
@@ -469,7 +464,6 @@ const StatsPage: React.FC = () => {
             enriched_at: log.enriched_at || null,
           }));
           setRecentAlerts(mappedLogs);
-          console.log('📊 Loaded', mappedLogs.length, 'threats from logs:', mappedLogs.map((l: WAFEvent) => `${l.ip}::${l.description || l.threat}`));
 
           // Load manually blocked threats from custom rules (not from logs)
           // A threat is "manually blocked" if there's a custom rule with is_manual_block=true
@@ -480,51 +474,40 @@ const StatsPage: React.FC = () => {
               },
             });
 
-            console.log('📋 Rules response status:', rulesResp.status);
 
             if (rulesResp.ok) {
               const rulesData = await rulesResp.json();
               const customRules = rulesData.custom_rules || [];
-              const defaultRules = rulesData.default_rules || [];
-              const allRules = [...defaultRules, ...customRules];
-              console.log('📋 Loaded', customRules.length, 'custom rules and', defaultRules.length, 'default rules (total:', allRules.length, ')');
 
               const manuallyBlocked = new Map<string, number>();
-              console.log('🔍 Checking', customRules.length, 'custom rules for is_manual_block flag');
               customRules.forEach((rule: any) => {
-                console.log('  📌 Rule:', rule.name, '| is_manual_block:', rule.is_manual_block, '| type:', typeof rule.is_manual_block);
                 if (rule.is_manual_block) {
-                  console.log('🔒 Found manual block rule:', rule.name, '(ID:', rule.id, ')');
                   // Extract threat description from rule name: "Manual Block: {description}"
                   // Match with logs to find which threats are manually blocked
-                  console.log('  🔎 Searching through', mappedLogs.length, 'logs to match this rule');
                   mappedLogs.forEach((log: WAFEvent) => {
                     const expectedName = `Manual Block: ${log.description || log.threat}`;
                     if (rule.name === expectedName) {
                       const key = `${log.ip}::${log.description || log.threat}`;
-                      console.log('✅ Matched manual block rule to threat:', key, '-> Rule ID:', rule.id);
                       manuallyBlocked.set(key, rule.id);
                     }
                   });
                 }
               });
-              console.log('📋 Total manually blocked threats found:', manuallyBlocked.size);
               setManuallyBlockedThreats(manuallyBlocked);
 
               // Update alerts to mark manually blocked threats with blockedBy='manual'
               setRecentAlerts(prev => prev.map(alert => {
                 const key = `${alert.ip}::${alert.description || alert.threat}`;
                 if (manuallyBlocked.has(key)) {
-                  console.log('✨ Updating alert to blockedBy=manual:', key);
                   return { ...alert, blockedBy: 'manual', blocked: true };
                 }
                 return alert;
               }));
             } else {
-              console.error('❌ Failed to fetch rules:', rulesResp.status, rulesResp.statusText);
+              console.error('Failed to fetch rules:', rulesResp.status, rulesResp.statusText);
             }
           } catch (rulesError) {
-            console.error('❌ Failed to load manual block rules:', rulesError);
+            console.error('Failed to load manual block rules:', rulesError);
             // Don't fail if rules can't be loaded, just won't restore manually blocked state
           }
         } else {
@@ -985,7 +968,6 @@ const StatsPage: React.FC = () => {
       // Crea una regola custom per bloccare questa minaccia
       // La regola blocca basandosi sul payload della minaccia
       const ruleName = `Manual Block: ${description}`;
-      console.log('🛑 Creating manual block rule with name:', ruleName, 'for IP:', ip);
 
       const createRuleResp = await fetch('/api/rules', {
         method: 'POST',
@@ -1015,11 +997,9 @@ const StatsPage: React.FC = () => {
       // Get the created rule to track it
       const createRuleData = await createRuleResp.json();
       const ruleId = createRuleData.id || createRuleData.rule?.id;
-      console.log('✅ Manual block rule created with ID:', ruleId, 'Full response:', createRuleData);
 
       // Track this manually blocked threat to filter out future auto-blocked matches
       const manualBlockKey = `${ip}::${description}`;
-      console.log('📌 Tracking manually blocked threat with key:', manualBlockKey, 'Rule ID:', ruleId);
       setManuallyBlockedThreats(prev => new Map(prev).set(manualBlockKey, ruleId));
 
       // Update the threat log to mark it as manually blocked
@@ -1030,7 +1010,6 @@ const StatsPage: React.FC = () => {
           blocked: true,
           blocked_by: 'manual',
         };
-        console.log('📤 Sending threat block status update:', updatePayload);
 
         const updateResp = await fetch('/api/logs/threat-status', {
           method: 'PUT',
@@ -1043,13 +1022,10 @@ const StatsPage: React.FC = () => {
 
         if (!updateResp.ok) {
           const errorText = await updateResp.text();
-          console.error('❌ Failed to update threat block status:', updateResp.status, updateResp.statusText, 'Error:', errorText);
-        } else {
-          console.log('✅ Threat log updated successfully:', { ip, description, blocked: true, blocked_by: 'manual' });
+          console.error('Failed to update threat block status:', updateResp.status, updateResp.statusText, 'Error:', errorText);
         }
       } catch (logError) {
         console.error('Failed to update threat block status:', logError);
-        // Don't fail the whole operation if update fails
       }
 
       showToast('Threat blocked successfully', 'success');
@@ -1095,13 +1071,11 @@ const StatsPage: React.FC = () => {
         if (rulesResp.ok) {
           const rulesData = await rulesResp.json();
           const customRules = rulesData.custom_rules || [];
-          console.log('🔍 Searching for manual block rule in', customRules.length, 'custom rules');
           // Find manual block rule by name (Manual Block: {description})
           const manualBlockRule = customRules.find((r: any) =>
             r.is_manual_block === true &&
             r.name === `Manual Block: ${description || alert?.threat}`
           );
-          console.log(manualBlockRule ? '✅ Found manual block rule to delete:' : '❌ Manual block rule not found:', manualBlockRule?.name);
 
           if (manualBlockRule) {
             // Delete the manual block rule
