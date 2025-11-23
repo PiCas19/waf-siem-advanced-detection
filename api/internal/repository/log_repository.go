@@ -80,6 +80,7 @@ func (r *GormLogRepository) Delete(ctx context.Context, id uint) error {
 
 func (r *GormLogRepository) UpdateByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error {
 	query := r.db.WithContext(ctx).
+		Model(&models.Log{}).
 		Where("client_ip = ? AND (threat_type = ? OR description = ?)", ip, description, description)
 
 	result := query.Updates(updates)
@@ -104,6 +105,7 @@ func (r *GormLogRepository) UpdateByIPAndDescription(ctx context.Context, ip str
 // This ensures that when manually blocking, we only update the detected threat, not the already-blocked ones
 func (r *GormLogRepository) UpdateDetectedByIPAndDescription(ctx context.Context, ip string, description string, updates map[string]interface{}) error {
 	query := r.db.WithContext(ctx).
+		Model(&models.Log{}).
 		Where("client_ip = ? AND (threat_type = ? OR description = ?) AND blocked = ?", ip, description, description, false)
 
 	result := query.Updates(updates)
