@@ -149,6 +149,8 @@ const Rules: React.FC = () => {
       const token = localStorage.getItem('authToken');
 
       try {
+        const ruleToDelete = rules.find(r => r.id === id);
+
         const response = await fetch(`/api/rules/${id}`, {
           method: 'DELETE',
           headers: {
@@ -160,6 +162,49 @@ const Rules: React.FC = () => {
           setRules(rules.filter(r => r.id !== id));
           setShowDetails(false);
           showToast('Regola eliminata con successo', 'success', 4000);
+
+          // Auto-unblock threat if this is a manual block rule
+          if (ruleToDelete && ruleToDelete.name.startsWith('Manual Block: ')) {
+            const threatDescription = ruleToDelete.name.replace('Manual Block: ', '');
+
+            try {
+              // Find the IP of the threat - we need to fetch logs to match IP with threat
+              const logsResponse = await fetch('/api/logs', {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                },
+              });
+
+              if (logsResponse.ok) {
+                const logsData = await logsResponse.json();
+                const logs = logsData.security_logs || logsData.logs || [];
+
+                // Find the threat matching this description
+                const matchingThreat = logs.find((log: any) =>
+                  log.description === threatDescription || log.threat_type === threatDescription
+                );
+
+                if (matchingThreat) {
+                  // Unblock the threat
+                  await fetch('/api/logs/threat-status', {
+                    method: 'PUT',
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      ip: matchingThreat.client_ip || matchingThreat.ip,
+                      description: threatDescription,
+                      blocked: false,
+                      blocked_by: '',
+                    }),
+                  });
+                }
+              }
+            } catch (error) {
+              // Silently fail - rule was deleted successfully
+            }
+          }
         }
       } catch (error) {
         showToast('Errore nell\'eliminazione della regola', 'error', 4000);
