@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 	"gorm.io/gorm"
 )
@@ -83,22 +82,7 @@ func (r *GormLogRepository) UpdateByIPAndDescription(ctx context.Context, ip str
 		Model(&models.Log{}).
 		Where("client_ip = ? AND (threat_type = ? OR description = ?)", ip, description, description)
 
-	result := query.Updates(updates)
-
-	// Log for debugging
-	fmt.Printf("[INFO] UpdateByIPAndDescription: IP=%s, description=%s, RowsAffected=%d\n", ip, description, result.RowsAffected)
-	if result.RowsAffected == 0 {
-		fmt.Printf("[WARN] UpdateByIPAndDescription: No rows updated. Checking what logs exist for this IP...\n")
-		// Check what logs exist for this IP
-		var existingLogs []models.Log
-		r.db.WithContext(ctx).Where("client_ip = ?", ip).Find(&existingLogs)
-		fmt.Printf("[WARN] Found %d logs for IP %s:\n", len(existingLogs), ip)
-		for _, log := range existingLogs {
-			fmt.Printf("  - threat_type=%s, description=%s, blocked=%v\n", log.ThreatType, log.Description, log.Blocked)
-		}
-	}
-
-	return result.Error
+	return query.Updates(updates).Error
 }
 
 // UpdateDetectedByIPAndDescription updates only DETECTED (not blocked) logs matching IP and description
@@ -108,20 +92,7 @@ func (r *GormLogRepository) UpdateDetectedByIPAndDescription(ctx context.Context
 		Model(&models.Log{}).
 		Where("client_ip = ? AND (threat_type = ? OR description = ?) AND blocked = ?", ip, description, description, false)
 
-	result := query.Updates(updates)
-
-	// Log for debugging
-	if result.RowsAffected == 0 {
-		fmt.Printf("[WARN] UpdateDetectedByIPAndDescription: No rows updated for IP=%s, description=%s. Checking what exists...\n", ip, description)
-		// Check what logs exist for this IP
-		var existingLogs []models.Log
-		r.db.WithContext(ctx).Where("client_ip = ?", ip).Find(&existingLogs)
-		for _, log := range existingLogs {
-			fmt.Printf("  Existing log: threat_type=%s, description=%s, blocked=%v\n", log.ThreatType, log.Description, log.Blocked)
-		}
-	}
-
-	return result.Error
+	return query.Updates(updates).Error
 }
 
 func (r *GormLogRepository) FindPaginated(ctx context.Context, offset int, limit int) ([]models.Log, int64, error) {

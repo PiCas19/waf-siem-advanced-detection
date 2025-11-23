@@ -112,14 +112,11 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			log.Printf("[ERROR] ShouldBindJSON failed: %v\n", err)
 			c.JSON(400, gin.H{"error": "Invalid request"})
 			return
 		}
 
 		ctx := context.Background()
-
-		log.Printf("[INFO] Updating threat log: IP=%s, Description=%s, Blocked=%v, BlockedBy=%s\n", req.IP, req.Description, req.Blocked, req.BlockedBy)
 
 		// Update the threat log with the new block status
 		updates := map[string]interface{}{
@@ -130,12 +127,10 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 		// Update all threats matching this IP+description, regardless of current blocked status
 		// This ensures we can update any threat to mark it as manually blocked
 		if err := logService.UpdateLogsByIPAndDescription(ctx, req.IP, req.Description, updates); err != nil {
-			log.Printf("[ERROR] Failed to update threat log: %v\n", err)
 			c.JSON(500, gin.H{"error": "Failed to update threat block status"})
 			return
 		}
 
-		log.Printf("[INFO] Threat log updated successfully\n")
 		c.JSON(200, gin.H{"message": "Threat block status updated successfully"})
 	}
 }
