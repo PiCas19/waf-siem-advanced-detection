@@ -1,11 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchBlocklist } from '@/services/api';
-
 export default function BlockedIPs() {
-  const { data: ips = [] } = useQuery({
-    queryKey: ['blocklist'],
-    queryFn: fetchBlocklist,
-  });
+  const ips: any[] = [];
 
   return (
     <div className="bg-gray-800 p-6 rounded-lg">
