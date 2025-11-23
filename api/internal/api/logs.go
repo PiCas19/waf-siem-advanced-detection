@@ -131,6 +131,13 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 			return
 		}
 
+		// Log the manual block/unblock action to WAF log file
+		if req.Blocked {
+			log.Printf("[MANUAL_BLOCK] IP=%s, Description=%s, blocked=true, blocked_by=manual\n", req.IP, req.Description)
+		} else {
+			log.Printf("[MANUAL_UNBLOCK] IP=%s, Description=%s, blocked=false, blocked_by=\"\"\n", req.IP, req.Description)
+		}
+
 		c.JSON(200, gin.H{"message": "Threat block status updated successfully"})
 	}
 }
