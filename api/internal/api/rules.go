@@ -320,7 +320,10 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 
 		LogRuleAction(db, userID.(uint), userEmail.(string), "DELETE_RULE", ruleID, ruleName, nil, clientIP.(string))
 
-		c.JSON(200, gin.H{"message": "Rule deleted successfully"})
+		c.JSON(200, gin.H{
+			"message": "Rule deleted successfully",
+			"manual_block_deleted": rule != nil && rule.IsManualBlock,
+		})
 	}
 }
 

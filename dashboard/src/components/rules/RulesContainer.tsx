@@ -74,9 +74,18 @@ export default function RulesContainer() {
         });
 
         if (response.ok) {
+          const data = await response.json();
           setCustomRules(customRules.filter(r => r.id !== id));
           setShowDetailsModal(false);
           showToast('Rule deleted successfully', 'success', 4000);
+
+          // If this was a manual block rule, trigger stats page refresh
+          if (data.manual_block_deleted) {
+            if (typeof window !== 'undefined') {
+              const refreshEvent = new CustomEvent('statsRefresh', { detail: { timestamp: Date.now() } });
+              window.dispatchEvent(refreshEvent);
+            }
+          }
         } else {
           const errorData = await response.json();
           showToast('Error deleting rule: ' + (errorData.error || 'Unknown error'), 'error', 4000);
