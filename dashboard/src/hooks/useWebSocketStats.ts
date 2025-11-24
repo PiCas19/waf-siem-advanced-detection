@@ -146,6 +146,12 @@ export function useWebSocketStats() {
             // Chiama tutti i callback registrati
             alertCallbacksRef.current.forEach(callback => callback(alert));
             setNewAlert(alert);
+
+            // Triggerare un refresh completo della pagina stats
+            if (typeof window !== 'undefined') {
+              const refreshEvent = new CustomEvent('statsRefresh', { detail: { timestamp: Date.now() } });
+              window.dispatchEvent(refreshEvent);
+            }
           }
           // Handle enrichment updates from the backend
           else if (message.type === 'enrichment_update' && message.data) {
@@ -196,5 +202,13 @@ export function useWebSocketStats() {
     };
   };
 
-  return { stats, isConnected, newAlert, onAlertReceived };
+  // Funzione per triggerare un refresh completo della pagina stats
+  const triggerStatsRefresh = () => {
+    if (typeof window !== 'undefined') {
+      const refreshEvent = new CustomEvent('statsRefresh', { detail: { timestamp: Date.now() } });
+      window.dispatchEvent(refreshEvent);
+    }
+  };
+
+  return { stats, isConnected, newAlert, onAlertReceived, triggerStatsRefresh };
 }

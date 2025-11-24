@@ -236,6 +236,124 @@ const StatsPage: React.FC = () => {
   // Reported false positives state
   const [reportedFalsePositives, setReportedFalsePositives] = useState<Set<string>>(new Set());
 
+  // Funzione per ricaricare tutti i dati della pagina stats
+  const loadStatsData = async () => {
+    try {
+      // Carica stats per il timeline
+      const data = await fetchStats();
+      initializeTimeline();
+
+      const token = localStorage.getItem('authToken');
+
+      // Carica i false positive segnalati dal database
+      const fpResponse = await fetch('/api/false-positives', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (fpResponse.ok) {
+        const fpData = await fpResponse.json();
+        // Crea un set di chiavi (ip::threat) dei false positive segnalati
+        const reportedFPs = new Set<string>();
+        (fpData.false_positives || []).forEach((fp: any) => {
+          const key = `${fp.client_ip || ''}::${fp.description || fp.threat_type || ''}`;
+          reportedFPs.add(key);
+        });
+        setReportedFalsePositives(reportedFPs);
+      }
+
+      // Carica logs (tutte le threat) dal database
+      const logsResponse = await fetch('/api/logs', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (logsResponse.ok) {
+        const logsData = await logsResponse.json();
+        // Mappa i logs al formato WAFEvent
+        const mappedLogs = logsData.logs.map((log: any) => ({
+          ip: log.client_ip,
+          method: log.method,
+          path: log.url,
+          timestamp: log.created_at || new Date().toISOString(),
+          threat: log.threat_type,
+          blocked: log.blocked,
+          blockedBy: log.blocked_by || '', // "auto", "manual", or ""
+          user_agent: log.user_agent,
+          payload: log.payload || '',
+          description: log.description || log.threat_type,
+          // IP Trust Score field
+          ip_trust_score: log.ip_trust_score || undefined,
+          // Threat Intelligence fields
+          ip_reputation: log.ip_reputation || 0,
+          is_malicious: log.is_malicious || false,
+          asn: log.asn || '',
+          isp: log.isp || '',
+          country: log.country || '',
+          threat_level: log.threat_level || 'low',
+          threat_source: log.threat_source || '',
+          is_on_blocklist: log.is_on_blocklist || false,
+          blocklist_name: log.blocklist_name || '',
+          abuse_reports: log.abuse_reports || 0,
+          enriched_at: log.enriched_at || null,
+        }));
+        setRecentAlerts(mappedLogs);
+
+        // Load manually blocked threats from custom rules (not from logs)
+        // A threat is "manually blocked" if there's a custom rule with is_manual_block=true
+        try {
+          const rulesResp = await fetch('/api/rules', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+
+          if (rulesResp.ok) {
+            const rulesData = await rulesResp.json();
+            const customRules = rulesData.custom_rules || [];
+
+            const manuallyBlocked = new Map<string, number>();
+            customRules.forEach((rule: any) => {
+              if (rule.is_manual_block) {
+                // Extract threat description from rule name: "Manual Block: {description}"
+                // Match with logs to find which threats are manually blocked
+                mappedLogs.forEach((log: WAFEvent) => {
+                  const expectedName = `Manual Block: ${log.description || log.threat}`;
+                  if (rule.name === expectedName) {
+                    const key = `${log.ip}::${log.description || log.threat}`;
+                    manuallyBlocked.set(key, rule.id);
+                  }
+                });
+              }
+            });
+            setManuallyBlockedThreats(manuallyBlocked);
+
+            // Update alerts to mark manually blocked threats with blockedBy='manual'
+            setRecentAlerts(prev => prev.map(alert => {
+              const key = `${alert.ip}::${alert.description || alert.threat}`;
+              if (manuallyBlocked.has(key)) {
+                return { ...alert, blockedBy: 'manual', blocked: true };
+              }
+              return alert;
+            }));
+          } else {
+            console.error('Failed to fetch rules:', rulesResp.status, rulesResp.statusText);
+          }
+        } catch (rulesError) {
+          console.error('Failed to load manual block rules:', rulesError);
+          // Don't fail if rules can't be loaded, just won't restore manually blocked state
+        }
+      } else {
+        // Fallback a stats.recent se logs endpoint fallisce
+        setRecentAlerts(data.recent || []);
+      }
+    } catch (error) {
+      console.error('Failed to load stats data:', error);
+    }
+  };
+
   // Calcola i permessi dell'utente
   const canBlockThreats = user && hasPermission(user.role as any, 'threats_block');
   const canUnblockThreats = user && hasPermission(user.role as any, 'threats_unblock');
@@ -399,127 +517,19 @@ const StatsPage: React.FC = () => {
   // Search states
   const [allAlertsSearchQuery, setAllAlertsSearchQuery] = useState<string>('');
 
-  // Carica i dati iniziali e quando refreshTrigger cambia
+  // Carica i dati iniziali al mount e ascolta l'evento statsRefresh dal WebSocket
   useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        // Carica stats per il timeline
-        const data = await fetchStats();
-        initializeTimeline();
+    // Carica i dati iniziali
+    loadStatsData();
 
-        const token = localStorage.getItem('authToken');
-
-        // Carica i false positive segnalati dal database
-        const fpResponse = await fetch('/api/false-positives', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (fpResponse.ok) {
-          const fpData = await fpResponse.json();
-          // Crea un set di chiavi (ip::threat) dei false positive segnalati
-          const reportedFPs = new Set<string>();
-          (fpData.false_positives || []).forEach((fp: any) => {
-            const key = `${fp.client_ip || ''}::${fp.description || fp.threat_type || ''}`;
-            reportedFPs.add(key);
-          });
-          setReportedFalsePositives(reportedFPs);
-        }
-
-        // Carica logs (tutte le threat) dal database
-        const logsResponse = await fetch('/api/logs', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (logsResponse.ok) {
-          const logsData = await logsResponse.json();
-          // Mappa i logs al formato WAFEvent
-          const mappedLogs = logsData.logs.map((log: any) => ({
-            ip: log.client_ip,
-            method: log.method,
-            path: log.url,
-            timestamp: log.created_at || new Date().toISOString(),
-            threat: log.threat_type,
-            blocked: log.blocked,
-            blockedBy: log.blocked_by || '', // "auto", "manual", or ""
-            user_agent: log.user_agent,
-            payload: log.payload || '',
-            description: log.description || log.threat_type,
-            // IP Trust Score field
-            ip_trust_score: log.ip_trust_score || undefined,
-            // Threat Intelligence fields
-            ip_reputation: log.ip_reputation || 0,
-            is_malicious: log.is_malicious || false,
-            asn: log.asn || '',
-            isp: log.isp || '',
-            country: log.country || '',
-            threat_level: log.threat_level || 'low',
-            threat_source: log.threat_source || '',
-            is_on_blocklist: log.is_on_blocklist || false,
-            blocklist_name: log.blocklist_name || '',
-            abuse_reports: log.abuse_reports || 0,
-            enriched_at: log.enriched_at || null,
-          }));
-          setRecentAlerts(mappedLogs);
-
-          // Load manually blocked threats from custom rules (not from logs)
-          // A threat is "manually blocked" if there's a custom rule with is_manual_block=true
-          try {
-            const rulesResp = await fetch('/api/rules', {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-              },
-            });
-
-
-            if (rulesResp.ok) {
-              const rulesData = await rulesResp.json();
-              const customRules = rulesData.custom_rules || [];
-
-              const manuallyBlocked = new Map<string, number>();
-              customRules.forEach((rule: any) => {
-                if (rule.is_manual_block) {
-                  // Extract threat description from rule name: "Manual Block: {description}"
-                  // Match with logs to find which threats are manually blocked
-                  mappedLogs.forEach((log: WAFEvent) => {
-                    const expectedName = `Manual Block: ${log.description || log.threat}`;
-                    if (rule.name === expectedName) {
-                      const key = `${log.ip}::${log.description || log.threat}`;
-                      manuallyBlocked.set(key, rule.id);
-                    }
-                  });
-                }
-              });
-              setManuallyBlockedThreats(manuallyBlocked);
-
-              // Update alerts to mark manually blocked threats with blockedBy='manual'
-              setRecentAlerts(prev => prev.map(alert => {
-                const key = `${alert.ip}::${alert.description || alert.threat}`;
-                if (manuallyBlocked.has(key)) {
-                  return { ...alert, blockedBy: 'manual', blocked: true };
-                }
-                return alert;
-              }));
-            } else {
-              console.error('Failed to fetch rules:', rulesResp.status, rulesResp.statusText);
-            }
-          } catch (rulesError) {
-            console.error('Failed to load manual block rules:', rulesError);
-            // Don't fail if rules can't be loaded, just won't restore manually blocked state
-          }
-        } else {
-          // Fallback a stats.recent se logs endpoint fallisce
-          setRecentAlerts(data.recent || []);
-        }
-      } catch (error) {
-        console.error('Failed to load initial stats:', error);
-      }
+    // Ascolta l'evento statsRefresh dal WebSocket
+    const handleStatsRefresh = () => {
+      loadStatsData();
     };
-    loadInitialData();
-  }, []); // Load only on component mount, don't refresh on manual block/unblock
+
+    window.addEventListener('statsRefresh', handleStatsRefresh);
+    return () => window.removeEventListener('statsRefresh', handleStatsRefresh);
+  }, []); // Load only on component mount
 
   // Inizializza timeline con dati dai logs storici
   const initializeTimeline = () => {
