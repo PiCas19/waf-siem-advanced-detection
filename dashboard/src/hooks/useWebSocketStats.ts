@@ -19,6 +19,7 @@ interface WAFEvent {
   description?: string; // Rule name/description for per-rule blocking
   // Threat Intelligence Enrichment fields
   ip_reputation?: number;
+  ip_trust_score?: number;
   threat_level?: string;
   country?: string;
   asn?: string;
