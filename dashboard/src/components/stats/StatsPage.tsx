@@ -399,6 +399,33 @@ const StatsPage: React.FC = () => {
         }
       }
 
+      // Check if this alert already exists from the initial data load
+      // Look for an alert with the same IP, threat, and timestamp (very similar time)
+      const alertKey = `${newAlert.ip}::${newAlert.threat}::${newAlert.timestamp}`;
+      const existingAlertIndex = prevAlerts.findIndex(a => {
+        const existingKey = `${a.ip}::${a.threat}::${a.timestamp}`;
+        // If timestamps are within 1 second, consider them the same alert
+        return existingKey === alertKey || (
+          a.ip === newAlert.ip &&
+          a.threat === newAlert.threat &&
+          Math.abs(new Date(a.timestamp).getTime() - new Date(newAlert.timestamp).getTime()) < 1000
+        );
+      });
+
+      // If alert already exists, update it with new enriched data instead of duplicating
+      if (existingAlertIndex >= 0) {
+        const updatedAlerts = [...prevAlerts];
+        updatedAlerts[existingAlertIndex] = {
+          ...prevAlerts[existingAlertIndex],
+          ...newAlert,
+          // Preserve any existing enrichment data if new alert doesn't have it
+          ip_reputation: newAlert.ip_reputation || prevAlerts[existingAlertIndex].ip_reputation,
+          threat_level: newAlert.threat_level || prevAlerts[existingAlertIndex].threat_level,
+          ip_trust_score: newAlert.ip_trust_score || prevAlerts[existingAlertIndex].ip_trust_score,
+        };
+        return updatedAlerts;
+      }
+
       // Otherwise, add this alert as a new row (allows BLOCKED and DETECTED to coexist as separate rows)
       const updatedAlerts = [newAlert, ...prevAlerts.slice(0, 999)];
       // Force state update to trigger re-renders
