@@ -293,6 +293,31 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 			return
 		}
 
+		// If this is a manual block rule, revert the threat back to "detected" status
+		if rule != nil && rule.IsManualBlock {
+			// Extract threat description from rule pattern
+			// Pattern is the IP address for manual block rules
+			threatIP := rule.Pattern
+			threatDescription := rule.Type // The threat type is stored in Type field for manual blocks
+
+			// Update the log to remove the "blocked" status
+			updates := map[string]interface{}{
+				"blocked":    false,
+				"blocked_by": "",
+			}
+
+			if err := db.WithContext(ctx).
+				Model(&models.Log{}).
+				Where("client_ip = ? AND (threat_type = ? OR description = ?)", threatIP, threatDescription, threatDescription).
+				Where("blocked = ?", true).
+				Updates(updates).Error; err != nil {
+				fmt.Printf("[ERROR] Failed to revert threat status: %v\n", err)
+			}
+
+			// Log the unblock action to WAF log files
+			logUnblockToWAF(threatIP, threatDescription, rule.Severity, "", "", "")
+		}
+
 		LogRuleAction(db, userID.(uint), userEmail.(string), "DELETE_RULE", ruleID, ruleName, nil, clientIP.(string))
 
 		c.JSON(200, gin.H{"message": "Rule deleted successfully"})
