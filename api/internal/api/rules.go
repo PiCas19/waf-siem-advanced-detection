@@ -301,8 +301,10 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 				threatDescription = rule.Name[len("Manual Block: "):]
 			}
 
-			// Update ALL logs with this threat description that are currently blocked manually
-			// to revert them back to detected status
+			// Update logs that match ALL three criteria:
+			// 1. Same threat description (from rule name or threat_type)
+			// 2. Same payload (from rule pattern)
+			// 3. Currently blocked manually (blocked=true AND blocked_by="manual")
 			updates := map[string]interface{}{
 				"blocked":    false,
 				"blocked_by": "",
@@ -310,8 +312,8 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 
 			if err := db.WithContext(ctx).
 				Model(&models.Log{}).
-				Where("(threat_type = ? OR description = ?) AND blocked = ? AND blocked_by = ?",
-					threatDescription, threatDescription, true, "manual").
+				Where("(threat_type = ? OR description = ?) AND payload = ? AND blocked = ? AND blocked_by = ?",
+					threatDescription, threatDescription, rule.Pattern, true, "manual").
 				Updates(updates).Error; err != nil {
 				fmt.Printf("[ERROR] Failed to revert threat status: %v\n", err)
 			}
