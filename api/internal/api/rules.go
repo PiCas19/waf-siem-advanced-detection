@@ -295,12 +295,14 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 
 		// If this is a manual block rule, revert the threat back to "detected" status
 		if rule != nil && rule.IsManualBlock {
-			// Extract threat description from rule pattern
-			// Pattern is the IP address for manual block rules
-			threatIP := rule.Pattern
-			threatDescription := rule.Type // The threat type is stored in Type field for manual blocks
+			// Extract threat description from rule name: "Manual Block: {description}"
+			threatDescription := ""
+			if rule.Name != "" && len(rule.Name) > len("Manual Block: ") {
+				threatDescription = rule.Name[len("Manual Block: "):]
+			}
 
-			// Update the log to remove the "blocked" status
+			// Update ALL logs with this threat description that are currently blocked manually
+			// to revert them back to detected status
 			updates := map[string]interface{}{
 				"blocked":    false,
 				"blocked_by": "",
@@ -308,14 +310,14 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 
 			if err := db.WithContext(ctx).
 				Model(&models.Log{}).
-				Where("client_ip = ? AND (threat_type = ? OR description = ?)", threatIP, threatDescription, threatDescription).
-				Where("blocked = ?", true).
+				Where("(threat_type = ? OR description = ?) AND blocked = ? AND blocked_by = ?",
+					threatDescription, threatDescription, true, "manual").
 				Updates(updates).Error; err != nil {
 				fmt.Printf("[ERROR] Failed to revert threat status: %v\n", err)
 			}
 
 			// Log the unblock action to WAF log files
-			logUnblockToWAF(threatIP, threatDescription, rule.Severity, "", "", "")
+			logUnblockToWAF("", threatDescription, rule.Severity, "", "", "")
 		}
 
 		LogRuleAction(db, userID.(uint), userEmail.(string), "DELETE_RULE", ruleID, ruleName, nil, clientIP.(string))
