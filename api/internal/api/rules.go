@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 
@@ -32,7 +31,7 @@ func NewGetRulesHandler(ruleService *service.RuleService) gin.HandlerFunc {
 		defaultRules := GetDefaultRules()
 
 		// Get custom rules from service
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		customRules, err := ruleService.GetAllRules(ctx)
 		if err != nil {
 			logger.Log.WithError(err).Error("Failed to fetch custom rules")
@@ -52,7 +51,7 @@ func NewGetRulesHandler(ruleService *service.RuleService) gin.HandlerFunc {
 // NewGetCustomRulesHandler returns only enabled custom rules for WAF
 func NewGetCustomRulesHandler(ruleService *service.RuleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		customRules, err := ruleService.GetEnabledRules(ctx)
 		if err != nil {
 			logger.Log.WithError(err).Error("Failed to fetch custom rules")
@@ -76,7 +75,7 @@ func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		userID, _ := c.Get("user_id")
 		userEmail, _ := c.Get("user_email")
 		clientIP, _ := c.Get("client_ip")
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		if err := c.ShouldBindJSON(&rule); err != nil {
 			logger.Log.WithError(err).Error("Failed to parse rule")
@@ -138,7 +137,7 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		userID, _ := c.Get("user_id")
 		userEmail, _ := c.Get("user_email")
 		clientIP, _ := c.Get("client_ip")
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		if err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Invalid rule ID format", nil, clientIP.(string), "Invalid rule ID")
@@ -268,7 +267,7 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		userID, _ := c.Get("user_id")
 		userEmail, _ := c.Get("user_email")
 		clientIP, _ := c.Get("client_ip")
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		if err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "DELETE_RULE", "RULE", "rule", ruleID, "Invalid rule ID format", nil, clientIP.(string), "Invalid rule ID")
@@ -337,7 +336,7 @@ func NewToggleRuleHandler(ruleService *service.RuleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ruleID := c.Param("id")
 		id, err := strconv.ParseUint(ruleID, 10, 32)
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		if err != nil {
 			c.JSON(400, gin.H{"error": "Invalid rule ID"})

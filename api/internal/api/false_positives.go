@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"strconv"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 // NewGetFalsePositivesHandler - Returns the list of false positives
 func NewGetFalsePositivesHandler(falsePositiveService *service.FalsePositiveService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		falsePositives, err := falsePositiveService.GetAllFalsePositives(ctx)
 		if err != nil {
@@ -46,7 +45,7 @@ func NewReportFalsePositiveHandler(falsePositiveService *service.FalsePositiveSe
 			return
 		}
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		falsePositive := models.FalsePositive{
 			ThreatType:  req.ThreatType,
@@ -97,7 +96,7 @@ func NewUpdateFalsePositiveStatusHandler(falsePositiveService *service.FalsePosi
 			return
 		}
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		update := models.FalsePositive{
 			ID:          uint(idUint),
@@ -126,7 +125,7 @@ func NewDeleteFalsePositiveHandler(falsePositiveService *service.FalsePositiveSe
 			return
 		}
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		if err := falsePositiveService.DeleteFalsePositive(ctx, uint(idUint)); err != nil {
 			c.JSON(500, gin.H{"error": "failed to delete false positive"})

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -46,7 +45,7 @@ func NewLogManualBlockHandler(logService *service.LogService, db *gorm.DB) gin.H
 		}
 
 		// Save to database for persistence
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		logEntry := &models.Log{
 			ThreatType:    req.ThreatType,
 			Severity:      req.Severity,
