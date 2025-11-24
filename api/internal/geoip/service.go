@@ -157,6 +157,11 @@ func IsPrivateIP(ipStr string) bool {
 // LookupCountry returns country name for given IP address
 // For private/local IPs, uses the server's public IP for geolocation
 func (s *Service) LookupCountry(ipStr string) string {
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "geoip_country_lookup",
+		"ip":        ipStr,
+	}).Debug("Starting country lookup")
+
 	s.mu.RLock()
 	reader := s.reader
 	ranges := s.ranges
@@ -165,6 +170,10 @@ func (s *Service) LookupCountry(ipStr string) string {
 
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "geoip_country_lookup",
+			"ip":        ipStr,
+		}).Warn("Invalid IP address format")
 		return "Unknown"
 	}
 
@@ -253,13 +262,27 @@ type IPifyResponse struct {
 // EnrichIPFromService enriches unknown IPs using ipify.org API
 // This is called when local databases don't recognize an IP
 func (s *Service) EnrichIPFromService(ipStr string) string {
+	startTime := time.Now()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "geoip_enrich_from_service",
+		"ip":        ipStr,
+	}).Info("Starting external GeoIP enrichment via ipapi.co")
+
 	// Skip private IPs
 	if IsPrivateIP(ipStr) {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "geoip_enrich_from_service",
+			"ip":        ipStr,
+		}).Debug("Skipping enrichment for private IP")
 		return "Unknown"
 	}
 
 	// Validate IP format
 	if net.ParseIP(ipStr) == nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "geoip_enrich_from_service",
+			"ip":        ipStr,
+		}).Warn("Invalid IP format for enrichment")
 		return "Unknown"
 	}
 
@@ -273,6 +296,12 @@ func (s *Service) EnrichIPFromService(ipStr string) string {
 
 	resp, err := client.Get(url)
 	if err != nil {
+		duration := time.Since(startTime).Milliseconds()
+		logger.Log.WithFields(map[string]interface{}{
+			"operation":   "geoip_enrich_from_service",
+			"ip":          ipStr,
+			"duration_ms": duration,
+		}).WithError(err).Error("External GeoIP API request failed")
 		return "Unknown"
 	}
 	defer resp.Body.Close()
@@ -293,8 +322,22 @@ func (s *Service) EnrichIPFromService(ipStr string) string {
 
 	// Extract country name from response
 	if country, ok := apiResp["country_name"].(string); ok && country != "" {
+		duration := time.Since(startTime).Milliseconds()
+		logger.Log.WithFields(map[string]interface{}{
+			"operation":   "geoip_enrich_from_service",
+			"ip":          ipStr,
+			"country":     country,
+			"duration_ms": duration,
+		}).Info("External GeoIP enrichment completed successfully")
 		return country
 	}
+
+	duration := time.Since(startTime).Milliseconds()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation":   "geoip_enrich_from_service",
+		"ip":          ipStr,
+		"duration_ms": duration,
+	}).Warn("External GeoIP enrichment returned no country data")
 
 	return "Unknown"
 }
