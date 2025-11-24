@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/mailer"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -768,7 +769,9 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 
 	if err := h.mailer.SendEmail(user.Email, subject, body); err != nil {
 		// Log the error but don't expose it to client
-		fmt.Printf("[ERROR] Failed to send password reset email to %s: %v\n", user.Email, err)
+		logger.Log.WithFields(map[string]interface{}{
+			"email": user.Email,
+		}).WithError(err).Error("Failed to send password reset email")
 	}
 
 	// Always return success for security

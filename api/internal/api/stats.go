@@ -14,6 +14,7 @@ import (
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/threatintel"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/websocket"
@@ -47,22 +48,22 @@ func InitTIService(db *gorm.DB) {
 	virusTotalKey := os.Getenv("VIRUSTOTAL_API_KEY")
 	if virusTotalKey != "" {
 		tiService.SetVirusTotalKey(virusTotalKey)
-		fmt.Println("[INFO] VirusTotal API key configured")
+		logger.Log.Info("VirusTotal API key configured")
 	} else {
-		fmt.Println("[WARN] VIRUSTOTAL_API_KEY not set. VirusTotal enrichment will be skipped. Get a free API key from https://www.virustotal.com/")
+		logger.Log.Warn("VIRUSTOTAL_API_KEY not set. VirusTotal enrichment will be skipped. Get a free API key from https://www.virustotal.com/")
 	}
 
 	// Set AbuseIPDB API key from environment variable
 	abuseIPDBKey := os.Getenv("ABUSEIPDB_API_KEY")
 	if abuseIPDBKey != "" {
 		tiService.SetAbuseIPDBKey(abuseIPDBKey)
-		fmt.Println("[INFO] AbuseIPDB API key configured")
+		logger.Log.Info("AbuseIPDB API key configured")
 	} else {
-		fmt.Println("[WARN] ABUSEIPDB_API_KEY not set. AbuseIPDB enrichment will be skipped. Get a free API key from https://www.abuseipdb.com/")
+		logger.Log.Warn("ABUSEIPDB_API_KEY not set. AbuseIPDB enrichment will be skipped. Get a free API key from https://www.abuseipdb.com/")
 	}
 
 	if virusTotalKey == "" && abuseIPDBKey == "" {
-		fmt.Println("[WARN] No TI API keys configured. Using only GeoIP enrichment.")
+		logger.Log.Warn("No TI API keys configured. Using only GeoIP enrichment.")
 	}
 }
 
@@ -80,7 +81,7 @@ func extractRealClientIP(c *gin.Context) (string, string, bool) {
 	if xPublicIP := c.GetHeader("X-Public-IP"); xPublicIP != "" {
 		xPublicIP = strings.TrimSpace(xPublicIP)
 		if xPublicIP != "" {
-			fmt.Printf("[DEBUG] X-Public-IP header found (Tailscale/VPN): %s\n", xPublicIP)
+			logger.Log.WithField("ip", xPublicIP).Debug("X-Public-IP header found (Tailscale/VPN)")
 			return xPublicIP, xPublicIP, true // Return: IP, publicIP, isXPublicIP
 		}
 	}
@@ -92,7 +93,7 @@ func extractRealClientIP(c *gin.Context) (string, string, bool) {
 		if len(ips) > 0 {
 			realIP := strings.TrimSpace(ips[0])
 			if realIP != "" {
-				fmt.Printf("[DEBUG] X-Forwarded-For header found: %s\n", xForwardedFor)
+				logger.Log.WithField("header", xForwardedFor).Debug("X-Forwarded-For header found")
 				return realIP, "", false // Return: IP, publicIP (empty), isXPublicIP (false)
 			}
 		}
@@ -102,7 +103,7 @@ func extractRealClientIP(c *gin.Context) (string, string, bool) {
 	if cfIP := c.GetHeader("CF-Connecting-IP"); cfIP != "" {
 		cfIP = strings.TrimSpace(cfIP)
 		if cfIP != "" {
-			fmt.Printf("[DEBUG] CF-Connecting-IP header found: %s\n", cfIP)
+			logger.Log.WithField("ip", cfIP).Debug("CF-Connecting-IP header found")
 			return cfIP, "", false
 		}
 	}
@@ -111,7 +112,7 @@ func extractRealClientIP(c *gin.Context) (string, string, bool) {
 	if xRealIP := c.GetHeader("X-Real-IP"); xRealIP != "" {
 		xRealIP = strings.TrimSpace(xRealIP)
 		if xRealIP != "" {
-			fmt.Printf("[DEBUG] X-Real-IP header found: %s\n", xRealIP)
+			logger.Log.WithField("ip", xRealIP).Debug("X-Real-IP header found")
 			return xRealIP, "", false
 		}
 	}
@@ -120,7 +121,7 @@ func extractRealClientIP(c *gin.Context) (string, string, bool) {
 	if xClientIP := c.GetHeader("X-Client-IP"); xClientIP != "" {
 		xClientIP = strings.TrimSpace(xClientIP)
 		if xClientIP != "" {
-			fmt.Printf("[DEBUG] X-Client-IP header found: %s\n", xClientIP)
+			logger.Log.WithField("ip", xClientIP).Debug("X-Client-IP header found")
 			return xClientIP, "", false
 		}
 	}
@@ -164,7 +165,7 @@ func getRuleByThreatName(ruleService *service.RuleService, threatType string) *m
 
 	allRules, err := ruleService.GetAllRules(ctx)
 	if err != nil {
-		fmt.Printf("[WARN] Failed to fetch rules from database: %v\n", err)
+		logger.Log.WithError(err).Warn("Failed to fetch rules from database")
 		return nil
 	}
 
@@ -182,7 +183,7 @@ func getRuleByThreatName(ruleService *service.RuleService, threatType string) *m
 		}
 	}
 
-	fmt.Printf("[WARN] No rule found in database for threat type: %s\n", threatType)
+	logger.Log.WithField("threat_type", threatType).Warn("No rule found in database for threat type")
 	return nil
 }
 
@@ -191,7 +192,7 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 	return func(c *gin.Context) {
 		var event websocket.WAFEvent
 		if err := c.ShouldBindJSON(&event); err != nil {
-			fmt.Printf("[ERROR] Failed to bind JSON: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to bind JSON")
 			c.JSON(400, gin.H{"error": "invalid json"})
 			return
 		}
@@ -199,17 +200,29 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		// Extract real client IP from proxy headers if available
 		realIP, publicIP, isXPublicIP := extractRealClientIP(c)
 		if realIP != event.IP && realIP != "" {
-			fmt.Printf("[INFO] Real client IP detected from headers: %s (WAF reported: %s)\n", realIP, event.IP)
+			logger.Log.WithFields(map[string]interface{}{
+				"real_ip":      realIP,
+				"waf_reported": event.IP,
+			}).Info("Real client IP detected from headers")
 			event.IP = realIP
 		}
 
-		fmt.Printf("[INFO] Received WAF event: IP=%s, Threat=%s, Method=%s, Path=%s\n", event.IP, event.Threat, event.Method, event.Path)
+		logger.Log.WithFields(map[string]interface{}{
+			"ip":     event.IP,
+			"threat": event.Threat,
+			"method": event.Method,
+			"path":   event.Path,
+		}).Info("Received WAF event")
 		if isXPublicIP && publicIP != "" {
-			fmt.Printf("[INFO] X-Public-IP (Tailscale/VPN client public IP): %s\n", publicIP)
+			logger.Log.WithField("public_ip", publicIP).Info("X-Public-IP (Tailscale/VPN client public IP)")
 		}
 
 		event.Timestamp = time.Now().Format("2006-01-02T15:04:05Z07:00")
-		fmt.Printf("[INFO] Received event with BlockedBy=%s for threat=%s (blocked=%v)\n", event.BlockedBy, event.Threat, event.Blocked)
+		logger.Log.WithFields(map[string]interface{}{
+			"blocked_by": event.BlockedBy,
+			"threat":     event.Threat,
+			"blocked":    event.Blocked,
+		}).Info("Received event with BlockedBy status")
 
 		ctx := context.Background()
 
@@ -221,9 +234,13 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		if ruleFromDB != nil {
 			severity = ruleFromDB.Severity
 			payload = ruleFromDB.Pattern // Pattern from rule
-			fmt.Printf("[DEBUG] Found rule in DB: Name=%s, Severity=%s, Payload length=%d\n", ruleFromDB.Name, severity, len(payload))
+			logger.Log.WithFields(map[string]interface{}{
+				"name":           ruleFromDB.Name,
+				"severity":       severity,
+				"payload_length": len(payload),
+			}).Debug("Found rule in DB")
 		} else {
-			fmt.Printf("[DEBUG] No rule found in DB for threat=%s, using default severity\n", event.Threat)
+			logger.Log.WithField("threat", event.Threat).Debug("No rule found in DB, using default severity")
 		}
 
 		// Update in-memory stats
@@ -267,13 +284,17 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		}
 
 		if log.ClientIPVPNReport {
-			fmt.Printf("[INFO] *** TAILSCALE/VPN CLIENT DETECTED *** Internal IP=%s, Public IP=%s, Source=%s, Trusted=%v\n",
-				log.ClientIP, log.ClientIPPublic, log.ClientIPSource, log.ClientIPTrusted)
+			logger.Log.WithFields(map[string]interface{}{
+				"internal_ip": log.ClientIP,
+				"public_ip":   log.ClientIPPublic,
+				"source":      log.ClientIPSource,
+				"trusted":     log.ClientIPTrusted,
+			}).Info("TAILSCALE/VPN CLIENT DETECTED")
 		}
 
 		// Save event using service layer
 		if err := logService.CreateLog(ctx, &log); err != nil {
-			fmt.Printf("[ERROR] Failed to save log: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to save log")
 			c.JSON(500, gin.H{"error": "failed to save event"})
 			return
 		}
@@ -281,9 +302,14 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		// Enrich log with threat intelligence synchronously
 		enrichmentStart := time.Now()
 		if err := tiService.EnrichLog(&log); err != nil {
-			fmt.Printf("[WARN] Threat intelligence enrichment failed for IP %s: %v\n", log.ClientIP, err)
+			logger.Log.WithFields(map[string]interface{}{
+				"ip": log.ClientIP,
+			}).WithError(err).Warn("Threat intelligence enrichment failed")
 		} else {
-			fmt.Printf("[INFO] Threat intelligence enrichment completed for IP %s in %v\n", log.ClientIP, time.Since(enrichmentStart))
+			logger.Log.WithFields(map[string]interface{}{
+				"ip":       log.ClientIP,
+				"duration": time.Since(enrichmentStart),
+			}).Info("Threat intelligence enrichment completed")
 		}
 
 		// Update the log with enriched threat intel data
@@ -303,9 +329,9 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		}
 
 		if err := logService.UpdateLogsByIPAndDescription(ctx, log.ClientIP, log.Description, updateData); err != nil {
-			fmt.Printf("[ERROR] Failed to update log with threat intelligence: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to update log with threat intelligence")
 		} else {
-			fmt.Printf("[INFO] Log successfully enriched and updated\n")
+			logger.Log.Info("Log successfully enriched and updated")
 			websocket.BroadcastEnrichment(
 				log.ClientIP,
 				log.IPReputation,
@@ -394,7 +420,7 @@ func verifyTurnstileToken(token string) bool {
 	// Get Turnstile secret key from environment
 	secretKey := os.Getenv("TURNSTILE_SECRET_KEY")
 	if secretKey == "" {
-		fmt.Printf("[WARN] TURNSTILE_SECRET_KEY not set in environment\n")
+		logger.Log.Warn("TURNSTILE_SECRET_KEY not set in environment")
 		return false
 	}
 
@@ -409,14 +435,14 @@ func verifyTurnstileToken(token string) bool {
 
 	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to marshal Turnstile request: %v\n", err)
+		logger.Log.WithError(err).Error("Failed to marshal Turnstile request")
 		return false
 	}
 
 	// Make request to Cloudflare
 	resp, err := http.Post(verifyURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to verify Turnstile token: %v\n", err)
+		logger.Log.WithError(err).Error("Failed to verify Turnstile token")
 		return false
 	}
 	defer resp.Body.Close()
@@ -424,7 +450,7 @@ func verifyTurnstileToken(token string) bool {
 	// Read response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("[ERROR] Failed to read Turnstile response: %v\n", err)
+		logger.Log.WithError(err).Error("Failed to read Turnstile response")
 		return false
 	}
 
@@ -437,17 +463,17 @@ func verifyTurnstileToken(token string) bool {
 	}
 
 	if err := json.Unmarshal(body, &verifyResponse); err != nil {
-		fmt.Printf("[ERROR] Failed to parse Turnstile response: %v\n", err)
+		logger.Log.WithError(err).Error("Failed to parse Turnstile response")
 		return false
 	}
 
 	// Check if verification was successful
 	if !verifyResponse.Success {
-		fmt.Printf("[WARN] Turnstile verification failed: %v\n", verifyResponse.ErrorCodes)
+		logger.Log.WithField("error_codes", verifyResponse.ErrorCodes).Warn("Turnstile verification failed")
 		return false
 	}
 
-	fmt.Printf("[INFO] Turnstile verified successfully\n")
+	logger.Log.Info("Turnstile verified successfully")
 	return true
 }
 
@@ -462,7 +488,7 @@ func GetGeolocationHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		geoService, err := geoip.GetInstance()
 		if err != nil {
-			fmt.Printf("[ERROR] Failed to initialize GeoIP service: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to initialize GeoIP service")
 			c.JSON(500, gin.H{"error": "geoip service unavailable"})
 			return
 		}
@@ -470,7 +496,7 @@ func GetGeolocationHandler(db *gorm.DB) gin.HandlerFunc {
 		var logs []models.Log
 		result := db.Find(&logs)
 		if result.Error != nil {
-			fmt.Printf("[ERROR] Failed to fetch logs: %v\n", result.Error)
+			logger.Log.WithError(result.Error).Error("Failed to fetch logs")
 			c.JSON(500, gin.H{"error": "database error"})
 			return
 		}
@@ -507,32 +533,34 @@ func NewWAFChallengeVerifyHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		if err := c.ShouldBind(&request); err != nil {
-			fmt.Printf("[ERROR] Failed to bind challenge verify request: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to bind challenge verify request")
 			c.JSON(400, gin.H{"error": "invalid request"})
 			return
 		}
 
-		fmt.Printf("[INFO] Challenge verification request received:\n")
-		fmt.Printf("  ChallengeID: %s\n", request.ChallengeID)
-		fmt.Printf("  OriginalRequest: %s\n", request.OriginalRequest)
-		if len(request.CaptchaToken) > 20 {
-			fmt.Printf("  CaptchaToken: %s... (length: %d)\n", request.CaptchaToken[:20], len(request.CaptchaToken))
-		} else {
-			fmt.Printf("  CaptchaToken: %s (length: %d)\n", request.CaptchaToken, len(request.CaptchaToken))
+		tokenPreview := request.CaptchaToken
+		if len(tokenPreview) > 20 {
+			tokenPreview = tokenPreview[:20] + "..."
 		}
+		logger.Log.WithFields(map[string]interface{}{
+			"challenge_id":      request.ChallengeID,
+			"original_request":  request.OriginalRequest,
+			"captcha_token":     tokenPreview,
+			"captcha_token_len": len(request.CaptchaToken),
+		}).Info("Challenge verification request received")
 
 		// Verify the Turnstile token with Cloudflare
 		captchaVerified := false
 		if request.CaptchaToken != "" {
-			fmt.Printf("[INFO] Verifying Turnstile token with Cloudflare...\n")
+			logger.Log.Info("Verifying Turnstile token with Cloudflare")
 			captchaVerified = verifyTurnstileToken(request.CaptchaToken)
 			if captchaVerified {
-				fmt.Printf("[INFO] Turnstile verification SUCCESS\n")
+				logger.Log.Info("Turnstile verification SUCCESS")
 			} else {
-				fmt.Printf("[WARN] Turnstile verification FAILED\n")
+				logger.Log.Warn("Turnstile verification FAILED")
 			}
 		} else {
-			fmt.Printf("[WARN] No Captcha token provided\n")
+			logger.Log.Warn("No Captcha token provided")
 		}
 
 		// Log the successful challenge verification
@@ -545,7 +573,7 @@ func NewWAFChallengeVerifyHandler(db *gorm.DB) gin.HandlerFunc {
 			IPAddress:   c.ClientIP(),
 		}
 		if err := db.Create(&auditLog).Error; err != nil {
-			fmt.Printf("[ERROR] Failed to log challenge verification: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to log challenge verification")
 		}
 
 		// Return success HTML page

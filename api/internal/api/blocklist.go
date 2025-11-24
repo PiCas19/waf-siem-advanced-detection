@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -294,7 +293,7 @@ func emitBlockedIPEvent(ip, threatType, severity, description, reason, duration,
 	// Create logs directory if it doesn't exist
 	logsDir := "/var/log/caddy"
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		log.Printf("[ERROR] Failed to create logs directory: %v\n", err)
+		logger.Log.WithError(err).Error("Failed to create logs directory")
 		return
 	}
 
@@ -302,7 +301,7 @@ func emitBlockedIPEvent(ip, threatType, severity, description, reason, duration,
 	eventLogPath := logsDir + "/blocked_ip_events.log"
 	eventLogger, err := logger.NewEventLogger(eventLogPath)
 	if err != nil {
-		log.Printf("[ERROR] Failed to initialize event logger: %v\n", err)
+		logger.Log.WithError(err).Error("Failed to initialize event logger")
 		return
 	}
 	defer eventLogger.Close()
@@ -324,11 +323,15 @@ func emitBlockedIPEvent(ip, threatType, severity, description, reason, duration,
 
 	// Log the event
 	if err := eventLogger.LogBlockedIPEvent(event); err != nil {
-		log.Printf("[ERROR] Failed to log blocked IP event: %v\n", err)
+		logger.Log.WithError(err).Error("Failed to log blocked IP event")
 		return
 	}
 
-	log.Printf("[INFO] Blocked IP event emitted: %s (threat: %s, duration: %s)\n", ip, threatType, duration)
+	logger.Log.WithFields(map[string]interface{}{
+		"ip":       ip,
+		"threat":   threatType,
+		"duration": duration,
+	}).Info("Blocked IP event emitted")
 }
 
 // emitUnblockedIPEvent emits an unblocking event to the SIEM via log file
@@ -336,7 +339,7 @@ func emitUnblockedIPEvent(ip, threatType, severity, description, operator, opera
 	// Create logs directory if it doesn't exist
 	logsDir := "/var/log/caddy"
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		log.Printf("[ERROR] Failed to create logs directory: %v\n", err)
+		logger.Log.WithError(err).Error("Failed to create logs directory")
 		return
 	}
 
@@ -344,7 +347,7 @@ func emitUnblockedIPEvent(ip, threatType, severity, description, operator, opera
 	eventLogPath := logsDir + "/blocked_ip_events.log"
 	eventLogger, err := logger.NewEventLogger(eventLogPath)
 	if err != nil {
-		log.Printf("[ERROR] Failed to initialize event logger: %v\n", err)
+		logger.Log.WithError(err).Error("Failed to initialize event logger")
 		return
 	}
 	defer eventLogger.Close()
@@ -366,18 +369,21 @@ func emitUnblockedIPEvent(ip, threatType, severity, description, operator, opera
 
 	// Log the event
 	if err := eventLogger.LogBlockedIPEvent(event); err != nil {
-		log.Printf("[ERROR] Failed to log unblocked IP event: %v\n", err)
+		logger.Log.WithError(err).Error("Failed to log unblocked IP event")
 		return
 	}
 
-	log.Printf("[INFO] Unblocked IP event emitted: %s (threat: %s)\n", ip, threatType)
+	logger.Log.WithFields(map[string]interface{}{
+		"ip":     ip,
+		"threat": threatType,
+	}).Info("Unblocked IP event emitted")
 }
 
 // logUnblockToWAF logs a manual unblock event to WAF log files
 func logUnblockToWAF(ip, threat, severity, url, userAgent, payload string) {
 	logsDir := "/var/log/caddy"
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
-		log.Printf("[WARN] Failed to create logs directory: %v\n", err)
+		logger.Log.WithError(err).Warn("Failed to create logs directory")
 		return
 	}
 
@@ -390,7 +396,9 @@ func logUnblockToWAF(ip, threat, severity, url, userAgent, payload string) {
 	for _, logFilePath := range logFiles {
 		wafLogger, err := logger.NewWAFLogger(logFilePath)
 		if err != nil {
-			log.Printf("[WARN] Failed to initialize WAF logger for %s: %v\n", logFilePath, err)
+			logger.Log.WithFields(map[string]interface{}{
+				"path": logFilePath,
+			}).WithError(err).Warn("Failed to initialize WAF logger")
 			continue
 		}
 		defer wafLogger.Close()
@@ -411,7 +419,9 @@ func logUnblockToWAF(ip, threat, severity, url, userAgent, payload string) {
 		}
 
 		if err := wafLogger.Log(entry); err != nil {
-			log.Printf("[WARN] Failed to log manual unblock to WAF file %s: %v\n", logFilePath, err)
+			logger.Log.WithFields(map[string]interface{}{
+				"path": logFilePath,
+			}).WithError(err).Warn("Failed to log manual unblock to WAF file")
 		}
 	}
 }

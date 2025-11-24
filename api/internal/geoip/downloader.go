@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 )
 
 const (
@@ -55,8 +57,11 @@ func DownloadDatabase(config *DownloadConfig) error {
 		info, err := os.Stat(dbFilePath)
 		if err == nil && info.Size() > 0 {
 			// Database exists and has content - use it
-			fmt.Printf("[INFO] Using existing MaxMind database: %s (size: %d bytes, modified: %s)\n",
-				dbFilePath, info.Size(), info.ModTime().Format("2006-01-02 15:04:05 MST"))
+			logger.Log.WithFields(map[string]interface{}{
+				"path":     dbFilePath,
+				"size":     info.Size(),
+				"modified": info.ModTime().Format("2006-01-02 15:04:05 MST"),
+			}).Info("Using existing MaxMind database")
 			return nil
 		}
 	}
@@ -64,7 +69,7 @@ func DownloadDatabase(config *DownloadConfig) error {
 	// For production/CI environments, check if database is fresh (within 7 days)
 	// This ensures we get updated threat data regularly
 	if fileExists(dbFilePath) && isFileRecent(dbFilePath, 7*24*time.Hour) {
-		fmt.Printf("[INFO] MaxMind database exists and is recent (< 7 days), skipping download\n")
+		logger.Log.Info("MaxMind database exists and is recent (< 7 days), skipping download")
 		return nil
 	}
 

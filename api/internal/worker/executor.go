@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/mailer"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/threatintel"
 	"gorm.io/gorm"
@@ -35,7 +36,7 @@ func (e *EnrichmentExecutor) Execute(ctx context.Context, job Job) error {
 
 	// Perform enrichment
 	// this is placeholder - will be implemented with actual enrichment logic
-	fmt.Printf("[EnrichmentExecutor] Enriching IP: %s\n", enrichmentJob.ip)
+	logger.Log.WithField("ip", enrichmentJob.ip).Info("EnrichmentExecutor enriching IP")
 
 	if enrichmentJob.onResult != nil {
 		enrichmentJob.onResult(nil, nil)
@@ -75,7 +76,10 @@ func (e *EmailExecutor) Execute(ctx context.Context, job Job) error {
 		return fmt.Errorf("failed to send email to %s: %w", emailJob.toEmail, err)
 	}
 
-	fmt.Printf("[EmailExecutor] Email sent to: %s (Subject: %s)\n", emailJob.toEmail, emailJob.subject)
+	logger.Log.WithFields(map[string]interface{}{
+		"to":      emailJob.toEmail,
+		"subject": emailJob.subject,
+	}).Info("EmailExecutor email sent")
 	return nil
 }
 
