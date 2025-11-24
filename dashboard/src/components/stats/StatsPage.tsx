@@ -220,7 +220,7 @@ const getSeverityColor = (count: number): string => {
 };
 
 const StatsPage: React.FC = () => {
-  const { stats, isConnected, onAlertReceived } = useWebSocketStats();
+  const { stats, isConnected, newAlert } = useWebSocketStats();
   const { user } = useAuth();
   const { showToast } = useToast();
   const [timelineData, setTimelineData] = useState<ChartDataPoint[]>([]);
@@ -372,41 +372,39 @@ const StatsPage: React.FC = () => {
     });
   }, [recentAlerts]);
 
-  // Registra callback per aggiornamenti real-time degli alert
+  // Ascolta nuovi alert dal WebSocket e li aggiunge a recentAlerts in real-time
   useEffect(() => {
-    const unsubscribe = onAlertReceived((alert: WAFEvent) => {
-      setRecentAlerts(prevAlerts => {
-        // Check if we already have a manually blocked alert for this IP and threat
-        // If so, preserve the manual block status and don't add the new alert
-        const manualBlockKey = `${alert.ip}::${alert.description || alert.threat}`;
-        const existingManualBlockIndex = prevAlerts.findIndex(a => {
-          const existingKey = `${a.ip}::${a.description || a.threat}`;
-          return existingKey === manualBlockKey && a.blockedBy === 'manual' && a.blocked === true;
-        });
+    if (!newAlert) return;
 
-        // If we found a manually blocked alert, preserve that status and don't add duplicate
-        if (existingManualBlockIndex >= 0) {
+    setRecentAlerts(prevAlerts => {
+      // Check if we already have a manually blocked alert for this IP and threat
+      // If so, preserve the manual block status and don't add the new alert
+      const manualBlockKey = `${newAlert.ip}::${newAlert.description || newAlert.threat}`;
+      const existingManualBlockIndex = prevAlerts.findIndex(a => {
+        const existingKey = `${a.ip}::${a.description || a.threat}`;
+        return existingKey === manualBlockKey && a.blockedBy === 'manual' && a.blocked === true;
+      });
+
+      // If we found a manually blocked alert, preserve that status and don't add duplicate
+      if (existingManualBlockIndex >= 0) {
+        return prevAlerts;
+      }
+
+      // Also skip auto-blocked threats that were blocked by a manual block rule
+      // These are threats that matched a rule created by clicking BLOCK on an earlier threat
+      if (newAlert.blocked && newAlert.blockedBy === 'auto') {
+        const isManuallyBlockedRule = manuallyBlockedThreats.has(manualBlockKey);
+        if (isManuallyBlockedRule) {
           return prevAlerts;
         }
+      }
 
-        // Also skip auto-blocked threats that were blocked by a manual block rule
-        // These are threats that matched a rule created by clicking BLOCK on an earlier threat
-        if (alert.blocked && alert.blockedBy === 'auto') {
-          const isManuallyBlockedRule = manuallyBlockedThreats.has(manualBlockKey);
-          if (isManuallyBlockedRule) {
-            return prevAlerts;
-          }
-        }
-
-        // Otherwise, add this alert as a new row (allows BLOCKED and DETECTED to coexist as separate rows)
-        const newAlerts = [alert, ...prevAlerts.slice(0, 999)];
-        // Force state update to trigger re-renders
-        return newAlerts;
-      });
+      // Otherwise, add this alert as a new row (allows BLOCKED and DETECTED to coexist as separate rows)
+      const updatedAlerts = [newAlert, ...prevAlerts.slice(0, 999)];
+      // Force state update to trigger re-renders
+      return updatedAlerts;
     });
-
-    return unsubscribe;
-  }, [onAlertReceived, manuallyBlockedThreats]);
+  }, [newAlert, manuallyBlockedThreats]);
 
   // Listen for enrichment updates from the backend
   useEffect(() => {
