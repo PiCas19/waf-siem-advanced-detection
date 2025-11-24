@@ -5,7 +5,9 @@ import (
     "os"
     "strconv"
     "strings"
+    "time"
 
+    "github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
     gomail "gopkg.in/gomail.v2"
 )
 
@@ -62,7 +64,18 @@ func NewMailerFromEnv() *Mailer {
 
 // SendEmail sends a generic email with HTML and plain text content.
 func (m *Mailer) SendEmail(toEmail, subject, htmlBody string) error {
+	startTime := time.Now()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "send_email",
+		"to":        toEmail,
+		"subject":   subject,
+	}).Info("Starting email send")
+
 	if m == nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "send_email",
+			"to":        toEmail,
+		}).Error("Mailer not configured")
 		return fmt.Errorf("mailer not configured")
 	}
 
@@ -83,12 +96,45 @@ func (m *Mailer) SendEmail(toEmail, subject, htmlBody string) error {
 	d := gomail.NewDialer(m.Host, m.Port, m.Username, m.Password)
 	// If SMTP_USER/PASS empty, dialer will attempt unauthenticated send
 
-	return d.DialAndSend(msg)
+	err := d.DialAndSend(msg)
+	duration := time.Since(startTime).Milliseconds()
+
+	if err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation":   "send_email",
+			"to":          toEmail,
+			"subject":     subject,
+			"smtp_host":   m.Host,
+			"smtp_port":   m.Port,
+			"duration_ms": duration,
+		}).WithError(err).Error("Failed to send email")
+		return err
+	}
+
+	logger.Log.WithFields(map[string]interface{}{
+		"operation":   "send_email",
+		"to":          toEmail,
+		"subject":     subject,
+		"duration_ms": duration,
+	}).Info("Email sent successfully")
+
+	return nil
 }
 
 // SendInvite sends an invitation email with reset link and temporary password.
 func (m *Mailer) SendInvite(toEmail, fullName, resetLink, tempPassword string) error {
+    startTime := time.Now()
+    logger.Log.WithFields(map[string]interface{}{
+        "operation": "send_invite",
+        "to":        toEmail,
+        "name":      fullName,
+    }).Info("Starting invitation email send")
+
     if m == nil {
+        logger.Log.WithFields(map[string]interface{}{
+            "operation": "send_invite",
+            "to":        toEmail,
+        }).Error("Mailer not configured")
         return fmt.Errorf("mailer not configured")
     }
 
@@ -133,5 +179,27 @@ func (m *Mailer) SendInvite(toEmail, fullName, resetLink, tempPassword string) e
     d := gomail.NewDialer(m.Host, m.Port, m.Username, m.Password)
     // If SMTP_USER/PASS empty, dialer will attempt unauthenticated send
 
-    return d.DialAndSend(msg)
+    err := d.DialAndSend(msg)
+    duration := time.Since(startTime).Milliseconds()
+
+    if err != nil {
+        logger.Log.WithFields(map[string]interface{}{
+            "operation":   "send_invite",
+            "to":          toEmail,
+            "name":        fullName,
+            "smtp_host":   m.Host,
+            "smtp_port":   m.Port,
+            "duration_ms": duration,
+        }).WithError(err).Error("Failed to send invitation email")
+        return err
+    }
+
+    logger.Log.WithFields(map[string]interface{}{
+        "operation":   "send_invite",
+        "to":          toEmail,
+        "name":        fullName,
+        "duration_ms": duration,
+    }).Info("Invitation email sent successfully")
+
+    return nil
 }

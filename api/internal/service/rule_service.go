@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/repository"
 )
 
@@ -22,7 +24,29 @@ func NewRuleService(ruleRepo repository.RuleRepository) *RuleService {
 
 // GetAllRules retrieves all rules
 func (s *RuleService) GetAllRules(ctx context.Context) ([]models.Rule, error) {
-	return s.ruleRepo.FindAll(ctx)
+	startTime := time.Now()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "get_all_rules",
+	}).Info("Fetching all rules from database")
+
+	rules, err := s.ruleRepo.FindAll(ctx)
+	duration := time.Since(startTime).Milliseconds()
+
+	if err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation":   "get_all_rules",
+			"duration_ms": duration,
+		}).WithError(err).Error("Failed to fetch all rules")
+		return nil, err
+	}
+
+	logger.Log.WithFields(map[string]interface{}{
+		"operation":   "get_all_rules",
+		"count":       len(rules),
+		"duration_ms": duration,
+	}).Info("Successfully fetched all rules")
+
+	return rules, nil
 }
 
 // GetRuleByID retrieves a rule by ID
@@ -57,19 +81,62 @@ func (s *RuleService) GetRulesCount(ctx context.Context) (int64, error) {
 
 // CreateRule creates a new rule
 func (s *RuleService) CreateRule(ctx context.Context, rule *models.Rule) error {
+	startTime := time.Now()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "create_rule",
+		"rule_name": rule.Name,
+		"rule_type": rule.Type,
+	}).Info("Starting rule creation")
+
 	if rule == nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "create_rule",
+		}).Error("Validation failed: rule cannot be nil")
 		return fmt.Errorf("rule cannot be nil")
 	}
 	if rule.Name == "" {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "create_rule",
+		}).Error("Validation failed: rule name cannot be empty")
 		return fmt.Errorf("rule name cannot be empty")
 	}
 	if rule.Pattern == "" {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "create_rule",
+			"rule_name": rule.Name,
+		}).Error("Validation failed: rule pattern cannot be empty")
 		return fmt.Errorf("rule pattern cannot be empty")
 	}
 	if rule.Type == "" {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "create_rule",
+			"rule_name": rule.Name,
+		}).Error("Validation failed: rule type cannot be empty")
 		return fmt.Errorf("rule type cannot be empty")
 	}
-	return s.ruleRepo.Create(ctx, rule)
+
+	err := s.ruleRepo.Create(ctx, rule)
+	duration := time.Since(startTime).Milliseconds()
+
+	if err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation":   "create_rule",
+			"rule_name":   rule.Name,
+			"rule_type":   rule.Type,
+			"duration_ms": duration,
+		}).WithError(err).Error("Failed to create rule")
+		return err
+	}
+
+	logger.Log.WithFields(map[string]interface{}{
+		"operation":   "create_rule",
+		"rule_id":     rule.ID,
+		"rule_name":   rule.Name,
+		"rule_type":   rule.Type,
+		"duration_ms": duration,
+	}).Info("Rule created successfully")
+
+	return nil
 }
 
 // UpdateRule updates an existing rule
@@ -85,10 +152,38 @@ func (s *RuleService) UpdateRule(ctx context.Context, rule *models.Rule) error {
 
 // DeleteRule deletes a rule
 func (s *RuleService) DeleteRule(ctx context.Context, id uint) error {
+	startTime := time.Now()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "delete_rule",
+		"rule_id":   id,
+	}).Info("Starting rule deletion")
+
 	if id == 0 {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "delete_rule",
+		}).Error("Validation failed: rule ID must be set")
 		return fmt.Errorf("rule ID must be set")
 	}
-	return s.ruleRepo.Delete(ctx, id)
+
+	err := s.ruleRepo.Delete(ctx, id)
+	duration := time.Since(startTime).Milliseconds()
+
+	if err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation":   "delete_rule",
+			"rule_id":     id,
+			"duration_ms": duration,
+		}).WithError(err).Error("Failed to delete rule")
+		return err
+	}
+
+	logger.Log.WithFields(map[string]interface{}{
+		"operation":   "delete_rule",
+		"rule_id":     id,
+		"duration_ms": duration,
+	}).Info("Rule deleted successfully")
+
+	return nil
 }
 
 // ToggleRuleEnabled enables/disables a rule

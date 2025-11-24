@@ -49,15 +49,30 @@ type TwoFASetupResponse struct {
 
 // Login handles user login (first step - password verification)
 func (h *AuthHandler) Login(c *gin.Context) {
+	ipAddress := c.ClientIP()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "login_attempt",
+		"ip_address": ipAddress,
+	}).Info("Starting login process")
+
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "login_attempt",
+			"ip_address": ipAddress,
+		}).WithError(err).Error("Failed to bind login request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "login_attempt",
+		"email": req.Email,
+		"ip_address": ipAddress,
+	}).Info("Processing login for user")
+
 	// Find user
 	var user models.User
-	ipAddress := c.ClientIP()
 	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
 		// Log failed login attempt - user not found
 		auditLog := models.AuditLog{
@@ -154,11 +169,29 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Generate token if 2FA is not enabled
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "token_generation",
+		"user_id": user.ID,
+		"email": user.Email,
+	}).Info("Generating authentication token")
+
 	token, err := GenerateToken(user.ID, user.Email, user.Role)
 	if err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "token_generation",
+			"user_id": user.ID,
+			"email": user.Email,
+		}).WithError(err).Error("Failed to generate authentication token")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
 	}
+
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "login_success",
+		"user_id": user.ID,
+		"email": user.Email,
+		"ip_address": ipAddress,
+	}).Info("Login successful - token generated")
 
 	// Log successful login (using direct DB create since we're in auth package)
 	auditLog := models.AuditLog{
@@ -188,11 +221,29 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 // VerifyOTPLogin handles the 2FA verification step
 func (h *AuthHandler) VerifyOTPLogin(c *gin.Context) {
+	ipAddress := c.ClientIP()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "2fa_verification",
+		"ip_address": ipAddress,
+	}).Info("Starting 2FA verification")
+
 	var req LoginOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "2fa_verification",
+			"ip_address": ipAddress,
+		}).WithError(err).Error("Failed to bind 2FA verification request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "2fa_verification",
+		"email": req.Email,
+		"ip_address": ipAddress,
+		"has_otp": req.OTPCode != "",
+		"has_backup": req.BackupCode != "",
+	}).Info("Processing 2FA verification")
 
 	// Validate that at least one of OTP code or backup code is provided
 	if req.OTPCode == "" && req.BackupCode == "" {
@@ -208,7 +259,6 @@ func (h *AuthHandler) VerifyOTPLogin(c *gin.Context) {
 
 	// Find user
 	var user models.User
-	ipAddress := c.ClientIP()
 	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
 		// Log failed 2FA attempt - user not found
 		auditLog := models.AuditLog{
@@ -305,6 +355,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 // AdminCreateUser allows an admin to create a new user (invite flow)
 func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
+	ipAddress := c.ClientIP()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "admin_create_user",
+		"ip_address": ipAddress,
+	}).Info("Starting user creation by admin")
+
 	var req struct {
 		Email string `json:"email" binding:"required,email"`
 		Name  string `json:"name" binding:"required"`
@@ -312,6 +368,10 @@ func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "admin_create_user",
+			"ip_address": ipAddress,
+		}).WithError(err).Error("Failed to bind user creation request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -319,7 +379,16 @@ func (h *AuthHandler) AdminCreateUser(c *gin.Context) {
 	// Get admin user ID from context
 	adminUserID, _ := c.Get("user_id")
 	adminUserEmail, _ := c.Get("user_email")
-	ipAddress := c.ClientIP()
+
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "admin_create_user",
+		"admin_id": adminUserID,
+		"admin_email": adminUserEmail,
+		"target_email": req.Email,
+		"target_name": req.Name,
+		"target_role": req.Role,
+		"ip_address": ipAddress,
+	}).Info("Processing user creation request")
 
 	// validate role against supported roles
 	if _, ok := RolePermissions[req.Role]; !ok {
@@ -716,15 +785,31 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 // ForgotPassword handles password reset request (send email)
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	ipAddress := c.ClientIP()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "forgot_password",
+		"ip_address": ipAddress,
+	}).Info("Password reset request received")
+
 	type ForgotPasswordRequest struct {
 		Email string `json:"email" binding:"required,email"`
 	}
 
 	var req ForgotPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "forgot_password",
+			"ip_address": ipAddress,
+		}).WithError(err).Error("Failed to bind password reset request")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email"})
 		return
 	}
+
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "forgot_password",
+		"email": req.Email,
+		"ip_address": ipAddress,
+	}).Info("Processing password reset request")
 
 	// Find user
 	var user models.User

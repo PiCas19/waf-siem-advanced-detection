@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"gorm.io/gorm"
 )
 
@@ -76,6 +77,7 @@ func (es *EnrichmentService) putInCache(key string, cached *CachedEnrichment) {
 }
 
 func (es *EnrichmentService) EnrichLog(log *models.Log) error {
+	startTime := time.Now()
 	isPrivate := isPrivateIP(log.ClientIP)
 	isReserved := isReservedRange(log.ClientIP)
 	isTailscaleVPN := log.ClientIPVPNReport
@@ -182,6 +184,22 @@ func (es *EnrichmentService) EnrichLog(log *models.Log) error {
 	})
 
 	applyThreatIntel(log, data)
+	duration := time.Since(startTime).Milliseconds()
+
+	// Import logger package at top of file if not already imported
+	if log.EnrichedAt != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation":      "enrich_log",
+			"client_ip":      log.ClientIP,
+			"is_private":     isPrivate,
+			"is_vpn":         isTailscaleVPN,
+			"country":        log.Country,
+			"threat_level":   log.ThreatLevel,
+			"is_malicious":   log.IsMalicious,
+			"duration_ms":    duration,
+		}).Info("Threat intelligence enrichment completed")
+	}
+
 	return nil
 }
 
@@ -189,6 +207,12 @@ func (es *EnrichmentService) checkVirusTotal(ip string, apiKey string) (*ThreatI
 	if apiKey == "" {
 		return nil, nil // Skip if API key not configured
 	}
+
+	startTime := time.Now()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "virustotal_lookup",
+		"ip":        ip,
+	}).Info("Starting VirusTotal IP lookup")
 
 	url := "https://www.virustotal.com/api/v3/ip_addresses/" + ip
 	req, err := http.NewRequest("GET", url, nil)
@@ -254,6 +278,16 @@ func (es *EnrichmentService) checkVirusTotal(ip string, apiKey string) (*ThreatI
 	}
 
 	threatLevel := calculateThreatLevel(reputation)
+	duration := time.Since(startTime).Milliseconds()
+
+	logger.Log.WithFields(map[string]interface{}{
+		"operation":      "virustotal_lookup",
+		"ip":             ip,
+		"reputation":     reputation,
+		"is_malicious":   isMalicious,
+		"threat_level":   threatLevel,
+		"duration_ms":    duration,
+	}).Info("VirusTotal lookup completed")
 
 	data := &ThreatIntelData{
 		IPReputation: reputation,
@@ -269,6 +303,12 @@ func (es *EnrichmentService) checkAbuseIPDB(ip string, apiKey string) (*ThreatIn
 	if apiKey == "" {
 		return nil, nil // Skip if API key not configured
 	}
+
+	startTime := time.Now()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "abuseipdb_lookup",
+		"ip":        ip,
+	}).Info("Starting AbuseIPDB IP lookup")
 
 	url := "https://api.abuseipdb.com/api/v2/check"
 	req, err := http.NewRequest("GET", url, nil)
@@ -315,6 +355,17 @@ func (es *EnrichmentService) checkAbuseIPDB(ip string, apiKey string) (*ThreatIn
 	reputation := abuseResp.Data.AbuseConfidenceScore
 	isMalicious := reputation > 25 // Consider suspicious if score > 25
 	threatLevel := calculateThreatLevel(reputation)
+	duration := time.Since(startTime).Milliseconds()
+
+	logger.Log.WithFields(map[string]interface{}{
+		"operation":      "abuseipdb_lookup",
+		"ip":             ip,
+		"reputation":     reputation,
+		"is_malicious":   isMalicious,
+		"abuse_reports":  abuseResp.Data.Reports,
+		"threat_level":   threatLevel,
+		"duration_ms":    duration,
+	}).Info("AbuseIPDB lookup completed")
 
 	data := &ThreatIntelData{
 		IPReputation: reputation,
@@ -327,6 +378,12 @@ func (es *EnrichmentService) checkAbuseIPDB(ip string, apiKey string) (*ThreatIn
 }
 
 func (es *EnrichmentService) checkGeoIP(ip string) (*ThreatIntelData, error) {
+	startTime := time.Now()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "geoip_lookup",
+		"ip":        ip,
+	}).Debug("Starting GeoIP lookup via ip-api.com")
+
 	url := "http://ip-api.com/json/" + ip
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -361,8 +418,24 @@ func (es *EnrichmentService) checkGeoIP(ip string) (*ThreatIntelData, error) {
 	}
 
 	if apiResp.Status != "success" {
+		duration := time.Since(startTime).Milliseconds()
+		logger.Log.WithFields(map[string]interface{}{
+			"operation":   "geoip_lookup",
+			"ip":          ip,
+			"duration_ms": duration,
+			"status":      apiResp.Status,
+		}).Warn("GeoIP lookup returned unsuccessful status")
 		return nil, err
 	}
+
+	duration := time.Since(startTime).Milliseconds()
+	logger.Log.WithFields(map[string]interface{}{
+		"operation":   "geoip_lookup",
+		"ip":          ip,
+		"country":     apiResp.CountryCode,
+		"isp":         apiResp.ISP,
+		"duration_ms": duration,
+	}).Debug("GeoIP lookup completed successfully")
 
 	data := &ThreatIntelData{
 		Country:      apiResp.CountryCode,
