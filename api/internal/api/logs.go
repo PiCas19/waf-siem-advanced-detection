@@ -14,89 +14,145 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
 
-// logToWAFFile writes a manual block/unblock event to the WAF log file
-// It retrieves the original threat data from database and writes complete log entry
+// logToWAFFile writes a manual block/unblock event to the WAF log files
+// Writes to either /var/log/caddy/waf_wan.log or /var/log/caddy/waf_lan.log
+// depending on the ClientIPSource of the threat
 func logToWAFFile(ctx context.Context, logService *service.LogService, ip string, description string, blocked bool, blockedBy string) error {
+	log.Printf("[WAF-LOG] logToWAFFile called: ip=%s, description=%s, blocked=%v, blockedBy=%s", ip, description, blocked, blockedBy)
+
 	// Find the original threat log to get all details
 	logs, err := logService.GetLogsByIP(ctx, ip)
-	if err != nil || len(logs) == 0 {
-		return fmt.Errorf("could not find threat log for IP %s", ip)
-	}
+	log.Printf("[WAF-LOG] GetLogsByIP for IP %s: found %d logs, error: %v", ip, len(logs), err)
 
-	// Find the matching log entry by description or threat_type
 	var targetLog *models.Log
-	for i := range logs {
-		if logs[i].Description == description || logs[i].ThreatType == description {
-			targetLog = &logs[i]
-			break
+
+	if err == nil && len(logs) > 0 {
+		// Find the matching log entry by description or threat_type
+		for i := range logs {
+			if logs[i].Description == description || logs[i].ThreatType == description {
+				targetLog = &logs[i]
+				log.Printf("[WAF-LOG] Found matching log entry")
+				break
+			}
+		}
+
+		// If no exact match found, use the first log as a fallback
+		if targetLog == nil && len(logs) > 0 {
+			log.Printf("[WAF-LOG] No exact match found, using first log as fallback")
+			targetLog = &logs[0]
 		}
 	}
 
 	if targetLog == nil {
-		return fmt.Errorf("could not find matching threat log")
+		log.Printf("[WAF-LOG] WARNING: Could not find threat log in database for IP %s, description %s", ip, description)
+		// Create a minimal log entry with available data - don't fail the operation
 	}
 
-	// Create complete WAF log entry with all original data
-	logEntry := map[string]interface{}{
-		"timestamp":             targetLog.CreatedAt.Format(time.RFC3339Nano),
-		"threat_type":           targetLog.ThreatType,
-		"severity":              targetLog.Severity,
-		"description":           targetLog.Description,
-		"client_ip":             targetLog.ClientIP,
-		"client_ip_source":      targetLog.ClientIPSource,
-		"client_ip_trusted":     targetLog.ClientIPTrusted,
-		"client_ip_vpn_report":  targetLog.ClientIPVPNReport,
-		"method":                targetLog.Method,
-		"url":                   targetLog.URL,
-		"user_agent":            targetLog.UserAgent,
-		"payload":               targetLog.Payload,
-		"blocked":               blocked,
-		"blocked_by":            blockedBy,
+	// Determine if this is WAN or LAN traffic based on ClientIPSource
+	// WAN traffic comes from Tailscale/VPN (x-public-ip, x-forwarded-for)
+	// LAN traffic comes from internal sources (remote-addr, internal proxies)
+	isWAN := false
+	if targetLog != nil {
+		// Check if it's from a Tailscale/VPN source
+		isWAN = targetLog.ClientIPVPNReport ||
+		        targetLog.ClientIPSource == "x-public-ip" ||
+		        (targetLog.ClientIPSource == "x-forwarded-for" && targetLog.ClientIPTrusted)
 	}
 
-	// Find the WAF log file - look in waf/logs directory (relative to project root or API executable)
-	// Try multiple possible paths:
-	// 1. ./waf/logs (if running from project root)
-	// 2. ../waf/logs (if running from api folder)
-	// 3. ./logs (fallback to current directory)
-	logDirCandidates := []string{
-		"waf/logs",
-		"../waf/logs",
-		"../../waf/logs",
-		"logs",
+	// Determine which log file to write to
+	var logFilePath string
+	if isWAN {
+		logFilePath = "/var/log/caddy/waf_wan.log"
+	} else {
+		logFilePath = "/var/log/caddy/waf_lan.log"
+	}
+	log.Printf("[WAF-LOG] Determined traffic type: %s, will write to: %s",
+		map[bool]string{true: "WAN", false: "LAN"}[isWAN], logFilePath)
+
+	// Create the WAF log entry struct matching the WAF logger format
+	wafLogEntry := models.Log{
+		CreatedAt:        time.Now(),
+		ThreatType:       description,
+		Severity:         "Unknown",
+		Description:      description,
+		ClientIP:         ip,
+		ClientIPSource:   "manual-dashboard",
+		ClientIPTrusted:  false,
+		ClientIPVPNReport: false,
+		Method:           "",
+		URL:              "",
+		UserAgent:        "",
+		Payload:          "",
+		Blocked:          blocked,
+		BlockedBy:        blockedBy,
 	}
 
-	var logDir string
-	for _, candidate := range logDirCandidates {
-		if err := os.MkdirAll(candidate, 0755); err == nil {
-			logDir = candidate
-			break
+	// If we found the original log, use its data instead
+	if targetLog != nil {
+		wafLogEntry = *targetLog
+		wafLogEntry.Blocked = blocked
+		wafLogEntry.BlockedBy = blockedBy
+		wafLogEntry.CreatedAt = time.Now() // Update timestamp to block action time
+	}
+
+	// Create directory if it doesn't exist
+	logDir := "/var/log/caddy"
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		log.Printf("[WAF-LOG] WARNING: Could not create log directory %s: %v", logDir, err)
+		// Try fallback location in case /var/log/caddy is not writable
+		logDir = "/tmp/caddy_logs"
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			log.Printf("[WAF-LOG] ERROR: Could not create fallback log directory: %v", err)
+			return fmt.Errorf("could not create log directory")
+		}
+		if isWAN {
+			logFilePath = filepath.Join(logDir, "waf_wan.log")
+		} else {
+			logFilePath = filepath.Join(logDir, "waf_lan.log")
 		}
 	}
 
-	if logDir == "" {
-		return fmt.Errorf("could not create logs directory")
-	}
-
-	// Get today's date for the log filename
-	dateStr := time.Now().Format("2006-01-02")
-	logFile := filepath.Join(logDir, fmt.Sprintf("waf_%s.log", dateStr))
+	log.Printf("[WAF-LOG] Writing to log file: %s", logFilePath)
 
 	// Marshal to JSON
-	data, err := json.Marshal(logEntry)
+	logEntryMap := map[string]interface{}{
+		"timestamp":             wafLogEntry.CreatedAt.Format(time.RFC3339Nano),
+		"threat_type":           wafLogEntry.ThreatType,
+		"severity":              wafLogEntry.Severity,
+		"description":           wafLogEntry.Description,
+		"client_ip":             wafLogEntry.ClientIP,
+		"client_ip_source":      wafLogEntry.ClientIPSource,
+		"client_ip_trusted":     wafLogEntry.ClientIPTrusted,
+		"client_ip_vpn_report":  wafLogEntry.ClientIPVPNReport,
+		"method":                wafLogEntry.Method,
+		"url":                   wafLogEntry.URL,
+		"user_agent":            wafLogEntry.UserAgent,
+		"payload":               wafLogEntry.Payload,
+		"blocked":               wafLogEntry.Blocked,
+		"blocked_by":            wafLogEntry.BlockedBy,
+	}
+
+	data, err := json.Marshal(logEntryMap)
 	if err != nil {
+		log.Printf("[WAF-LOG] ERROR: Failed to marshal JSON: %v", err)
 		return err
 	}
 
 	// Append to WAF log file
-	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
+		log.Printf("[WAF-LOG] ERROR: Failed to open log file %s: %v", logFilePath, err)
 		return err
 	}
 	defer f.Close()
 
 	// Write to file
 	_, err = f.Write(append(data, '\n'))
+	if err != nil {
+		log.Printf("[WAF-LOG] ERROR: Failed to write to log file: %v", err)
+	} else {
+		log.Printf("[WAF-LOG] SUCCESS: Log entry written to %s", logFilePath)
+	}
 	return err
 }
 

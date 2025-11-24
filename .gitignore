@@ -1,5 +1,7 @@
 # Binaries
 /caddy
+api/api-server
+waf/caddy-waf
 *.exe
 *.dll
 *.so
