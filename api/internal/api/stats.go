@@ -224,7 +224,7 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 			"blocked":    event.Blocked,
 		}).Info("Received event with BlockedBy status")
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Fetch rule from database to get severity and payload
 		ruleFromDB := getRuleByThreatName(ruleService, event.Threat)

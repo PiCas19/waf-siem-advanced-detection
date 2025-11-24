@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -14,7 +13,7 @@ import (
 // NewGetUsersHandler returns a handler that lists users (admin-only)
 func NewGetUsersHandler(userService *service.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		users, err := userService.GetAllUsers(ctx)
 		if err != nil {
@@ -83,7 +82,7 @@ func NewUpdateUserHandler(userService *service.UserService) gin.HandlerFunc {
 			return
 		}
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		user, err := userService.GetUserByID(ctx, uint(userID))
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
@@ -151,7 +150,7 @@ func NewDeleteUserHandler(userService *service.UserService) gin.HandlerFunc {
 			return
 		}
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 		user, err := userService.GetUserByID(ctx, uint(userID))
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})

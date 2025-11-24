@@ -196,7 +196,7 @@ func isDefaultThreatType(threatType string) bool {
 // NewGetLogsHandler returns security and audit logs with service layer
 func NewGetLogsHandler(logService *service.LogService, auditLogService *service.AuditLogService, blocklistService *service.BlocklistService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Fetch security logs
 		logs, err := logService.GetAllLogs(ctx)
@@ -280,7 +280,7 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 			return
 		}
 
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Update the threat log with the new block status
 		updates := map[string]interface{}{

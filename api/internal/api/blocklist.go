@@ -16,7 +16,7 @@ import (
 // GetBlocklist - Returns the list of blocked IPs from database
 func GetBlocklist(blocklistService *service.BlocklistService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		blockedIPs, err := blocklistService.GetActiveBlockedIPs(ctx)
 		if err != nil {
@@ -88,7 +88,7 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 		return
 	}
 
-	ctx := context.Background()
+	ctx := c.Request.Context()
 
 	blockedIP := models.BlockedIP{
 		IPAddress:   validatedIP,
@@ -175,7 +175,7 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 		return
 	}
 
-	ctx := context.Background()
+	ctx := c.Request.Context()
 
 	// Find and delete the block
 	blockedIP, err := blocklistService.GetBlockedIPByIPAndDescription(ctx, ip, threat)
@@ -230,7 +230,7 @@ func IsIPBlocked(blocklistService *service.BlocklistService, ip string, descript
 // Public endpoint (no auth required) - WAF needs to fetch this frequently
 func NewGetBlocklistForWAF(blocklistService *service.BlocklistService) func(*gin.Context) {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		blockedIPs, err := blocklistService.GetActiveBlockedIPs(ctx)
 		if err != nil {
@@ -249,7 +249,7 @@ func NewGetBlocklistForWAF(blocklistService *service.BlocklistService) func(*gin
 // Public endpoint (no auth required) - WAF needs to fetch this frequently
 func NewGetWhitelistForWAF(whitelistService *service.WhitelistService) func(*gin.Context) {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		whitelisted, err := whitelistService.GetAllWhitelistedIPs(ctx)
 		if err != nil {

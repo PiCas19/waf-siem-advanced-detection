@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 
@@ -12,7 +11,7 @@ import (
 // NewGetAuditLogsHandler returns a handler to retrieve audit logs with pagination
 func NewGetAuditLogsHandler(auditLogService *service.AuditLogService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Get query parameters for filtering and pagination
 		page := c.DefaultQuery("page", "1")
@@ -56,7 +55,7 @@ func NewGetAuditLogsHandler(auditLogService *service.AuditLogService) gin.Handle
 // NewGetAuditLogStatsHandler returns statistics about audit logs
 func NewGetAuditLogStatsHandler(auditLogService *service.AuditLogService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx := context.Background()
+		ctx := c.Request.Context()
 
 		// Get counts from service
 		totalActions, _ := auditLogService.GetAuditLogsCount(ctx)
