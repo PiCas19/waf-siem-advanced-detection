@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
 
@@ -18,11 +18,19 @@ import (
 // Writes to either /var/log/caddy/waf_wan.log or /var/log/caddy/waf_lan.log
 // depending on the ClientIPSource of the threat
 func logToWAFFile(ctx context.Context, logService *service.LogService, ip string, description string, blocked bool, blockedBy string) error {
-	log.Printf("[WAF-LOG] logToWAFFile called: ip=%s, description=%s, blocked=%v, blockedBy=%s", ip, description, blocked, blockedBy)
+	logger.Log.WithFields(map[string]interface{}{
+		"ip":          ip,
+		"description": description,
+		"blocked":     blocked,
+		"blocked_by":  blockedBy,
+	}).Debug("logToWAFFile called")
 
 	// Find the original threat log to get all details
 	logs, err := logService.GetLogsByIP(ctx, ip)
-	log.Printf("[WAF-LOG] GetLogsByIP for IP %s: found %d logs, error: %v", ip, len(logs), err)
+	logger.Log.WithFields(map[string]interface{}{
+		"ip":        ip,
+		"log_count": len(logs),
+	}).WithError(err).Debug("GetLogsByIP result")
 
 	var targetLog *models.Log
 
@@ -31,20 +39,23 @@ func logToWAFFile(ctx context.Context, logService *service.LogService, ip string
 		for i := range logs {
 			if logs[i].Description == description || logs[i].ThreatType == description {
 				targetLog = &logs[i]
-				log.Printf("[WAF-LOG] Found matching log entry")
+				logger.Log.Debug("Found matching log entry")
 				break
 			}
 		}
 
 		// If no exact match found, use the first log as a fallback
 		if targetLog == nil && len(logs) > 0 {
-			log.Printf("[WAF-LOG] No exact match found, using first log as fallback")
+			logger.Log.Debug("No exact match found, using first log as fallback")
 			targetLog = &logs[0]
 		}
 	}
 
 	if targetLog == nil {
-		log.Printf("[WAF-LOG] WARNING: Could not find threat log in database for IP %s, description %s", ip, description)
+		logger.Log.WithFields(map[string]interface{}{
+			"ip":          ip,
+			"description": description,
+		}).Warn("Could not find threat log in database")
 		// Create a minimal log entry with available data - don't fail the operation
 	}
 
@@ -66,8 +77,10 @@ func logToWAFFile(ctx context.Context, logService *service.LogService, ip string
 	} else {
 		logFilePath = "/var/log/caddy/waf_lan.log"
 	}
-	log.Printf("[WAF-LOG] Determined traffic type: %s, will write to: %s",
-		map[bool]string{true: "WAN", false: "LAN"}[isWAN], logFilePath)
+	logger.Log.WithFields(map[string]interface{}{
+		"traffic_type": map[bool]string{true: "WAN", false: "LAN"}[isWAN],
+		"log_path":     logFilePath,
+	}).Debug("Determined traffic type and log path")
 
 	// Create the WAF log entry struct matching the WAF logger format
 	wafLogEntry := models.Log{
@@ -98,11 +111,13 @@ func logToWAFFile(ctx context.Context, logService *service.LogService, ip string
 	// Create directory if it doesn't exist
 	logDir := "/var/log/caddy"
 	if err := os.MkdirAll(logDir, 0755); err != nil {
-		log.Printf("[WAF-LOG] WARNING: Could not create log directory %s: %v", logDir, err)
+		logger.Log.WithFields(map[string]interface{}{
+			"log_dir": logDir,
+		}).WithError(err).Warn("Could not create log directory")
 		// Try fallback location in case /var/log/caddy is not writable
 		logDir = "/tmp/caddy_logs"
 		if err := os.MkdirAll(logDir, 0755); err != nil {
-			log.Printf("[WAF-LOG] ERROR: Could not create fallback log directory: %v", err)
+			logger.Log.WithError(err).Error("Could not create fallback log directory")
 			return fmt.Errorf("could not create log directory")
 		}
 		if isWAN {
@@ -112,7 +127,7 @@ func logToWAFFile(ctx context.Context, logService *service.LogService, ip string
 		}
 	}
 
-	log.Printf("[WAF-LOG] Writing to log file: %s", logFilePath)
+	logger.Log.WithField("log_path", logFilePath).Debug("Writing to log file")
 
 	// Marshal to JSON
 	logEntryMap := map[string]interface{}{
@@ -134,14 +149,16 @@ func logToWAFFile(ctx context.Context, logService *service.LogService, ip string
 
 	data, err := json.Marshal(logEntryMap)
 	if err != nil {
-		log.Printf("[WAF-LOG] ERROR: Failed to marshal JSON: %v", err)
+		logger.Log.WithError(err).Error("Failed to marshal JSON")
 		return err
 	}
 
 	// Append to WAF log file
 	f, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Printf("[WAF-LOG] ERROR: Failed to open log file %s: %v", logFilePath, err)
+		logger.Log.WithFields(map[string]interface{}{
+			"log_path": logFilePath,
+		}).WithError(err).Error("Failed to open log file")
 		return err
 	}
 	defer f.Close()
@@ -149,9 +166,9 @@ func logToWAFFile(ctx context.Context, logService *service.LogService, ip string
 	// Write to file
 	_, err = f.Write(append(data, '\n'))
 	if err != nil {
-		log.Printf("[WAF-LOG] ERROR: Failed to write to log file: %v", err)
+		logger.Log.WithError(err).Error("Failed to write to log file")
 	} else {
-		log.Printf("[WAF-LOG] SUCCESS: Log entry written to %s", logFilePath)
+		logger.Log.WithField("log_path", logFilePath).Debug("Log entry written successfully")
 	}
 	return err
 }
@@ -280,7 +297,7 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 
 		// Log the manual block/unblock action to WAF log file with complete threat details
 		if err := logToWAFFile(ctx, logService, req.IP, req.Description, req.Blocked, req.BlockedBy); err != nil {
-			log.Printf("Warning: Failed to write to WAF log file: %v\n", err)
+			logger.Log.WithError(err).Warn("Failed to write to WAF log file")
 			// Don't fail the request if logging fails
 		}
 

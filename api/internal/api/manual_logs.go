@@ -2,12 +2,12 @@ package api
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
 
@@ -62,7 +62,7 @@ func NewLogManualBlockHandler(logService *service.LogService, db *gorm.DB) gin.H
 		}
 
 		if err := logService.CreateLog(ctx, logEntry); err != nil {
-			log.Printf("[ERROR] Failed to save manual block to database: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to save manual block to database")
 			c.JSON(500, gin.H{"error": "Failed to log event"})
 			return
 		}

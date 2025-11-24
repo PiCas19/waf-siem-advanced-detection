@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/oschwald/geoip2-golang"
 )
 
@@ -66,7 +67,7 @@ func GetPublicIP() string {
 		}
 	}
 
-	fmt.Println("[WARN] Could not detect server public IP, local IP mapping will not work")
+	logger.Log.Warn("Could not detect server public IP, local IP mapping will not work")
 	return ""
 }
 
@@ -101,10 +102,10 @@ func NewService() (*Service, error) {
 	}
 
 	// Fallback to JSON file if MaxMind not available
-	fmt.Println("[WARN] MaxMind database not found, falling back to JSON IP ranges")
+	logger.Log.Warn("MaxMind database not found, falling back to JSON IP ranges")
 	if err := s.loadFromFile("geoip/ip_ranges.json"); err != nil {
 		// If JSON file also not found, use hardcoded fallback ranges
-		fmt.Println("[WARN] Could not load IP ranges from file, using fallback ranges")
+		logger.Log.Warn("Could not load IP ranges from file, using fallback ranges")
 		s.ranges = getFallbackRanges()
 	}
 

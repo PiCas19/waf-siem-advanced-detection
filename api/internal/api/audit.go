@@ -2,12 +2,12 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 )
 
 // LogAudit logs a user action to the audit log
@@ -54,7 +54,7 @@ func LogAudit(db *gorm.DB, c *gin.Context, action, category, description, resour
 
 	// Save to database
 	if err := db.Create(&auditLog).Error; err != nil {
-		fmt.Printf("[ERROR] Failed to save audit log: %v\n", err)
+		logger.Log.WithError(err).Error("Failed to save audit log")
 		return err
 	}
 

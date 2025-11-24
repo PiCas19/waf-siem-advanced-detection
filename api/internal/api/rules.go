@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 	"gorm.io/gorm"
 )
@@ -34,7 +35,7 @@ func NewGetRulesHandler(ruleService *service.RuleService) gin.HandlerFunc {
 		ctx := context.Background()
 		customRules, err := ruleService.GetAllRules(ctx)
 		if err != nil {
-			fmt.Printf("[ERROR] Failed to fetch custom rules: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to fetch custom rules")
 			customRules = []models.Rule{}
 		}
 
@@ -54,7 +55,7 @@ func NewGetCustomRulesHandler(ruleService *service.RuleService) gin.HandlerFunc 
 		ctx := context.Background()
 		customRules, err := ruleService.GetEnabledRules(ctx)
 		if err != nil {
-			fmt.Printf("[ERROR] Failed to fetch custom rules: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to fetch custom rules")
 			c.JSON(500, gin.H{"error": "failed to fetch custom rules"})
 			return
 		}
@@ -78,7 +79,7 @@ func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		ctx := context.Background()
 
 		if err := c.ShouldBindJSON(&rule); err != nil {
-			fmt.Printf("[ERROR] Failed to parse rule: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to parse rule")
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Invalid rule data format", nil, clientIP.(string), "Invalid JSON format")
 			c.JSON(400, gin.H{"error": "Invalid rule data"})
 			return
@@ -107,7 +108,7 @@ func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		}
 
 		if err := ruleService.CreateRule(ctx, &rule); err != nil {
-			fmt.Printf("[ERROR] Failed to create rule: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to create rule")
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Database error: failed to create rule", nil, clientIP.(string), err.Error())
 			c.JSON(500, gin.H{"error": "failed to create rule"})
 			return
@@ -231,7 +232,7 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		// Update only specified fields in database
 		if err := db.WithContext(ctx).Model(&models.Rule{}).Where("id = ?", uint(id)).Updates(updates).Error; err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Failed to update rule", nil, clientIP.(string), err.Error())
-			fmt.Printf("[ERROR] Failed to update rule: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to update rule")
 			c.JSON(500, gin.H{"error": "failed to update rule"})
 			return
 		}
@@ -287,7 +288,7 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 			if err.Error() == "rule not found" {
 				c.JSON(404, gin.H{"error": "Rule not found"})
 			} else {
-				fmt.Printf("[ERROR] Failed to delete rule: %v\n", err)
+				logger.Log.WithError(err).Error("Failed to delete rule")
 				c.JSON(500, gin.H{"error": "failed to delete rule"})
 			}
 			return
@@ -315,7 +316,7 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 				Where("(threat_type = ? OR description = ?) AND payload = ? AND blocked = ? AND blocked_by = ?",
 					threatDescription, threatDescription, rule.Pattern, true, "manual").
 				Updates(updates).Error; err != nil {
-				fmt.Printf("[ERROR] Failed to revert threat status: %v\n", err)
+				logger.Log.WithError(err).Error("Failed to revert threat status")
 			}
 
 			// Log the unblock action to WAF log files
@@ -348,7 +349,7 @@ func NewToggleRuleHandler(ruleService *service.RuleService) gin.HandlerFunc {
 			if err.Error() == "rule not found" {
 				c.JSON(404, gin.H{"error": "Rule not found"})
 			} else {
-				fmt.Printf("[ERROR] Failed to fetch rule: %v\n", err)
+				logger.Log.WithError(err).Error("Failed to fetch rule")
 				c.JSON(500, gin.H{"error": "failed to fetch rule"})
 			}
 			return
@@ -357,7 +358,7 @@ func NewToggleRuleHandler(ruleService *service.RuleService) gin.HandlerFunc {
 		// Toggle the enabled state
 		enabled := !rule.Enabled
 		if err := ruleService.ToggleRuleEnabled(ctx, uint(id), enabled); err != nil {
-			fmt.Printf("[ERROR] Failed to toggle rule: %v\n", err)
+			logger.Log.WithError(err).Error("Failed to toggle rule")
 			c.JSON(500, gin.H{"error": "failed to toggle rule"})
 			return
 		}

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 )
 
 // Job represents a unit of work to be processed
@@ -104,10 +106,10 @@ func (w *Worker) Start(ctx context.Context) {
 		for {
 			select {
 			case <-w.done:
-				fmt.Printf("[Worker %d] Shutting down\n", w.id)
+				logger.Log.WithField("worker_id", w.id).Info("Worker shutting down")
 				return
 			case <-ctx.Done():
-				fmt.Printf("[Worker %d] Context cancelled\n", w.id)
+				logger.Log.WithField("worker_id", w.id).Info("Worker context cancelled")
 				return
 			case job := <-w.jobChan:
 				if job == nil {
@@ -124,9 +126,17 @@ func (w *Worker) Start(ctx context.Context) {
 				}
 
 				if err != nil {
-					fmt.Printf("[Worker %d] Job %s failed: %v (took %v)\n", w.id, job.ID(), err, duration)
+					logger.Log.WithFields(map[string]interface{}{
+						"worker_id": w.id,
+						"job_id":    job.ID(),
+						"duration":  duration,
+					}).WithError(err).Error("Job failed")
 				} else {
-					fmt.Printf("[Worker %d] Job %s completed (took %v)\n", w.id, job.ID(), duration)
+					logger.Log.WithFields(map[string]interface{}{
+						"worker_id": w.id,
+						"job_id":    job.ID(),
+						"duration":  duration,
+					}).Info("Job completed")
 				}
 			}
 		}
@@ -238,7 +248,7 @@ func (p *WorkerPool) GetStats() PoolStats {
 
 // Shutdown gracefully shuts down the pool
 func (p *WorkerPool) Shutdown(timeout time.Duration) error {
-	fmt.Println("[WorkerPool] Initiating shutdown...")
+	logger.Log.Info("WorkerPool initiating shutdown")
 
 	// Stop accepting new jobs
 	close(p.jobChan)
@@ -254,9 +264,9 @@ func (p *WorkerPool) Shutdown(timeout time.Duration) error {
 
 	select {
 	case <-done:
-		fmt.Println("[WorkerPool] All workers shut down successfully")
+		logger.Log.Info("WorkerPool all workers shut down successfully")
 	case <-time.After(timeout):
-		fmt.Println("[WorkerPool] Shutdown timeout - forcing termination")
+		logger.Log.Warn("WorkerPool shutdown timeout - forcing termination")
 	}
 
 	p.cancel()
