@@ -1187,6 +1187,16 @@ const StatsPage: React.FC = () => {
 
   // Segnala falso positivo
   const handleReportFalsePositive = async (alert: WAFEvent) => {
+    // Validate required fields
+    if (!alert.threat || !alert.threat.trim()) {
+      showToast('Cannot report: threat type is missing', 'error');
+      return;
+    }
+    if (!alert.ip || !alert.ip.trim()) {
+      showToast('Cannot report: client IP is missing', 'error');
+      return;
+    }
+
     const key = getAlertKey(alert.ip, alert.description || alert.threat);
     setProcessingKey(key);
 
@@ -1202,13 +1212,16 @@ const StatsPage: React.FC = () => {
           threat_type: alert.threat,
           description: alert.description || '',
           client_ip: alert.ip,
-          method: alert.method,
-          url: alert.path,
+          method: alert.method || '',
+          url: alert.path || '',
         }),
       });
 
       if (!resp.ok) {
-        showToast('Error reporting false positive', 'error');
+        const errorData = await resp.json();
+        const errorMsg = errorData.error || errorData.message || 'Unknown error';
+        console.error('False positive error response:', errorData);
+        showToast(`Error reporting false positive: ${errorMsg}`, 'error');
       } else {
         showToast('False positive reported successfully', 'success');
         // Ricarica i false positive dal backend per sincronizzare
