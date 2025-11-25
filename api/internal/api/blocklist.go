@@ -20,7 +20,7 @@ func GetBlocklist(blocklistService *service.BlocklistService) gin.HandlerFunc {
 
 		blockedIPs, err := blocklistService.GetActiveBlockedIPs(ctx)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "Failed to fetch blocked IPs"})
+			InternalServerErrorWithCode(c, ErrServiceError, "Failed to fetch blocked IPs")
 			return
 		}
 
@@ -58,33 +58,32 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 		Payload       string `json:"payload"`       // Threat payload
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request"})
+	if !ValidateJSON(c, &req) {
 		return
 	}
 
 	// Validate IP address
 	validatedIP, err := ValidateIP(req.IP)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		BadRequestWithCode(c, ErrInvalidIP, err.Error())
 		return
 	}
 
 	// Validate threat type
 	if err := ValidateThreat(req.Threat); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		BadRequestWithCode(c, ErrInvalidThreatType, err.Error())
 		return
 	}
 
 	// Validate reason
 	if err := ValidateReason(req.Reason); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		BadRequestWithCode(c, ErrInvalidRequest, err.Error())
 		return
 	}
 
 	// Validate duration
 	if err := ValidateDuration(req.DurationHours); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		BadRequestWithCode(c, ErrInvalidDuration, err.Error())
 		return
 	}
 
@@ -127,7 +126,7 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 		// Update existing block
 		blockedIP.ID = existingBlock.ID
 		if err := blocklistService.UpdateBlockedIP(ctx, &blockedIP); err != nil {
-			c.JSON(500, gin.H{"error": "Failed to update blocked IP"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to update blocked IP")
 			return
 		}
 
@@ -138,14 +137,14 @@ func BlockIPWithService(blocklistService *service.BlocklistService, logService *
 	} else {
 		// Create new block
 		if err := blocklistService.BlockIP(ctx, &blockedIP); err != nil {
-			c.JSON(500, gin.H{"error": "Failed to create blocked IP"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to create blocked IP")
 			return
 		}
 
 		// Fetch the created block to get the actual stored values
 		createdBlock, err := blocklistService.GetBlockedIPByIPAndDescription(ctx, validatedIP, req.Threat)
 		if err != nil || createdBlock == nil {
-			c.JSON(500, gin.H{"error": "Failed to retrieve created block"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to retrieve created block")
 			return
 		}
 
@@ -171,7 +170,7 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 	threat := c.Query("threat") // Get rule name from query string
 
 	if threat == "" {
-		c.JSON(400, gin.H{"error": "threat parameter required"})
+		BadRequestWithCode(c, ErrMissingField, "threat parameter required")
 		return
 	}
 
@@ -180,12 +179,12 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 	// Find and delete the block
 	blockedIP, err := blocklistService.GetBlockedIPByIPAndDescription(ctx, ip, threat)
 	if err != nil || blockedIP == nil {
-		c.JSON(404, gin.H{"error": "Blocked IP entry not found"})
+		NotFoundWithCode(c, ErrIPNotFound, "Blocked IP entry not found")
 		return
 	}
 
 	if err := blocklistService.UnblockIP(ctx, ip); err != nil {
-		c.JSON(500, gin.H{"error": "Failed to delete blocked IP"})
+		InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to delete blocked IP")
 		return
 	}
 
@@ -207,7 +206,7 @@ func UnblockIPWithService(blocklistService *service.BlocklistService, logService
 
 // UnblockIP - Deprecated: use NewUnblockIPHandler instead
 func UnblockIP(c *gin.Context) {
-	c.JSON(400, gin.H{"error": "use NewUnblockIPHandler"})
+	BadRequest(c, "use NewUnblockIPHandler")
 }
 
 // refreshStatsOnClients notifica i client di ricaricare gli stats
@@ -234,7 +233,7 @@ func NewGetBlocklistForWAF(blocklistService *service.BlocklistService) func(*gin
 
 		blockedIPs, err := blocklistService.GetActiveBlockedIPs(ctx)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "Failed to fetch blocked IPs"})
+			InternalServerErrorWithCode(c, ErrServiceError, "Failed to fetch blocked IPs")
 			return
 		}
 
@@ -253,7 +252,7 @@ func NewGetWhitelistForWAF(whitelistService *service.WhitelistService) func(*gin
 
 		whitelisted, err := whitelistService.GetAllWhitelistedIPs(ctx)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to fetch whitelist"})
+			InternalServerErrorWithCode(c, ErrServiceError, "Failed to fetch whitelist")
 			return
 		}
 

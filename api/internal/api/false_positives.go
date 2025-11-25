@@ -16,7 +16,7 @@ func NewGetFalsePositivesHandler(falsePositiveService *service.FalsePositiveServ
 
 		falsePositives, err := falsePositiveService.GetAllFalsePositives(ctx)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to fetch false positives"})
+			InternalServerErrorWithCode(c, ErrServiceError, "Failed to fetch false positives")
 			return
 		}
 
@@ -40,8 +40,7 @@ func NewReportFalsePositiveHandler(falsePositiveService *service.FalsePositiveSe
 			UserAgent   string `json:"user_agent"`
 		}
 
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid request"})
+		if !ValidateJSON(c, &req) {
 			return
 		}
 
@@ -59,7 +58,7 @@ func NewReportFalsePositiveHandler(falsePositiveService *service.FalsePositiveSe
 		}
 
 		if err := falsePositiveService.ReportFalsePositive(ctx, &falsePositive); err != nil {
-			c.JSON(500, gin.H{"error": "failed to report false positive"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to report false positive")
 			return
 		}
 
@@ -76,7 +75,7 @@ func NewUpdateFalsePositiveStatusHandler(falsePositiveService *service.FalsePosi
 		id := c.Param("id")
 		idUint, err := strconv.ParseUint(id, 10, 32)
 		if err != nil {
-			c.JSON(400, gin.H{"error": "Invalid ID"})
+			BadRequestWithCode(c, ErrInvalidRequest, "Invalid ID")
 			return
 		}
 
@@ -85,14 +84,13 @@ func NewUpdateFalsePositiveStatusHandler(falsePositiveService *service.FalsePosi
 			ReviewNotes  string `json:"review_notes"`
 		}
 
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid request"})
+		if !ValidateJSON(c, &req) {
 			return
 		}
 
 		// Validate status
 		if req.Status != "pending" && req.Status != "reviewed" && req.Status != "whitelisted" {
-			c.JSON(400, gin.H{"error": "Invalid status"})
+			BadRequestWithCode(c, ErrInvalidRequest, "Invalid status value")
 			return
 		}
 
@@ -107,7 +105,7 @@ func NewUpdateFalsePositiveStatusHandler(falsePositiveService *service.FalsePosi
 		update.ReviewedAt = &now
 
 		if err := falsePositiveService.UpdateFalsePositive(ctx, &update); err != nil {
-			c.JSON(500, gin.H{"error": "failed to update false positive"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to update false positive")
 			return
 		}
 
@@ -121,14 +119,14 @@ func NewDeleteFalsePositiveHandler(falsePositiveService *service.FalsePositiveSe
 		id := c.Param("id")
 		idUint, err := strconv.ParseUint(id, 10, 32)
 		if err != nil {
-			c.JSON(400, gin.H{"error": "Invalid ID"})
+			BadRequestWithCode(c, ErrInvalidRequest, "Invalid ID")
 			return
 		}
 
 		ctx := c.Request.Context()
 
 		if err := falsePositiveService.DeleteFalsePositive(ctx, uint(idUint)); err != nil {
-			c.JSON(500, gin.H{"error": "failed to delete false positive"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to delete false positive")
 			return
 		}
 

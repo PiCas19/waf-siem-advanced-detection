@@ -193,7 +193,7 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		var event websocket.WAFEvent
 		if err := c.ShouldBindJSON(&event); err != nil {
 			logger.Log.WithError(err).Error("Failed to bind JSON")
-			c.JSON(400, gin.H{"error": "invalid json"})
+			BadRequest(c, "invalid json")
 			return
 		}
 
@@ -295,7 +295,7 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		// Save event using service layer
 		if err := logService.CreateLog(ctx, &log); err != nil {
 			logger.Log.WithError(err).Error("Failed to save log")
-			c.JSON(500, gin.H{"error": "failed to save event"})
+			InternalServerError(c, "failed to save event")
 			return
 		}
 
@@ -489,7 +489,7 @@ func GetGeolocationHandler(db *gorm.DB) gin.HandlerFunc {
 		geoService, err := geoip.GetInstance()
 		if err != nil {
 			logger.Log.WithError(err).Error("Failed to initialize GeoIP service")
-			c.JSON(500, gin.H{"error": "geoip service unavailable"})
+			InternalServerError(c, "geoip service unavailable")
 			return
 		}
 
@@ -497,7 +497,7 @@ func GetGeolocationHandler(db *gorm.DB) gin.HandlerFunc {
 		result := db.Find(&logs)
 		if result.Error != nil {
 			logger.Log.WithError(result.Error).Error("Failed to fetch logs")
-			c.JSON(500, gin.H{"error": "database error"})
+			InternalServerError(c, "database error")
 			return
 		}
 
@@ -534,7 +534,7 @@ func NewWAFChallengeVerifyHandler(db *gorm.DB) gin.HandlerFunc {
 
 		if err := c.ShouldBind(&request); err != nil {
 			logger.Log.WithError(err).Error("Failed to bind challenge verify request")
-			c.JSON(400, gin.H{"error": "invalid request"})
+			BadRequest(c, "invalid request")
 			return
 		}
 

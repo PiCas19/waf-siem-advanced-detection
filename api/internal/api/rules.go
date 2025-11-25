@@ -55,7 +55,7 @@ func NewGetCustomRulesHandler(ruleService *service.RuleService) gin.HandlerFunc 
 		customRules, err := ruleService.GetEnabledRules(ctx)
 		if err != nil {
 			logger.Log.WithError(err).Error("Failed to fetch custom rules")
-			c.JSON(500, gin.H{"error": "failed to fetch custom rules"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "failed to fetch custom rules")
 			return
 		}
 
@@ -77,16 +77,15 @@ func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		clientIP, _ := c.Get("client_ip")
 		ctx := c.Request.Context()
 
-		if err := c.ShouldBindJSON(&rule); err != nil {
-			logger.Log.WithError(err).Error("Failed to parse rule")
+		if !ValidateJSON(c, &rule) {
+			logger.Log.Error("Failed to parse rule")
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Invalid rule data format", nil, clientIP.(string), "Invalid JSON format")
-			c.JSON(400, gin.H{"error": "Invalid rule data"})
 			return
 		}
 
 		if rule.Name == "" || rule.Pattern == "" {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Missing required fields: Name and Pattern", nil, clientIP.(string), "Missing required fields")
-			c.JSON(400, gin.H{"error": "Name and Pattern are required"})
+			BadRequestWithCode(c, ErrMissingField, "Name and Pattern are required")
 			return
 		}
 
@@ -109,7 +108,7 @@ func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		if err := ruleService.CreateRule(ctx, &rule); err != nil {
 			logger.Log.WithError(err).Error("Failed to create rule")
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Database error: failed to create rule", nil, clientIP.(string), err.Error())
-			c.JSON(500, gin.H{"error": "failed to create rule"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "failed to create rule")
 			return
 		}
 
@@ -141,7 +140,7 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 
 		if err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Invalid rule ID format", nil, clientIP.(string), "Invalid rule ID")
-			c.JSON(400, gin.H{"error": "Invalid rule ID"})
+			BadRequestWithCode(c, ErrInvalidRequest, "Invalid rule ID")
 			return
 		}
 
@@ -150,9 +149,9 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		if err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Rule not found", nil, clientIP.(string), err.Error())
 			if err.Error() == "rule not found" {
-				c.JSON(404, gin.H{"error": "Rule not found"})
+				NotFoundWithCode(c, ErrRuleNotFound, "Rule not found")
 			} else {
-				c.JSON(500, gin.H{"error": "failed to retrieve rule"})
+				InternalServerErrorWithCode(c, ErrDatabaseError, "failed to retrieve rule")
 			}
 			return
 		}
@@ -160,7 +159,7 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		// Check if this is a manual block rule - cannot be edited
 		if existingRule.IsManualBlock {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Cannot edit manual block rule", nil, clientIP.(string), "Manual block rules cannot be edited")
-			c.JSON(403, gin.H{"error": "Manual block rules cannot be edited. Delete and recreate if needed."})
+			ForbiddenWithCode(c, ErrCannotEditManualBlock, "Manual block rules cannot be edited. Delete and recreate if needed.")
 			return
 		}
 
@@ -176,9 +175,8 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 			RedirectEnabled   bool   `json:"redirect_enabled"`
 			ChallengeEnabled  bool   `json:"challenge_enabled"`
 		}
-		if err := c.ShouldBindJSON(&updateRequest); err != nil {
+		if !ValidateJSON(c, &updateRequest) {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Invalid request data format", nil, clientIP.(string), "Invalid JSON format")
-			c.JSON(400, gin.H{"error": "Invalid rule data"})
 			return
 		}
 
@@ -232,14 +230,14 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		if err := db.WithContext(ctx).Model(&models.Rule{}).Where("id = ?", uint(id)).Updates(updates).Error; err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "UPDATE_RULE", "RULE", "rule", ruleID, "Failed to update rule", nil, clientIP.(string), err.Error())
 			logger.Log.WithError(err).Error("Failed to update rule")
-			c.JSON(500, gin.H{"error": "failed to update rule"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "failed to update rule")
 			return
 		}
 
 		// Fetch updated rule to ensure all fields are correct
 		rule, err := ruleService.GetRuleByID(ctx, uint(id))
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to retrieve updated rule"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "failed to retrieve updated rule")
 			return
 		}
 
@@ -271,7 +269,7 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 
 		if err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "DELETE_RULE", "RULE", "rule", ruleID, "Invalid rule ID format", nil, clientIP.(string), "Invalid rule ID")
-			c.JSON(400, gin.H{"error": "Invalid rule ID"})
+			BadRequestWithCode(c, ErrInvalidRequest, "Invalid rule ID")
 			return
 		}
 
@@ -285,10 +283,10 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 		if err := ruleService.DeleteRule(ctx, uint(id)); err != nil {
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "DELETE_RULE", "RULE", "rule", ruleID, "Failed to delete rule", nil, clientIP.(string), err.Error())
 			if err.Error() == "rule not found" {
-				c.JSON(404, gin.H{"error": "Rule not found"})
+				NotFoundWithCode(c, ErrRuleNotFound, "Rule not found")
 			} else {
 				logger.Log.WithError(err).Error("Failed to delete rule")
-				c.JSON(500, gin.H{"error": "failed to delete rule"})
+				InternalServerErrorWithCode(c, ErrDatabaseError, "failed to delete rule")
 			}
 			return
 		}
@@ -339,17 +337,17 @@ func NewToggleRuleHandler(ruleService *service.RuleService) gin.HandlerFunc {
 		ctx := c.Request.Context()
 
 		if err != nil {
-			c.JSON(400, gin.H{"error": "Invalid rule ID"})
+			BadRequestWithCode(c, ErrInvalidRequest, "Invalid rule ID")
 			return
 		}
 
 		rule, err := ruleService.GetRuleByID(ctx, uint(id))
 		if err != nil {
 			if err.Error() == "rule not found" {
-				c.JSON(404, gin.H{"error": "Rule not found"})
+				NotFoundWithCode(c, ErrRuleNotFound, "Rule not found")
 			} else {
 				logger.Log.WithError(err).Error("Failed to fetch rule")
-				c.JSON(500, gin.H{"error": "failed to fetch rule"})
+				InternalServerErrorWithCode(c, ErrDatabaseError, "failed to fetch rule")
 			}
 			return
 		}
@@ -358,7 +356,7 @@ func NewToggleRuleHandler(ruleService *service.RuleService) gin.HandlerFunc {
 		enabled := !rule.Enabled
 		if err := ruleService.ToggleRuleEnabled(ctx, uint(id), enabled); err != nil {
 			logger.Log.WithError(err).Error("Failed to toggle rule")
-			c.JSON(500, gin.H{"error": "failed to toggle rule"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "failed to toggle rule")
 			return
 		}
 
@@ -377,8 +375,8 @@ func GetRulesByType(db *gorm.DB, threatType string) []models.Rule {
 }
 
 // Deprecated handlers for backward compatibility
-func GetRules(c *gin.Context)     { c.JSON(400, gin.H{"error": "use NewGetRulesHandler"}) }
-func CreateRule(c *gin.Context)   { c.JSON(400, gin.H{"error": "use NewCreateRuleHandler"}) }
-func UpdateRule(c *gin.Context)   { c.JSON(400, gin.H{"error": "use NewUpdateRuleHandler"}) }
-func DeleteRule(c *gin.Context)   { c.JSON(400, gin.H{"error": "use NewDeleteRuleHandler"}) }
-func ToggleRule(c *gin.Context)   { c.JSON(400, gin.H{"error": "use NewToggleRuleHandler"}) }
+func GetRules(c *gin.Context)     { BadRequestWithCode(c, ErrInvalidRequest, "use NewGetRulesHandler") }
+func CreateRule(c *gin.Context)   { BadRequestWithCode(c, ErrInvalidRequest, "use NewCreateRuleHandler") }
+func UpdateRule(c *gin.Context)   { BadRequestWithCode(c, ErrInvalidRequest, "use NewUpdateRuleHandler") }
+func DeleteRule(c *gin.Context)   { BadRequestWithCode(c, ErrInvalidRequest, "use NewDeleteRuleHandler") }
+func ToggleRule(c *gin.Context)   { BadRequestWithCode(c, ErrInvalidRequest, "use NewToggleRuleHandler") }

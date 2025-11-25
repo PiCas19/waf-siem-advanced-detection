@@ -33,7 +33,7 @@ func NewGetAuditLogsHandler(auditLogService *service.AuditLogService) gin.Handle
 		// Fetch paginated results using service
 		auditLogs, total, err := auditLogService.GetPaginatedAuditLogs(ctx, pageNum, pageSizeNum)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch audit logs"})
+			InternalServerError(c, "Failed to fetch audit logs")
 			return
 		}
 
