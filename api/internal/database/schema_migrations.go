@@ -63,42 +63,37 @@ var Migrations = []Migration{
 		Version: "003",
 		Name:    "add_index_on_logs_created_at",
 		Up: func(db *gorm.DB) error {
-			if !db.Migrator().HasIndex("logs", "idx_logs_created_at") {
-				logger.Log.Info("Migrazione 003: Creando indice su logs.created_at per performance")
-				return db.Migrator().CreateIndex("logs", "created_at")
-			}
+			// Index is now defined in Log model struct with gorm:"index" tag
+			// This migration is kept for backward compatibility but does nothing
+			logger.Log.Info("Migrazione 003: Indice su logs.created_at gestito dal modello struct")
 			return nil
 		},
 		Down: func(db *gorm.DB) error {
-			return db.Migrator().DropIndex("logs", "created_at")
+			return nil
 		},
 	},
 	{
 		Version: "004",
 		Name:    "add_index_on_blocked_ips",
 		Up: func(db *gorm.DB) error {
-			if !db.Migrator().HasIndex("blocked_ips", "ip_address") {
-				logger.Log.Info("Migrazione 004: Creando indice su blocked_ips.ip_address per performance")
-				return db.Migrator().CreateIndex("blocked_ips", "ip_address")
-			}
+			// Index is now defined in BlockedIP model struct with gorm:"index" tag
+			logger.Log.Info("Migrazione 004: Indice su blocked_ips.ip_address gestito dal modello struct")
 			return nil
 		},
 		Down: func(db *gorm.DB) error {
-			return db.Migrator().DropIndex("blocked_ips", "ip_address")
+			return nil
 		},
 	},
 	{
 		Version: "005",
 		Name:    "add_index_on_rules_enabled",
 		Up: func(db *gorm.DB) error {
-			if !db.Migrator().HasIndex("rules", "enabled") {
-				logger.Log.Info("Migrazione 005: Creando indice su rules.enabled per performance")
-				return db.Migrator().CreateIndex("rules", "enabled")
-			}
+			// Index is now defined in Rule model struct with gorm:"index" tag
+			logger.Log.Info("Migrazione 005: Indice su rules.enabled gestito dal modello struct")
 			return nil
 		},
 		Down: func(db *gorm.DB) error {
-			return db.Migrator().DropIndex("rules", "enabled")
+			return nil
 		},
 	},
 }
