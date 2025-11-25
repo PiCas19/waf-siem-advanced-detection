@@ -85,7 +85,7 @@ func Initialize(dbPath string) (*gorm.DB, error) {
 		"operation": "database_migration",
 	}).Info("Database auto-migration completed successfully")
 
-	// Run custom migrations
+	// Run custom migrations (backward compatibility)
 	logger.Log.WithFields(map[string]interface{}{
 		"operation": "custom_migrations",
 	}).Info("Starting custom migrations")
@@ -94,6 +94,18 @@ func Initialize(dbPath string) (*gorm.DB, error) {
 		logger.Log.WithFields(map[string]interface{}{
 			"operation": "custom_migrations",
 		}).WithError(err).Error("Failed to run custom migrations")
+		return nil, err
+	}
+
+	// Run versioned schema migrations
+	logger.Log.WithFields(map[string]interface{}{
+		"operation": "schema_migrations",
+	}).Info("Starting schema migrations")
+
+	if err := RunSchemaMigrations(db); err != nil {
+		logger.Log.WithFields(map[string]interface{}{
+			"operation": "schema_migrations",
+		}).WithError(err).Error("Failed to run schema migrations")
 		return nil, err
 	}
 
