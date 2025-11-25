@@ -10,7 +10,19 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/repository"
 )
 
-// RuleService handles business logic for WAF rules
+// RuleService handles business logic for WAF detection rules, providing methods to
+// create, update, delete, enable/disable, and query security detection rules.
+//
+// Fields:
+//   - ruleRepo (repository.RuleRepository): Repository for rule database operations
+//
+// Example Usage:
+//   ruleService := service.NewRuleService(ruleRepo)
+//   err := ruleService.CreateRule(ctx, &models.Rule{Name: "XSS Detection", Type: "xss"})
+//
+// Thread Safety: Thread-safe when using appropriate database transaction handling.
+//
+// See Also: Rule, RuleRepository
 type RuleService struct {
 	ruleRepo repository.RuleRepository
 }
@@ -47,6 +59,11 @@ func (s *RuleService) GetAllRules(ctx context.Context) ([]models.Rule, error) {
 	}).Info("Successfully fetched all rules")
 
 	return rules, nil
+}
+
+// GetRulesPaginated retrieves paginated rules with total count
+func (s *RuleService) GetRulesPaginated(ctx context.Context, offset, limit int) ([]models.Rule, int64, error) {
+	return s.ruleRepo.FindPaginated(ctx, offset, limit)
 }
 
 // GetRuleByID retrieves a rule by ID

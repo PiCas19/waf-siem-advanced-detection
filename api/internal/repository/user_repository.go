@@ -93,3 +93,22 @@ func (r *GormUserRepository) ExistsByEmail(ctx context.Context, email string) (b
 		Count(&count).Error
 	return count > 0, err
 }
+
+func (r *GormUserRepository) FindPaginated(ctx context.Context, offset int, limit int) ([]models.User, int64, error) {
+	var users []models.User
+	var total int64
+
+	// Get total count
+	if err := r.db.WithContext(ctx).Model(&models.User{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
+	err := r.db.WithContext(ctx).
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&users).Error
+
+	return users, total, err
+}

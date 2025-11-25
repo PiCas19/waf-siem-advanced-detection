@@ -7,17 +7,39 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/helpers"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
 
-// NewGetUsersHandler returns a handler that lists users (admin-only)
+// NewGetUsersHandler godoc
+// @Summary Get users list
+// @Description Returns paginated list of system users (admin-only)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param limit query int false "Number of users per page (default 20, max 100)" default(20)
+// @Param offset query int false "Pagination offset (default 0)" default(0)
+// @Success 200 {object} map[string]interface{} "Users with pagination"
+// @Failure 400 {object} map[string]interface{} "Invalid parameters"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /admin/users [get]
+// @Security BearerAuth
 func NewGetUsersHandler(userService *service.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Parse pagination parameters
+		limit, offset, _, _, err := helpers.ParsePaginationParams(c)
+		if err != nil {
+			BadRequestWithCode(c, ErrInvalidRequest, err.Error())
+			return
+		}
+
 		ctx := c.Request.Context()
 
-		users, err := userService.GetAllUsers(ctx)
+		// Fetch paginated users
+		users, total, err := userService.GetUsersPaginated(ctx, offset, limit)
 		if err != nil {
-			InternalServerError(c, "failed to load users")
+			InternalServerErrorWithCode(c, ErrServiceError, "Failed to fetch users")
 			return
 		}
 
@@ -36,14 +58,35 @@ func NewGetUsersHandler(userService *service.UserService) gin.HandlerFunc {
 			})
 		}
 
-		c.JSON(http.StatusOK, gin.H{"users": out})
+		// Build paginated response
+		response := helpers.BuildStandardPaginatedResponse(out, limit, offset, total)
+
+		c.JSON(http.StatusOK, gin.H{
+			"users":      response.Items,
+			"pagination": response.Pagination,
+		})
 	}
 }
 
 // Deprecated compatibility stub
 func GetUsers(c *gin.Context) { BadRequest(c, "use NewGetUsersHandler") }
 
-// NewUpdateUserHandler returns a handler that updates a user (admin-only)
+// NewUpdateUserHandler godoc
+// @Summary Update user information
+// @Description Updates user name, role, and active status (admin-only)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param id path int true "User ID"
+// @Param request body object{name=string,role=string,active=boolean} true "Update request"
+// @Success 200 {object} map[string]interface{} "User updated successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid user ID"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Cannot edit own account"
+// @Failure 404 {object} map[string]interface{} "User not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /admin/users/{id} [put]
+// @Security BearerAuth
 func NewUpdateUserHandler(userService *service.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userIDStr := c.Param("id")
@@ -122,7 +165,21 @@ func NewUpdateUserHandler(userService *service.UserService) gin.HandlerFunc {
 	}
 }
 
-// NewDeleteUserHandler returns a handler that deletes a user (admin-only)
+// NewDeleteUserHandler godoc
+// @Summary Delete a user
+// @Description Deletes a user account (admin-only, cannot delete own account)
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Param id path int true "User ID"
+// @Success 200 {object} map[string]interface{} "User deleted successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid user ID"
+// @Failure 401 {object} map[string]interface{} "Unauthorized"
+// @Failure 403 {object} map[string]interface{} "Cannot delete own account"
+// @Failure 404 {object} map[string]interface{} "User not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /admin/users/{id} [delete]
+// @Security BearerAuth
 func NewDeleteUserHandler(userService *service.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userIDStr := c.Param("id")

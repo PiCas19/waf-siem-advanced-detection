@@ -17,6 +17,16 @@ import (
 	"gorm.io/gorm"
 )
 
+// AuthHandler handles authentication-related HTTP requests including login, registration,
+// 2FA setup, and password management.
+//
+// Fields:
+//   - db (*gorm.DB): Database connection for user operations
+//   - mailer (*mailer.Mailer): Email service for sending invites and reset links
+//
+// Thread Safety: Safe for concurrent use when using appropriate database transactions.
+//
+// See Also: User, Claims, OTPConfig
 type AuthHandler struct {
 	db *gorm.DB
 	mailer *mailer.Mailer
@@ -26,22 +36,34 @@ func NewAuthHandler(db *gorm.DB, m *mailer.Mailer) *AuthHandler {
 	return &AuthHandler{db: db, mailer: m}
 }
 
+// LoginRequest represents the first step of authentication (password verification).
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
 type LoginRequest struct {
 	Email string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
 
-type LoginOTPRequest struct {
+// LoginOTPRequest represents 2FA verification step with OTP or backup code.
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
+type LoginOTPRequest struct{
 	Email string `json:"email" binding:"required,email"`
 	OTPCode string `json:"otp_code"`
 	BackupCode string `json:"backup_code"`
 }
 
+// TwoFASetupRequest represents a request to complete 2FA setup.
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
 type TwoFASetupRequest struct {
 	OTPCode string `json:"otp_code" binding:"required,len=6"`
 }
 
-type TwoFASetupResponse struct {
+// TwoFASetupResponse contains 2FA setup information including QR code and backup codes.
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
+type TwoFASetupResponse struct{
 	QRCodeURL   string   `json:"qr_code_url"`
 	Secret      string   `json:"secret"`
 	BackupCodes []string `json:"backup_codes"`

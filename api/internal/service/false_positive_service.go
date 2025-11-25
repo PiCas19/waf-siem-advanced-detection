@@ -8,7 +8,19 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/repository"
 )
 
-// FalsePositiveService handles business logic for false positives
+// FalsePositiveService handles business logic for false positives, providing methods to
+// report, review, and manage security events incorrectly flagged as threats.
+//
+// Fields:
+//   - fpRepo (repository.FalsePositiveRepository): Repository for false positive operations
+//
+// Example Usage:
+//   fpService := service.NewFalsePositiveService(fpRepo)
+//   err := fpService.ReportFalsePositive(ctx, &models.FalsePositive{ThreatType: "xss"})
+//
+// Thread Safety: Thread-safe when using appropriate database transaction handling.
+//
+// See Also: FalsePositive, FalsePositiveRepository
 type FalsePositiveService struct {
 	fpRepo repository.FalsePositiveRepository
 }
@@ -23,6 +35,11 @@ func NewFalsePositiveService(fpRepo repository.FalsePositiveRepository) *FalsePo
 // GetAllFalsePositives retrieves all false positives
 func (s *FalsePositiveService) GetAllFalsePositives(ctx context.Context) ([]models.FalsePositive, error) {
 	return s.fpRepo.FindAll(ctx)
+}
+
+// GetFalsePositivesPaginated retrieves paginated false positives with total count
+func (s *FalsePositiveService) GetFalsePositivesPaginated(ctx context.Context, offset, limit int) ([]models.FalsePositive, int64, error) {
+	return s.fpRepo.FindPaginated(ctx, offset, limit)
 }
 
 // GetFalsePositiveByID retrieves a false positive by ID

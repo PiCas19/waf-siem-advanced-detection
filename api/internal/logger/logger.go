@@ -82,13 +82,25 @@ func WithFields(fields logrus.Fields) *logrus.Entry {
 	return Log.WithFields(fields)
 }
 
-// WAFLogger handles structured logging for WAF events
+// WAFLogger handles structured logging for WAF security events to file.
+//
+// Fields:
+//   - filename (string): Path to the log file
+//   - mutex (sync.Mutex): Mutex for thread-safe file writes
+//
+// Thread Safety: Thread-safe via internal mutex locking.
+//
+// See Also: LogEntry, NewWAFLogger()
 type WAFLogger struct {
 	filename string
 	mutex    sync.Mutex
 }
 
-// LogEntry represents a single WAF log entry with enhanced IP detection context
+// LogEntry represents a single WAF security event log entry with comprehensive threat metadata.
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
+//
+// See Also: WAFLogger.Log()
 type LogEntry struct {
 	Timestamp         time.Time `json:"timestamp"`
 	ThreatType        string    `json:"threat_type"`

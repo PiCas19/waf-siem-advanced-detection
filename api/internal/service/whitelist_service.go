@@ -8,7 +8,19 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/repository"
 )
 
-// WhitelistService handles business logic for whitelisted IPs
+// WhitelistService handles business logic for whitelisted IPs, providing methods to add,
+// remove, and query whitelisted IP addresses that bypass security checks.
+//
+// Fields:
+//   - whitelistRepo (repository.WhitelistedIPRepository): Repository for whitelist operations
+//
+// Example Usage:
+//   whitelistService := service.NewWhitelistService(whitelistRepo)
+//   err := whitelistService.AddToWhitelist(ctx, &models.WhitelistedIP{IPAddress: "203.0.113.42"})
+//
+// Thread Safety: Thread-safe when using appropriate database transaction handling.
+//
+// See Also: WhitelistedIP, WhitelistedIPRepository
 type WhitelistService struct {
 	whitelistRepo repository.WhitelistedIPRepository
 }
@@ -44,6 +56,11 @@ func (s *WhitelistService) IsIPWhitelisted(ctx context.Context, ip string) (bool
 // GetWhitelistedIPsCount returns total number of whitelisted IPs
 func (s *WhitelistService) GetWhitelistedIPsCount(ctx context.Context) (int64, error) {
 	return s.whitelistRepo.Count(ctx)
+}
+
+// GetWhitelistedIPsPaginated retrieves paginated whitelisted IPs with total count
+func (s *WhitelistService) GetWhitelistedIPsPaginated(ctx context.Context, offset, limit int) ([]models.WhitelistedIP, int64, error) {
+	return s.whitelistRepo.FindPaginated(ctx, offset, limit)
 }
 
 // AddToWhitelist adds an IP to the whitelist

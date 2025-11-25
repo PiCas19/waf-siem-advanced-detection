@@ -11,12 +11,15 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/gin-gonic/gin"
+	"github.com/swaggo/gin-swagger"
+	"github.com/swaggo/files"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/api"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/config"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/middleware"
+	_ "github.com/PiCas19/waf-siem-advanced-detection/api/docs"
 )
 
 func main() {
@@ -134,6 +137,10 @@ func main() {
 
 	// Setup routes
 	api.SetupRoutes(engine, db)
+
+	// Setup Swagger documentation
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	logger.Log.Info("Swagger documentation available at /swagger/index.html")
 
 	// Inizializza threat intelligence service
 	api.InitTIService(db)

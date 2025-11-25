@@ -10,34 +10,83 @@ import (
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/dto"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/helpers"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
 
-// GetBlocklist - Returns the list of blocked IPs from database
+// GetBlocklist godoc
+// @Summary Get blocked IPs list
+// @Description Returns paginated list of blocked IPs with optional filtering and sorting
+// @Tags Blocklist
+// @Accept json
+// @Produce json
+// @Param limit query int false "Number of items per page (default 20, max 100)" default(20)
+// @Param offset query int false "Pagination offset (default 0)" default(0)
+// @Param sort query string false "Sort field (id, ip_address, created_at, expires_at)"
+// @Param order query string false "Sort order (asc or desc)" default(asc)
+// @Success 200 {object} dto.StandardPaginatedResponse{items=[]models.BlockedIP}
+// @Failure 400 {object} map[string]interface{} "Invalid pagination parameters"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /blocklist [get]
+// @Security BearerAuth
 func GetBlocklist(blocklistService *service.BlocklistService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Parse pagination parameters
+		limit, offset, _, _, err := helpers.ParsePaginationParams(c)
+		if err != nil {
+			BadRequestWithCode(c, ErrInvalidRequest, err.Error())
+			return
+		}
+
 		ctx := c.Request.Context()
 
-		blockedIPs, err := blocklistService.GetActiveBlockedIPs(ctx)
+		// Fetch paginated blocked IPs
+		blockedIPs, total, err := blocklistService.GetBlockedIPsPaginated(ctx, offset, limit)
 		if err != nil {
 			InternalServerErrorWithCode(c, ErrServiceError, "Failed to fetch blocked IPs")
 			return
 		}
 
-		response := dto.NewStandardListResponse(blockedIPs, len(blockedIPs))
+		// Build paginated response
+		response := helpers.BuildStandardPaginatedResponse(blockedIPs, limit, offset, total)
 		c.JSON(200, response)
 	}
 }
 
-// NewBlockIPHandler - Factory function to create a handler for blocking IPs
+// NewBlockIPHandler godoc
+// @Summary Block an IP address
+// @Description Blocks an IP address for a specific rule/threat
+// @Tags Blocklist
+// @Accept json
+// @Produce json
+// @Param request body object{ip=string,threat=string,reason=string,permanent=boolean,duration_hours=integer} true "Block request"
+// @Success 201 {object} map[string]interface{} "IP blocked successfully"
+// @Success 200 {object} map[string]interface{} "IP block updated"
+// @Failure 400 {object} map[string]interface{} "Invalid IP, threat, or parameters"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /blocklist [post]
+// @Security BearerAuth
 func NewBlockIPHandler(blocklistService *service.BlocklistService, logService *service.LogService, ruleService *service.RuleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		BlockIPWithService(blocklistService, logService, ruleService, c)
 	}
 }
 
-// NewUnblockIPHandler - Factory function to create a handler for unblocking IPs
+// NewUnblockIPHandler godoc
+// @Summary Unblock an IP address
+// @Description Removes an IP address from the blocklist
+// @Tags Blocklist
+// @Accept json
+// @Produce json
+// @Param ip path string true "IP address"
+// @Param threat query string true "Threat/rule name"
+// @Success 200 {object} map[string]interface{} "IP unblocked successfully"
+// @Failure 400 {object} map[string]interface{} "Missing threat parameter"
+// @Failure 404 {object} map[string]interface{} "Blocked IP not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /blocklist/{ip} [delete]
+// @Security BearerAuth
 func NewUnblockIPHandler(blocklistService *service.BlocklistService, logService *service.LogService, ruleService *service.RuleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		UnblockIPWithService(blocklistService, logService, ruleService, c)
@@ -224,8 +273,15 @@ func IsIPBlocked(blocklistService *service.BlocklistService, ip string, descript
 	return err == nil
 }
 
-// NewGetBlocklistForWAF - Endpoint for WAF to fetch the list of blocked IPs
-// Public endpoint (no auth required) - WAF needs to fetch this frequently
+// NewGetBlocklistForWAF godoc
+// @Summary Get blocklist for WAF
+// @Description Returns blocklist for WAF (public endpoint, no auth required)
+// @Tags Blocklist
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Blocklist data"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /blocklist/waf [get]
 func NewGetBlocklistForWAF(blocklistService *service.BlocklistService) func(*gin.Context) {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
@@ -241,8 +297,15 @@ func NewGetBlocklistForWAF(blocklistService *service.BlocklistService) func(*gin
 	}
 }
 
-// NewGetWhitelistForWAF - Endpoint for WAF to fetch the list of whitelisted IPs
-// Public endpoint (no auth required) - WAF needs to fetch this frequently
+// NewGetWhitelistForWAF godoc
+// @Summary Get whitelist for WAF
+// @Description Returns whitelist for WAF (public endpoint, no auth required)
+// @Tags Whitelist
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Whitelist data"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /whitelist/waf [get]
 func NewGetWhitelistForWAF(whitelistService *service.WhitelistService) func(*gin.Context) {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()

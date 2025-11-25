@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/helpers"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 	"gorm.io/gorm"
@@ -24,31 +25,67 @@ type CustomRulesResponse struct {
 	Count int           `json:"count"`
 }
 
-// NewGetRulesHandler returns default and custom rules
+// NewGetRulesHandler godoc
+// @Summary Get rules (default and custom)
+// @Description Returns default rules and paginated custom rules
+// @Tags Rules
+// @Accept json
+// @Produce json
+// @Param limit query int false "Number of custom rules per page (default 20, max 100)" default(20)
+// @Param offset query int false "Pagination offset (default 0)" default(0)
+// @Success 200 {object} map[string]interface{} "Default and custom rules with pagination"
+// @Failure 400 {object} map[string]interface{} "Invalid parameters"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /rules [get]
+// @Security BearerAuth
 func NewGetRulesHandler(ruleService *service.RuleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Parse pagination parameters
+		limit, offset, _, _, err := helpers.ParsePaginationParams(c)
+		if err != nil {
+			BadRequestWithCode(c, ErrInvalidRequest, err.Error())
+			return
+		}
+
 		// Get default rules (cached, as they don't change at runtime)
 		defaultRules := GetDefaultRulesWithCache()
 
-		// Get custom rules from service
+		// Get paginated custom rules from service
 		ctx := c.Request.Context()
-		customRules, err := ruleService.GetAllRules(ctx)
+		customRules, total, err := ruleService.GetRulesPaginated(ctx, offset, limit)
 		if err != nil {
 			logger.Log.WithError(err).Error("Failed to fetch custom rules")
 			customRules = []models.Rule{}
+			total = 0
 		}
 
-		response := RulesResponse{
-			DefaultRules: defaultRules,
-			CustomRules:  customRules,
-			TotalRules:   len(defaultRules) + len(customRules),
+		// Build paginated response for custom rules
+		paginatedCustomRules := helpers.BuildStandardPaginatedResponse(customRules, limit, offset, total)
+
+		response := gin.H{
+			"default_rules": defaultRules,
+			"custom_rules": gin.H{
+				"items":      paginatedCustomRules.Items,
+				"pagination": paginatedCustomRules.Pagination,
+			},
+			"total_default_rules": len(defaultRules),
+			"total_custom_rules":  total,
 		}
 
 		c.JSON(200, response)
 	}
 }
 
-// NewGetCustomRulesHandler returns only enabled custom rules for WAF
+// NewGetCustomRulesHandler godoc
+// @Summary Get enabled custom rules
+// @Description Returns only enabled custom rules for WAF
+// @Tags Rules
+// @Accept json
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Enabled custom rules"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /rules/custom [get]
+// @Security BearerAuth
 func NewGetCustomRulesHandler(ruleService *service.RuleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
@@ -68,7 +105,18 @@ func NewGetCustomRulesHandler(ruleService *service.RuleService) gin.HandlerFunc 
 	}
 }
 
-// NewCreateRuleHandler creates a new WAF rule
+// NewCreateRuleHandler godoc
+// @Summary Create new WAF rule
+// @Description Creates a new custom WAF rule
+// @Tags Rules
+// @Accept json
+// @Produce json
+// @Param request body models.Rule true "Rule details"
+// @Success 201 {object} map[string]interface{} "Rule created successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid rule data"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /rules [post]
+// @Security BearerAuth
 func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rule models.Rule
@@ -87,6 +135,29 @@ func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Missing required fields: Name and Pattern", nil, clientIP.(string), "Missing required fields")
 			BadRequestWithCode(c, ErrMissingField, "Name and Pattern are required")
 			return
+		}
+
+		// Validate rule name
+		if err := helpers.ValidateRuleName(rule.Name); err != nil {
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Invalid rule name", nil, clientIP.(string), err.Error())
+			BadRequestWithCode(c, ErrInvalidRequest, "Invalid rule name: "+err.Error())
+			return
+		}
+
+		// Validate pattern
+		if err := helpers.ValidatePattern(rule.Pattern); err != nil {
+			LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Invalid pattern", nil, clientIP.(string), err.Error())
+			BadRequestWithCode(c, ErrInvalidRequest, "Invalid pattern: "+err.Error())
+			return
+		}
+
+		// Validate description if provided
+		if rule.Description != "" {
+			if err := helpers.ValidateDescription(rule.Description); err != nil {
+				LogAuditActionWithError(db, userID.(uint), userEmail.(string), "CREATE_RULE", "RULE", "rule", "", "Invalid description", nil, clientIP.(string), err.Error())
+				BadRequestWithCode(c, ErrInvalidRequest, "Invalid description: "+err.Error())
+				return
+			}
 		}
 
 		rule.Enabled = true
@@ -128,7 +199,21 @@ func NewCreateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 	}
 }
 
-// NewUpdateRuleHandler updates an existing WAF rule
+// NewUpdateRuleHandler godoc
+// @Summary Update WAF rule
+// @Description Updates an existing custom WAF rule
+// @Tags Rules
+// @Accept json
+// @Produce json
+// @Param id path int true "Rule ID"
+// @Param request body object{name=string,pattern=string,description=string,action=string,enabled=boolean} true "Update request"
+// @Success 200 {object} map[string]interface{} "Rule updated successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid rule ID"
+// @Failure 403 {object} map[string]interface{} "Manual block rules cannot be edited"
+// @Failure 404 {object} map[string]interface{} "Rule not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /rules/{id} [put]
+// @Security BearerAuth
 func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ruleID := c.Param("id")
@@ -257,7 +342,19 @@ func NewUpdateRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 	}
 }
 
-// NewDeleteRuleHandler deletes a WAF rule
+// NewDeleteRuleHandler godoc
+// @Summary Delete WAF rule
+// @Description Deletes a custom WAF rule (reverts manual blocks to detected status)
+// @Tags Rules
+// @Accept json
+// @Produce json
+// @Param id path int true "Rule ID"
+// @Success 200 {object} map[string]interface{} "Rule deleted successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid rule ID"
+// @Failure 404 {object} map[string]interface{} "Rule not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /rules/{id} [delete]
+// @Security BearerAuth
 func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ruleID := c.Param("id")
@@ -329,7 +426,19 @@ func NewDeleteRuleHandler(ruleService *service.RuleService, db *gorm.DB) gin.Han
 	}
 }
 
-// NewToggleRuleHandler enables/disables a WAF rule
+// NewToggleRuleHandler godoc
+// @Summary Toggle WAF rule
+// @Description Enables or disables a WAF rule
+// @Tags Rules
+// @Accept json
+// @Produce json
+// @Param id path int true "Rule ID"
+// @Success 200 {object} map[string]interface{} "Rule toggled successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid rule ID"
+// @Failure 404 {object} map[string]interface{} "Rule not found"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /rules/{id}/toggle [post]
+// @Security BearerAuth
 func NewToggleRuleHandler(ruleService *service.RuleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ruleID := c.Param("id")

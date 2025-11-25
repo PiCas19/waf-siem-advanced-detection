@@ -102,6 +102,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 
 		// Change password
 		protected.POST("/auth/change-password", authHandler.ChangePassword)
+
+		// Export endpoints
+		protected.GET("/export/logs", NewExportLogsHandler(logService))
+		protected.GET("/export/audit-logs", NewExportAuditLogsHandler(auditLogService))
+		protected.GET("/export/blocklist", NewExportBlocklistHandler(blocklistService))
 	}
 
 	admin := r.Group("/api/admin")

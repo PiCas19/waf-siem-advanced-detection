@@ -8,7 +8,11 @@ import (
 	"time"
 )
 
-// BlockedIPEvent rappresenta un evento di blocco manuale di un IP
+// BlockedIPEvent represents a manual IP block event for security auditing.
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
+//
+// See Also: EventLogger.LogBlockedIPEvent()
 type BlockedIPEvent struct {
 	Timestamp    time.Time `json:"timestamp"`
 	EventType    string    `json:"event_type"` // "ip_blocked_manual"
@@ -23,7 +27,15 @@ type BlockedIPEvent struct {
 	Status       string    `json:"status"`      // "success" o "failed"
 }
 
-// EventLogger handles logging of security events
+// EventLogger handles logging of security events (manual blocks, etc.) to file.
+//
+// Fields:
+//   - filename (string): Path to the event log file
+//   - mutex (sync.Mutex): Mutex for thread-safe file writes
+//
+// Thread Safety: Thread-safe via internal mutex locking.
+//
+// See Also: BlockedIPEvent, NewEventLogger()
 type EventLogger struct {
 	filename string
 	mutex    sync.Mutex

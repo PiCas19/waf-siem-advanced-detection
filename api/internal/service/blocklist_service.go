@@ -10,7 +10,20 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/repository"
 )
 
-// BlocklistService handles business logic for blocked IPs
+// BlocklistService handles business logic for blocked IPs, providing methods to block,
+// unblock, and query blocked IP addresses.
+//
+// Fields:
+//   - blockedIPRepo (repository.BlockedIPRepository): Repository for blocked IP operations
+//   - logRepo (repository.LogRepository): Repository for updating related security logs
+//
+// Example Usage:
+//   blocklistService := service.NewBlocklistService(blockedIPRepo, logRepo)
+//   err := blocklistService.BlockIP(ctx, &models.BlockedIP{IPAddress: "203.0.113.42"})
+//
+// Thread Safety: Thread-safe when using appropriate database transaction handling.
+//
+// See Also: BlockedIP, BlockedIPRepository, LogRepository
 type BlocklistService struct {
 	blockedIPRepo repository.BlockedIPRepository
 	logRepo       repository.LogRepository
@@ -53,6 +66,11 @@ func (s *BlocklistService) IsIPBlocked(ctx context.Context, ip string) (bool, er
 // GetBlockedIPsCount returns total number of blocked IPs
 func (s *BlocklistService) GetBlockedIPsCount(ctx context.Context) (int64, error) {
 	return s.blockedIPRepo.Count(ctx)
+}
+
+// GetBlockedIPsPaginated retrieves paginated blocked IPs with total count
+func (s *BlocklistService) GetBlockedIPsPaginated(ctx context.Context, offset, limit int) ([]models.BlockedIP, int64, error) {
+	return s.blockedIPRepo.FindPaginated(ctx, offset, limit)
 }
 
 // BlockIP adds an IP to the blocklist

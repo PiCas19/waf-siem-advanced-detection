@@ -9,7 +9,21 @@ import (
 
 var jwtSecret = []byte("your-secret-key-change-in-production")
 
-// Claims represents JWT claims
+// Claims represents JWT claims with user identification and role information.
+//
+// Fields:
+//   - UserID (uint): User's database ID
+//   - Email (string): User's email address
+//   - Role (string): User's role (admin, operator, analyst, user)
+//   - RegisteredClaims (jwt.RegisteredClaims): Standard JWT claims (exp, iat, etc.)
+//
+// Example Usage:
+//   token, err := GenerateToken(user.ID, user.Email, user.Role)
+//   claims, err := ValidateToken(tokenString)
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
+//
+// See Also: GenerateToken(), ValidateToken()
 type Claims struct {
 	UserID uint   `json:"user_id"`
 	Email  string `json:"email"`
