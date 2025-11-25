@@ -63,7 +63,7 @@ var Migrations = []Migration{
 		Version: "003",
 		Name:    "add_index_on_logs_created_at",
 		Up: func(db *gorm.DB) error {
-			if !db.Migrator().HasIndex("logs", "created_at") {
+			if !db.Migrator().HasIndex("logs", "idx_logs_created_at") {
 				logger.Log.Info("Migrazione 003: Creando indice su logs.created_at per performance")
 				return db.Migrator().CreateIndex("logs", "created_at")
 			}
