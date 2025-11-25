@@ -104,8 +104,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     whitelist_remove: true,
     false_positives_view: true,
     false_positives_report: true,
-    false_positives_resolve: false,
-    false_positives_delete: false,
+    false_positives_resolve: true,   // ✓ Can resolve FP (whitelistare, cancellare, etc.)
+    false_positives_delete: true,    // ✓ Can delete FP
     threats_block: true,
     threats_unblock: true,
     users_view: false,      // ✗ Cannot see Users menu
