@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/dto"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
@@ -24,10 +25,8 @@ func GetBlocklist(blocklistService *service.BlocklistService) gin.HandlerFunc {
 			return
 		}
 
-		c.JSON(200, gin.H{
-			"blocked_ips": blockedIPs,
-			"count":       len(blockedIPs),
-		})
+		response := dto.NewStandardListResponse(blockedIPs, len(blockedIPs))
+		c.JSON(200, response)
 	}
 }
 
@@ -237,10 +236,8 @@ func NewGetBlocklistForWAF(blocklistService *service.BlocklistService) func(*gin
 			return
 		}
 
-		c.JSON(200, gin.H{
-			"blocked_ips": blockedIPs,
-			"count":       len(blockedIPs),
-		})
+		response := dto.NewStandardListResponse(blockedIPs, len(blockedIPs))
+		c.JSON(200, response)
 	}
 }
 
@@ -256,10 +253,8 @@ func NewGetWhitelistForWAF(whitelistService *service.WhitelistService) func(*gin
 			return
 		}
 
-		c.JSON(200, gin.H{
-			"whitelisted_ips": whitelisted,
-			"count":           len(whitelisted),
-		})
+		response := dto.NewStandardListResponse(whitelisted, len(whitelisted))
+		c.JSON(200, response)
 	}
 }
 
