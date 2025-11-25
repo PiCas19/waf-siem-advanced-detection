@@ -54,7 +54,7 @@ import "time"
 // See Also: LogRepository, LogService
 type Log struct {
 	ID          uint      `gorm:"primarykey" json:"id"`
-	CreatedAt   time.Time `json:"created_at"`
+	CreatedAt   time.Time `gorm:"index" json:"created_at"`
 
 	ThreatType  string `json:"threat_type"`
 	Severity    string `json:"severity"`
