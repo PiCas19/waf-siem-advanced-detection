@@ -157,7 +157,9 @@ const BlocklistPage: React.FC = () => {
         });
         if (blockRes.ok) {
           const data = await blockRes.json();
-          setBlocklist(data.blocked_ips || []);
+          // Handle both old format and new format with pagination
+          const blocklistData = data.data || data.blocked_ips || [];
+          setBlocklist(blocklistData);
         }
 
         // Load whitelist
@@ -166,7 +168,9 @@ const BlocklistPage: React.FC = () => {
         });
         if (whiteRes.ok) {
           const data = await whiteRes.json();
-          setWhitelist(data.whitelisted_ips || []);
+          // Handle both old format and new format with pagination
+          const whitelistData = data.data || data.whitelisted_ips || [];
+          setWhitelist(whitelistData);
         }
 
         // Load false positives
@@ -175,7 +179,9 @@ const BlocklistPage: React.FC = () => {
         });
         if (fpRes.ok) {
           const data = await fpRes.json();
-          setFalsePositives(data.false_positives || []);
+          // Handle both old format and new format with pagination
+          const fpData = data.data || data.false_positives || [];
+          setFalsePositives(fpData);
         }
       } catch (error) {
         console.error('Failed to load data:', error);
@@ -201,7 +207,9 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          setBlocklist(data.blocked_ips || []);
+          // Handle both old format and new format with pagination
+          const blocklistData = data.data || data.blocked_ips || [];
+          setBlocklist(blocklistData);
         }
       } else if (activeTab === 'whitelist') {
         const res = await fetch('/api/whitelist', {
@@ -209,7 +217,9 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          setWhitelist(data.whitelisted_ips || []);
+          // Handle both old format and new format with pagination
+          const whitelistData = data.data || data.whitelisted_ips || [];
+          setWhitelist(whitelistData);
         }
       } else if (activeTab === 'false-positives') {
         const res = await fetch('/api/false-positives', {
@@ -217,7 +227,9 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          setFalsePositives(data.false_positives || []);
+          // Handle both old format and new format with pagination
+          const fpData = data.data || data.false_positives || [];
+          setFalsePositives(fpData);
         }
       }
     } catch (error) {

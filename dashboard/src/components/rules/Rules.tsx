@@ -74,7 +74,9 @@ const Rules: React.FC = () => {
         },
       });
       const data = await response.json();
-      setRules(data.rules || []);
+      // Handle both old format (rules array) and new format (data with pagination)
+      const rulesData = data.data || data.rules || [];
+      setRules(rulesData);
     } catch (error) {
       console.error('Failed to load rules:', error);
     }
@@ -177,7 +179,8 @@ const Rules: React.FC = () => {
 
               if (logsResponse.ok) {
                 const logsData = await logsResponse.json();
-                const logs = logsData.security_logs || logsData.logs || [];
+                // Handle both old format and new format with pagination
+                const logs = logsData.data || logsData.security_logs || logsData.logs || [];
 
                 // Find the threat matching this description
                 const matchingThreat = logs.find((log: any) =>
