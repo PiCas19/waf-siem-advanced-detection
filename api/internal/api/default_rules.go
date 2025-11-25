@@ -1,5 +1,14 @@
 package api
 
+import (
+	"time"
+
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/cache"
+)
+
+const defaultRulesCacheKey = "default_rules"
+const defaultRulesCacheTTL = 24 * time.Hour // Cache for 24 hours (default rules don't change)
+
 // DefaultRule rappresenta una regola di default hardcoded nel WAF
 type DefaultRule struct {
 	ID          string   `json:"id"`
@@ -232,4 +241,20 @@ func GetDefaultRules() []DefaultRule {
 			},
 		},
 	}
+}
+
+// GetDefaultRulesWithCache returns cached default rules
+// Caches rules for 24 hours since they don't change at runtime
+func GetDefaultRulesWithCache() []DefaultRule {
+	// Try to get from cache
+	if cached, found := cache.DefaultRulesCache.Get(defaultRulesCacheKey); found {
+		if rules, ok := cached.([]DefaultRule); ok {
+			return rules
+		}
+	}
+
+	// Not in cache, fetch and cache it
+	rules := GetDefaultRules()
+	cache.DefaultRulesCache.Set(defaultRulesCacheKey, rules, defaultRulesCacheTTL)
+	return rules
 }
