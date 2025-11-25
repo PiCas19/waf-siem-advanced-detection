@@ -151,8 +151,8 @@ const BlocklistPage: React.FC = () => {
       try {
         const token = localStorage.getItem('authToken');
 
-        // Load blocklist - API returns { items: [...], pagination: {...} }
-        const blockRes = await fetch('/api/blocklist', {
+        // Load blocklist with pagination - API returns { items: [...], pagination: {...} }
+        const blockRes = await fetch('/api/blocklist?limit=100&offset=0', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (blockRes.ok) {
@@ -161,8 +161,8 @@ const BlocklistPage: React.FC = () => {
           setBlocklist(blocklistData);
         }
 
-        // Load whitelist - API returns { items: [...], pagination: {...} }
-        const whiteRes = await fetch('/api/whitelist', {
+        // Load whitelist with pagination - API returns { items: [...], pagination: {...} }
+        const whiteRes = await fetch('/api/whitelist?limit=100&offset=0', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (whiteRes.ok) {
@@ -171,8 +171,8 @@ const BlocklistPage: React.FC = () => {
           setWhitelist(whitelistData);
         }
 
-        // Load false positives - API returns { false_positives: [...], pagination: {...}, count: X }
-        const fpRes = await fetch('/api/false-positives', {
+        // Load false positives with pagination - API returns { false_positives: [...], pagination: {...}, count: X }
+        const fpRes = await fetch('/api/false-positives?limit=100&offset=0', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (fpRes.ok) {
@@ -200,7 +200,7 @@ const BlocklistPage: React.FC = () => {
       const token = localStorage.getItem('authToken');
 
       if (activeTab === 'blocklist') {
-        const res = await fetch('/api/blocklist', {
+        const res = await fetch('/api/blocklist?limit=100&offset=0', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (res.ok) {
@@ -209,7 +209,7 @@ const BlocklistPage: React.FC = () => {
           setBlocklist(blocklistData);
         }
       } else if (activeTab === 'whitelist') {
-        const res = await fetch('/api/whitelist', {
+        const res = await fetch('/api/whitelist?limit=100&offset=0', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (res.ok) {
@@ -218,7 +218,7 @@ const BlocklistPage: React.FC = () => {
           setWhitelist(whitelistData);
         }
       } else if (activeTab === 'false-positives') {
-        const res = await fetch('/api/false-positives', {
+        const res = await fetch('/api/false-positives?limit=100&offset=0', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (res.ok) {
