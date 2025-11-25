@@ -245,8 +245,8 @@ const StatsPage: React.FC = () => {
 
       const token = localStorage.getItem('authToken');
 
-      // Carica i false positive segnalati dal database
-      const fpResponse = await fetch('/api/false-positives', {
+      // Carica i false positive segnalati dal database con pagination
+      const fpResponse = await fetch('/api/false-positives?limit=100&offset=0', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -265,8 +265,8 @@ const StatsPage: React.FC = () => {
         setReportedFalsePositives(reportedFPs);
       }
 
-      // Carica logs (tutte le threat) dal database
-      const logsResponse = await fetch('/api/logs', {
+      // Carica logs (tutte le threat) dal database con pagination
+      const logsResponse = await fetch('/api/logs?limit=100&offset=0', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -308,7 +308,7 @@ const StatsPage: React.FC = () => {
         // Load manually blocked threats from custom rules (not from logs)
         // A threat is "manually blocked" if there's a custom rule with is_manual_block=true
         try {
-          const rulesResp = await fetch('/api/rules', {
+          const rulesResp = await fetch('/api/rules?limit=100&offset=0', {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
@@ -1101,7 +1101,7 @@ const StatsPage: React.FC = () => {
       // Find and delete the manual block rule
       // Manual block rules are created with type=MANUAL_${description} and is_manual_block=true
       try {
-        const rulesResp = await fetch('/api/rules', {
+        const rulesResp = await fetch('/api/rules?limit=100&offset=0', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -1192,7 +1192,7 @@ const StatsPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('authToken');
-      const resp = await fetch('/api/false-positives', {
+      const resp = await fetch('/api/false-positives?limit=100&offset=0', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1212,7 +1212,7 @@ const StatsPage: React.FC = () => {
       } else {
         showToast('False positive reported successfully', 'success');
         // Ricarica i false positive dal backend per sincronizzare
-        const fpResponse = await fetch('/api/false-positives', {
+        const fpResponse = await fetch('/api/false-positives?limit=100&offset=0', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
