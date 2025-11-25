@@ -171,13 +171,14 @@ const BlocklistPage: React.FC = () => {
           setWhitelist(whitelistData);
         }
 
-        // Load false positives - API returns { data: [...], pagination: {...} }
+        // Load false positives - API returns { false_positives: [...], pagination: {...}, count: X }
         const fpRes = await fetch('/api/false-positives', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (fpRes.ok) {
           const data = await fpRes.json();
-          const fpData = data.data || data.false_positives || [];
+          // Check false_positives first (actual API response), then data as fallback
+          const fpData = data.false_positives || data.data || [];
           setFalsePositives(fpData);
         }
       } catch (error) {
@@ -222,7 +223,8 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          const fpData = data.data || data.false_positives || [];
+          // API returns { false_positives: [...], pagination: {...}, count: X }
+          const fpData = data.false_positives || data.data || [];
           setFalsePositives(fpData);
         }
       }
