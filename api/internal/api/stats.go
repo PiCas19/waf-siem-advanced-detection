@@ -191,9 +191,8 @@ func getRuleByThreatName(ruleService *service.RuleService, threatType string) *m
 func NewWAFEventHandler(logService *service.LogService, auditLogService *service.AuditLogService, ruleService *service.RuleService, blocklistService *service.BlocklistService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var event websocket.WAFEvent
-		if err := c.ShouldBindJSON(&event); err != nil {
-			logger.Log.WithError(err).Error("Failed to bind JSON")
-			BadRequest(c, "invalid json")
+		if !ValidateJSON(c, &event) {
+			logger.Log.Error("Failed to bind JSON")
 			return
 		}
 
@@ -295,7 +294,7 @@ func NewWAFEventHandler(logService *service.LogService, auditLogService *service
 		// Save event using service layer
 		if err := logService.CreateLog(ctx, &log); err != nil {
 			logger.Log.WithError(err).Error("Failed to save log")
-			InternalServerError(c, "failed to save event")
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to save event")
 			return
 		}
 
@@ -489,7 +488,7 @@ func GetGeolocationHandler(db *gorm.DB) gin.HandlerFunc {
 		geoService, err := geoip.GetInstance()
 		if err != nil {
 			logger.Log.WithError(err).Error("Failed to initialize GeoIP service")
-			InternalServerError(c, "geoip service unavailable")
+			InternalServerErrorWithCode(c, ErrServiceError, "GeoIP service unavailable")
 			return
 		}
 
@@ -497,7 +496,7 @@ func GetGeolocationHandler(db *gorm.DB) gin.HandlerFunc {
 		result := db.Find(&logs)
 		if result.Error != nil {
 			logger.Log.WithError(result.Error).Error("Failed to fetch logs")
-			InternalServerError(c, "database error")
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Database error")
 			return
 		}
 
@@ -534,7 +533,7 @@ func NewWAFChallengeVerifyHandler(db *gorm.DB) gin.HandlerFunc {
 
 		if err := c.ShouldBind(&request); err != nil {
 			logger.Log.WithError(err).Error("Failed to bind challenge verify request")
-			BadRequest(c, "invalid request")
+			BadRequestWithCode(c, ErrInvalidRequest, "Invalid request")
 			return
 		}
 
