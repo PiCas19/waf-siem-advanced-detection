@@ -16,6 +16,31 @@ type ResponseEnvelope struct {
 	Timestamp time.Time   `json:"timestamp"`
 }
 
+// StandardListResponse è il formato standard per tutte le risposte di lista
+// Sostituisce: blocked_ips, whitelisted_ips, rules, users, etc.
+type StandardListResponse struct {
+	Items interface{} `json:"items"`       // Slice di items (BlockedIP, User, Rule, etc.)
+	Count int         `json:"count"`       // Numero di items
+	Total int64       `json:"total,omitempty"` // Total count (per pagination)
+}
+
+// NewStandardListResponse crea una risposta di lista standardizzata
+func NewStandardListResponse(items interface{}, count int) StandardListResponse {
+	return StandardListResponse{
+		Items: items,
+		Count: count,
+	}
+}
+
+// NewStandardListResponseWithTotal crea una risposta di lista con total (per pagination)
+func NewStandardListResponseWithTotal(items interface{}, count int, total int64) StandardListResponse {
+	return StandardListResponse{
+		Items: items,
+		Count: count,
+		Total: total,
+	}
+}
+
 type PaginatedResponse struct {
 	Data       interface{}     `json:"data"`
 	Pagination PaginationInfo `json:"pagination"`
