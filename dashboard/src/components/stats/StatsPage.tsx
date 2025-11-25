@@ -254,10 +254,10 @@ const StatsPage: React.FC = () => {
 
       if (fpResponse.ok) {
         const fpData = await fpResponse.json();
-        // Crea un set di chiavi (ip::threat) dei false positive segnalati
+        // API returns { false_positives: [...], pagination: {...}, count: X }
         const reportedFPs = new Set<string>();
-        // Handle both old format and new format with pagination
-        const fpList = fpData.data || fpData.false_positives || [];
+        // Check false_positives first (actual API response), then data as fallback
+        const fpList = fpData.false_positives || fpData.data || [];
         fpList.forEach((fp: any) => {
           const key = `${fp.client_ip || ''}::${fp.description || fp.threat_type || ''}`;
           reportedFPs.add(key);
