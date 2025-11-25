@@ -84,15 +84,18 @@ func RateLimitMiddleware(rateLimiter *RateLimiter) gin.HandlerFunc {
 		clientIP := c.ClientIP()
 
 		if !rateLimiter.Allow(clientIP) {
-			logger.WithFields(map[string]interface{}{
+			logger.Log.WithFields(map[string]interface{}{
 				"client_ip": clientIP,
 				"path":      c.Request.URL.Path,
+				"method":    c.Request.Method,
 			}).Warn("Rate limit exceeded")
 
 			c.Header("Retry-After", "60")
+			// Return standardized error response with code
 			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":   "rate limit exceeded",
+				"code":    "RATE_LIMIT_EXCEEDED",
 				"message": "Too many requests, please try again later",
+				"retry_after": 60,
 			})
 			c.Abort()
 			return
@@ -106,6 +109,24 @@ func RateLimitMiddleware(rateLimiter *RateLimiter) gin.HandlerFunc {
 func RateLimitByEndpoint(rps float64, burst int) gin.HandlerFunc {
 	limiter := NewRateLimiter(rps, burst)
 	return RateLimitMiddleware(limiter)
+}
+
+// SensitiveEndpointRateLimiter limita gli endpoint sensibili (login, admin, etc.)
+// Usa rate limit più stretto: 5 req/sec con burst di 10
+func SensitiveEndpointRateLimiter() gin.HandlerFunc {
+	return RateLimitByEndpoint(5, 10)
+}
+
+// GeneralAPIRateLimiter limita le API generiche
+// Usa rate limit moderato: 30 req/sec con burst di 50
+func GeneralAPIRateLimiter() gin.HandlerFunc {
+	return RateLimitByEndpoint(30, 50)
+}
+
+// StrictRateLimiter per endpoint molto sensibili (force-break login attempts, mass operations)
+// Usa rate limit molto stretto: 1 req/sec con burst di 3
+func StrictRateLimiter() gin.HandlerFunc {
+	return RateLimitByEndpoint(1, 3)
 }
 
 // Helper function
