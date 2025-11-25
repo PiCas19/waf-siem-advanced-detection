@@ -74,8 +74,8 @@ const Rules: React.FC = () => {
         },
       });
       const data = await response.json();
-      // Handle both old format (rules array) and new format (data with pagination)
-      const rulesData = data.data || data.rules || [];
+      // API returns: { default_rules: [...], custom_rules: { items: [...], pagination: {...} }, ... }
+      const rulesData = data.custom_rules?.items || data.rules || [];
       setRules(rulesData);
     } catch (error) {
       console.error('Failed to load rules:', error);
