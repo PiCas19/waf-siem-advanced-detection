@@ -92,3 +92,43 @@ func ValidateDuration(durationHours int) error {
 
 	return nil
 }
+
+// ValidateEmail valida che l'input sia un email valido
+func ValidateEmail(email string) error {
+	if email == "" {
+		return fmt.Errorf("email cannot be empty")
+	}
+
+	trimmed := strings.TrimSpace(email)
+	if len(trimmed) > 254 {
+		return fmt.Errorf("email is too long (max 254 characters)")
+	}
+
+	// Basic email pattern: localpart@domain.extension
+	emailPattern := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+	if !emailPattern.MatchString(trimmed) {
+		return fmt.Errorf("invalid email format")
+	}
+
+	return nil
+}
+
+// ValidateNonEmptyString valida che una stringa non sia vuota
+func ValidateNonEmptyString(value string, fieldName string) error {
+	if strings.TrimSpace(value) == "" {
+		return fmt.Errorf("%s cannot be empty", fieldName)
+	}
+	return nil
+}
+
+// ValidateStringLength valida la lunghezza di una stringa
+func ValidateStringLength(value string, fieldName string, minLen, maxLen int) error {
+	length := len(strings.TrimSpace(value))
+	if length < minLen {
+		return fmt.Errorf("%s must be at least %d characters", fieldName, minLen)
+	}
+	if length > maxLen {
+		return fmt.Errorf("%s cannot exceed %d characters", fieldName, maxLen)
+	}
+	return nil
+}

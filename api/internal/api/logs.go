@@ -201,7 +201,7 @@ func NewGetLogsHandler(logService *service.LogService, auditLogService *service.
 		// Fetch security logs
 		logs, err := logService.GetAllLogs(ctx)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to fetch logs"})
+			InternalServerErrorWithCode(c, ErrServiceError, "Failed to fetch logs")
 			return
 		}
 
@@ -275,8 +275,7 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 			BlockedBy   string `json:"blocked_by"` // "manual" or ""
 		}
 
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid request"})
+		if !ValidateJSON(c, &req) {
 			return
 		}
 
@@ -291,7 +290,7 @@ func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.Handl
 		// Update all threats matching this IP+description, regardless of current blocked status
 		// This ensures we can update any threat to mark it as manually blocked
 		if err := logService.UpdateLogsByIPAndDescription(ctx, req.IP, req.Description, updates); err != nil {
-			c.JSON(500, gin.H{"error": "Failed to update threat block status"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to update threat block status")
 			return
 		}
 

@@ -17,7 +17,7 @@ func NewGetUsersHandler(userService *service.UserService) gin.HandlerFunc {
 
 		users, err := userService.GetAllUsers(ctx)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load users"})
+			InternalServerError(c, "failed to load users")
 			return
 		}
 
@@ -41,7 +41,7 @@ func NewGetUsersHandler(userService *service.UserService) gin.HandlerFunc {
 }
 
 // Deprecated compatibility stub
-func GetUsers(c *gin.Context) { c.JSON(400, gin.H{"error": "use NewGetUsersHandler"}) }
+func GetUsers(c *gin.Context) { BadRequest(c, "use NewGetUsersHandler") }
 
 // NewUpdateUserHandler returns a handler that updates a user (admin-only)
 func NewUpdateUserHandler(userService *service.UserService) gin.HandlerFunc {
@@ -49,25 +49,25 @@ func NewUpdateUserHandler(userService *service.UserService) gin.HandlerFunc {
 		userIDStr := c.Param("id")
 		userID, err := strconv.ParseUint(userIDStr, 10, 32)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+			BadRequest(c, "invalid user id")
 			return
 		}
 
 		// Get authenticated user ID from context
 		authUserIDInterface, exists := c.Get("user_id")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			Unauthorized(c, "unauthorized")
 			return
 		}
 		authUserID, ok := authUserIDInterface.(uint)
 		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user id in token"})
+			Unauthorized(c, "invalid user id in token")
 			return
 		}
 
 		// Prevent user from editing themselves
 		if authUserID == uint(userID) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "cannot edit your own account"})
+			Forbidden(c, "cannot edit your own account")
 			return
 		}
 
@@ -78,14 +78,14 @@ func NewUpdateUserHandler(userService *service.UserService) gin.HandlerFunc {
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			BadRequest(c, err.Error())
 			return
 		}
 
 		ctx := c.Request.Context()
 		user, err := userService.GetUserByID(ctx, uint(userID))
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			NotFound(c, "user not found")
 			return
 		}
 
@@ -102,7 +102,7 @@ func NewUpdateUserHandler(userService *service.UserService) gin.HandlerFunc {
 		}
 
 		if err := userService.UpdateUser(ctx, user); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user"})
+			InternalServerError(c, "failed to update user")
 			return
 		}
 
@@ -128,37 +128,37 @@ func NewDeleteUserHandler(userService *service.UserService) gin.HandlerFunc {
 		userIDStr := c.Param("id")
 		userID, err := strconv.ParseUint(userIDStr, 10, 32)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+			BadRequest(c, "invalid user id")
 			return
 		}
 
 		// Get authenticated user ID from context
 		authUserIDInterface, exists := c.Get("user_id")
 		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			Unauthorized(c, "unauthorized")
 			return
 		}
 		authUserID, ok := authUserIDInterface.(uint)
 		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user id in token"})
+			Unauthorized(c, "invalid user id in token")
 			return
 		}
 
 		// Prevent user from deleting themselves
 		if authUserID == uint(userID) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "cannot delete your own account"})
+			Forbidden(c, "cannot delete your own account")
 			return
 		}
 
 		ctx := c.Request.Context()
 		user, err := userService.GetUserByID(ctx, uint(userID))
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			NotFound(c, "user not found")
 			return
 		}
 
 		if err := userService.DeleteUser(ctx, uint(userID)); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user"})
+			InternalServerError(c, "failed to delete user")
 			return
 		}
 

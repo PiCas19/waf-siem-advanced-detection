@@ -16,7 +16,7 @@ func NewGetWhitelistHandler(whitelistService *service.WhitelistService) gin.Hand
 
 		whitelisted, err := whitelistService.GetAllWhitelistedIPs(ctx)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to fetch whitelist"})
+			InternalServerErrorWithCode(c, ErrServiceError, "Failed to fetch whitelist")
 			return
 		}
 
@@ -35,21 +35,20 @@ func NewAddToWhitelistHandler(whitelistService *service.WhitelistService) gin.Ha
 			Reason    string `json:"reason" binding:"required"`
 		}
 
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid request"})
+		if !ValidateJSON(c, &req) {
 			return
 		}
 
 		// Validate IP address
 		validatedIP, err := ValidateIP(req.IPAddress)
 		if err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
+			BadRequestWithCode(c, ErrInvalidIP, err.Error())
 			return
 		}
 
 		// Validate reason
 		if err := ValidateReason(req.Reason); err != nil {
-			c.JSON(400, gin.H{"error": err.Error()})
+			BadRequestWithCode(c, ErrInvalidRequest, err.Error())
 			return
 		}
 
@@ -68,7 +67,7 @@ func NewAddToWhitelistHandler(whitelistService *service.WhitelistService) gin.Ha
 			existingIP.Reason = req.Reason
 			existingIP.DeletedAt = gorm.DeletedAt{}
 			if err := whitelistService.UpdateWhitelistedIP(ctx, existingIP); err != nil {
-				c.JSON(500, gin.H{"error": "failed to update whitelist entry"})
+				InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to update whitelist entry")
 				return
 			}
 
@@ -79,7 +78,7 @@ func NewAddToWhitelistHandler(whitelistService *service.WhitelistService) gin.Ha
 		} else {
 			// Create new whitelist entry
 			if err := whitelistService.AddToWhitelist(ctx, &whitelist); err != nil {
-				c.JSON(500, gin.H{"error": "failed to add to whitelist"})
+				InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to add to whitelist")
 				return
 			}
 
@@ -97,14 +96,14 @@ func NewRemoveFromWhitelistHandler(whitelistService *service.WhitelistService) g
 		id := c.Param("id")
 		idUint, err := strconv.ParseUint(id, 10, 32)
 		if err != nil {
-			c.JSON(400, gin.H{"error": "Invalid ID"})
+			BadRequestWithCode(c, ErrInvalidRequest, "Invalid ID")
 			return
 		}
 
 		ctx := c.Request.Context()
 
 		if err := whitelistService.RemoveFromWhitelist(ctx, uint(idUint)); err != nil {
-			c.JSON(500, gin.H{"error": "failed to remove from whitelist"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to remove from whitelist")
 			return
 		}
 
@@ -119,7 +118,7 @@ func NewGetWhitelistForWAFHandler(whitelistService *service.WhitelistService) gi
 
 		whitelisted, err := whitelistService.GetAllWhitelistedIPs(ctx)
 		if err != nil {
-			c.JSON(500, gin.H{"error": "failed to fetch whitelist"})
+			InternalServerErrorWithCode(c, ErrServiceError, "Failed to fetch whitelist")
 			return
 		}
 

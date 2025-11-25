@@ -39,8 +39,7 @@ type LogManualUnblockRequest struct {
 func NewLogManualBlockHandler(logService *service.LogService, db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LogManualBlockRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid request"})
+		if !ValidateJSON(c, &req) {
 			return
 		}
 
@@ -62,7 +61,7 @@ func NewLogManualBlockHandler(logService *service.LogService, db *gorm.DB) gin.H
 
 		if err := logService.CreateLog(ctx, logEntry); err != nil {
 			logger.Log.WithError(err).Error("Failed to save manual block to database")
-			c.JSON(500, gin.H{"error": "Failed to log event"})
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to log event")
 			return
 		}
 
@@ -75,8 +74,7 @@ func NewLogManualBlockHandler(logService *service.LogService, db *gorm.DB) gin.H
 func NewLogManualUnblockHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req LogManualUnblockRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "Invalid request"})
+		if !ValidateJSON(c, &req) {
 			return
 		}
 
