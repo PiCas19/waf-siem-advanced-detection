@@ -970,7 +970,13 @@ const BlocklistPage: React.FC = () => {
             <div className="flex justify-end">
               <button
                 onClick={() => setShowAddBlockForm(true)}
-                className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-medium transition"
+                disabled={!user || !hasPermission(user.role as any, 'blocklist_add')}
+                className={`px-6 py-2 rounded font-medium transition ${
+                  !user || !hasPermission(user.role as any, 'blocklist_add')
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                    : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
+                title={!user || !hasPermission(user.role as any, 'blocklist_add') ? 'You do not have permission to add blocked IPs' : ''}
               >
                 + Block IP
               </button>
@@ -1155,7 +1161,13 @@ const BlocklistPage: React.FC = () => {
                           <td className="py-3 px-4 text-center">
                             <button
                               onClick={() => handleDeleteBlock(entry.ip_address, entry.description)}
-                              className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                              disabled={!user || !hasPermission(user.role as any, 'blocklist_remove')}
+                              className={`inline-flex items-center gap-2 px-3 py-1 rounded text-xs font-medium transition ${
+                                !user || !hasPermission(user.role as any, 'blocklist_remove')
+                                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                  : 'bg-red-600 hover:bg-red-700 text-white'
+                              }`}
+                              title={!user || !hasPermission(user.role as any, 'blocklist_remove') ? 'You do not have permission to remove blocked IPs' : ''}
                             >
                               <Trash2 size={14} />
                               Remove
@@ -1312,7 +1324,13 @@ const BlocklistPage: React.FC = () => {
             <div className="flex justify-end">
               <button
                 onClick={() => setShowAddWhiteForm(true)}
-                className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition"
+                disabled={!user || !hasPermission(user.role as any, 'whitelist_add')}
+                className={`px-6 py-2 rounded font-medium transition ${
+                  !user || !hasPermission(user.role as any, 'whitelist_add')
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+                title={!user || !hasPermission(user.role as any, 'whitelist_add') ? 'You do not have permission to add whitelisted IPs' : ''}
               >
                 + Whitelist IP
               </button>
@@ -1408,7 +1426,13 @@ const BlocklistPage: React.FC = () => {
                           <td className="py-3 px-4 text-center">
                             <button
                               onClick={() => handleDeleteWhite(entry.id)}
-                              className="inline-flex items-center gap-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
+                              disabled={!user || !hasPermission(user.role as any, 'whitelist_remove')}
+                              className={`inline-flex items-center gap-2 px-3 py-1 rounded text-xs font-medium transition ${
+                                !user || !hasPermission(user.role as any, 'whitelist_remove')
+                                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                  : 'bg-red-600 hover:bg-red-700 text-white'
+                              }`}
+                              title={!user || !hasPermission(user.role as any, 'whitelist_remove') ? 'You do not have permission to remove whitelisted IPs' : ''}
                             >
                               <Trash2 size={14} />
                               Remove
