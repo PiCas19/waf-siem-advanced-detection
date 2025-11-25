@@ -32,10 +32,10 @@ export default function RulesContainer() {
       });
       const data: RulesResponse = await response.json();
 
-      // Supporta sia snake_case che camelCase e nuovo formato con pagination
+      // API returns: { default_rules: [...], custom_rules: { items: [...], pagination: {...} } }
       const defaults = data.default_rules || data.defaultRules || [];
-      // Per i custom rules, prova prima il nuovo formato (data), poi i vecchi formati
-      const customs = data.data || data.custom_rules || data.customRules || data.rules || [];
+      // Extract custom rules from the nested structure
+      const customs = data.custom_rules?.items || data.custom_rules || data.customRules || data.rules || [];
 
       setDefaultRules(defaults);
       setCustomRules(customs);

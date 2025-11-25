@@ -151,35 +151,32 @@ const BlocklistPage: React.FC = () => {
       try {
         const token = localStorage.getItem('authToken');
 
-        // Load blocklist
+        // Load blocklist - API returns { data: [...], pagination: {...} }
         const blockRes = await fetch('/api/blocklist', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (blockRes.ok) {
           const data = await blockRes.json();
-          // Handle both old format and new format with pagination
           const blocklistData = data.data || data.blocked_ips || [];
           setBlocklist(blocklistData);
         }
 
-        // Load whitelist
+        // Load whitelist - API returns { data: [...], pagination: {...} }
         const whiteRes = await fetch('/api/whitelist', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (whiteRes.ok) {
           const data = await whiteRes.json();
-          // Handle both old format and new format with pagination
           const whitelistData = data.data || data.whitelisted_ips || [];
           setWhitelist(whitelistData);
         }
 
-        // Load false positives
+        // Load false positives - API returns { data: [...], pagination: {...} }
         const fpRes = await fetch('/api/false-positives', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (fpRes.ok) {
           const data = await fpRes.json();
-          // Handle both old format and new format with pagination
           const fpData = data.data || data.false_positives || [];
           setFalsePositives(fpData);
         }
@@ -207,7 +204,6 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          // Handle both old format and new format with pagination
           const blocklistData = data.data || data.blocked_ips || [];
           setBlocklist(blocklistData);
         }
@@ -217,7 +213,6 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          // Handle both old format and new format with pagination
           const whitelistData = data.data || data.whitelisted_ips || [];
           setWhitelist(whitelistData);
         }
@@ -227,7 +222,6 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          // Handle both old format and new format with pagination
           const fpData = data.data || data.false_positives || [];
           setFalsePositives(fpData);
         }

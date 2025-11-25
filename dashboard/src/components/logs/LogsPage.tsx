@@ -157,8 +157,8 @@ export default function LogsPage(): React.ReactElement {
 
         if (response.ok) {
           const data = await response.json();
-          // Handle both old format (direct arrays) and new format (data with pagination)
-          const securityLogs = data.data || data.security_logs || data.logs || [];
+          // API returns: { security_logs: [...], audit_logs: [...], pagination: {...}, logs: [...] }
+          const securityLogs = data.security_logs || data.logs || [];
           const auditLogs = data.audit_logs || [];
           setLogs(securityLogs);
           setAuditLogs(auditLogs);

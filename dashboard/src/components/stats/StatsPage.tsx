@@ -274,8 +274,8 @@ const StatsPage: React.FC = () => {
 
       if (logsResponse.ok) {
         const logsData = await logsResponse.json();
-        // Handle both old format and new format with pagination
-        const logsList = logsData.data || logsData.logs || logsData.security_logs || [];
+        // API returns: { security_logs: [...], pagination: {...}, ... }
+        const logsList = logsData.security_logs || logsData.logs || [];
         // Mappa i logs al formato WAFEvent
         const mappedLogs = logsList.map((log: any) => ({
           ip: log.client_ip,
@@ -316,8 +316,8 @@ const StatsPage: React.FC = () => {
 
           if (rulesResp.ok) {
             const rulesData = await rulesResp.json();
-            // Handle both old format and new format with pagination
-            const customRules = rulesData.data || rulesData.custom_rules || rulesData.rules || [];
+            // API returns: { default_rules: [...], custom_rules: { items: [...], pagination: {...} } }
+            const customRules = rulesData.custom_rules?.items || rulesData.custom_rules || rulesData.rules || [];
 
             const manuallyBlocked = new Map<string, number>();
             customRules.forEach((rule: any) => {
