@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lock, CheckCircle, AlertTriangle, Trash2, Clock, Zap, AlertCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/contexts/SnackbarContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { hasPermission } from '@/types/rbac';
 
 // Validation helpers
 const validateIP = (ip: string): { valid: boolean; error?: string } => {
@@ -88,6 +90,7 @@ type Tab = 'blocklist' | 'whitelist' | 'false-positives';
 
 const BlocklistPage: React.FC = () => {
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('blocklist');
   const [blocklist, setBlocklist] = useState<BlockedEntry[]>([]);
   const [whitelist, setWhitelist] = useState<WhitelistedEntry[]>([]);
@@ -1632,24 +1635,39 @@ const BlocklistPage: React.FC = () => {
                               <div className="inline-flex gap-1 whitespace-nowrap">
                                 <button
                                   onClick={() => handleMarkFalsePositive(fp.id, 'reviewed')}
-                                  className="inline-flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition"
-                                  title="Mark as reviewed"
+                                  disabled={!user || !hasPermission(user.role as any, 'false_positives_resolve')}
+                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition ${
+                                    !user || !hasPermission(user.role as any, 'false_positives_resolve')
+                                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                  }`}
+                                  title={!user || !hasPermission(user.role as any, 'false_positives_resolve') ? 'You do not have permission to resolve false positives' : 'Mark as reviewed'}
                                 >
                                   <AlertTriangle size={12} />
                                   Review
                                 </button>
                                 <button
                                   onClick={() => handleMarkFalsePositive(fp.id, 'whitelisted')}
-                                  className="inline-flex items-center gap-1 px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition"
-                                  title="Add to whitelist"
+                                  disabled={!user || !hasPermission(user.role as any, 'false_positives_resolve')}
+                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition ${
+                                    !user || !hasPermission(user.role as any, 'false_positives_resolve')
+                                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                      : 'bg-green-600 hover:bg-green-700 text-white'
+                                  }`}
+                                  title={!user || !hasPermission(user.role as any, 'false_positives_resolve') ? 'You do not have permission to resolve false positives' : 'Add to whitelist'}
                                 >
                                   <CheckCircle size={12} />
                                   Whitelist
                                 </button>
                                 <button
                                   onClick={() => handleDeleteFalsePositive(fp.id)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
-                                  title="Delete"
+                                  disabled={!user || !hasPermission(user.role as any, 'false_positives_delete')}
+                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition ${
+                                    !user || !hasPermission(user.role as any, 'false_positives_delete')
+                                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                      : 'bg-red-600 hover:bg-red-700 text-white'
+                                  }`}
+                                  title={!user || !hasPermission(user.role as any, 'false_positives_delete') ? 'You do not have permission to delete false positives' : 'Delete'}
                                 >
                                   <Trash2 size={12} />
                                   Delete
@@ -1659,8 +1677,13 @@ const BlocklistPage: React.FC = () => {
                             {fp.status !== 'pending' && (
                               <button
                                 onClick={() => handleDeleteFalsePositive(fp.id)}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition"
-                                title="Delete"
+                                disabled={!user || !hasPermission(user.role as any, 'false_positives_delete')}
+                                className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition ${
+                                  !user || !hasPermission(user.role as any, 'false_positives_delete')
+                                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                    : 'bg-red-600 hover:bg-red-700 text-white'
+                                }`}
+                                title={!user || !hasPermission(user.role as any, 'false_positives_delete') ? 'You do not have permission to delete false positives' : 'Delete'}
                               >
                                 <Trash2 size={12} />
                                 Delete
