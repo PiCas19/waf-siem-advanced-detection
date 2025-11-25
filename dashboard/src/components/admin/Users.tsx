@@ -68,7 +68,9 @@ const Users: React.FC = () => {
           'Authorization': `Bearer ${token}`
         }
       })
-      setUsers(resp.data.users || [])
+      // Handle both old format (users array) and new format (data with pagination)
+      const userData = resp.data.data || resp.data.users || []
+      setUsers(userData)
     } catch (e: any) {
       setError(e.response?.data?.error || 'Failed to load users')
       console.error(e)

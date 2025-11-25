@@ -157,8 +157,11 @@ export default function LogsPage(): React.ReactElement {
 
         if (response.ok) {
           const data = await response.json();
-          setLogs(data.security_logs || data.logs || []);
-          setAuditLogs(data.audit_logs || []);
+          // Handle both old format (direct arrays) and new format (data with pagination)
+          const securityLogs = data.data || data.security_logs || data.logs || [];
+          const auditLogs = data.audit_logs || [];
+          setLogs(securityLogs);
+          setAuditLogs(auditLogs);
         }
       } catch (error) {
         console.error('Error loading logs:', error);

@@ -256,7 +256,9 @@ const StatsPage: React.FC = () => {
         const fpData = await fpResponse.json();
         // Crea un set di chiavi (ip::threat) dei false positive segnalati
         const reportedFPs = new Set<string>();
-        (fpData.false_positives || []).forEach((fp: any) => {
+        // Handle both old format and new format with pagination
+        const fpList = fpData.data || fpData.false_positives || [];
+        fpList.forEach((fp: any) => {
           const key = `${fp.client_ip || ''}::${fp.description || fp.threat_type || ''}`;
           reportedFPs.add(key);
         });
@@ -272,8 +274,10 @@ const StatsPage: React.FC = () => {
 
       if (logsResponse.ok) {
         const logsData = await logsResponse.json();
+        // Handle both old format and new format with pagination
+        const logsList = logsData.data || logsData.logs || logsData.security_logs || [];
         // Mappa i logs al formato WAFEvent
-        const mappedLogs = logsData.logs.map((log: any) => ({
+        const mappedLogs = logsList.map((log: any) => ({
           ip: log.client_ip,
           method: log.method,
           path: log.url,
@@ -312,7 +316,8 @@ const StatsPage: React.FC = () => {
 
           if (rulesResp.ok) {
             const rulesData = await rulesResp.json();
-            const customRules = rulesData.custom_rules || [];
+            // Handle both old format and new format with pagination
+            const customRules = rulesData.data || rulesData.custom_rules || rulesData.rules || [];
 
             const manuallyBlocked = new Map<string, number>();
             customRules.forEach((rule: any) => {
