@@ -157,8 +157,12 @@ const BlocklistPage: React.FC = () => {
         });
         if (blockRes.ok) {
           const data = await blockRes.json();
+          console.log('Blocklist API response:', data);
           const blocklistData = data.items || data.data || data.blocked_ips || [];
+          console.log('Extracted blocklist data:', blocklistData);
           setBlocklist(blocklistData);
+        } else {
+          console.error('Blocklist fetch failed:', blockRes.status, blockRes.statusText);
         }
 
         // Load whitelist with pagination - API returns { items: [...], pagination: {...} }
@@ -167,8 +171,12 @@ const BlocklistPage: React.FC = () => {
         });
         if (whiteRes.ok) {
           const data = await whiteRes.json();
+          console.log('Whitelist API response:', data);
           const whitelistData = data.items || data.data || data.whitelisted_ips || [];
+          console.log('Extracted whitelist data:', whitelistData);
           setWhitelist(whitelistData);
+        } else {
+          console.error('Whitelist fetch failed:', whiteRes.status, whiteRes.statusText);
         }
 
         // Load false positives with pagination - API returns { false_positives: [...], pagination: {...}, count: X }
@@ -177,9 +185,13 @@ const BlocklistPage: React.FC = () => {
         });
         if (fpRes.ok) {
           const data = await fpRes.json();
+          console.log('False-positives API response:', data);
           // Check false_positives first (actual API response), then data as fallback
           const fpData = data.false_positives || data.data || [];
+          console.log('Extracted false-positives data:', fpData);
           setFalsePositives(fpData);
+        } else {
+          console.error('False-positives fetch failed:', fpRes.status, fpRes.statusText);
         }
       } catch (error) {
         console.error('Failed to load data:', error);
@@ -205,8 +217,12 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
+          console.log('Blocklist API response (loadData):', data);
           const blocklistData = data.items || data.data || data.blocked_ips || [];
+          console.log('Extracted blocklist data (loadData):', blocklistData);
           setBlocklist(blocklistData);
+        } else {
+          console.error('Blocklist fetch failed (loadData):', res.status);
         }
       } else if (activeTab === 'whitelist') {
         const res = await fetch('/api/whitelist?limit=100&offset=0', {
@@ -214,8 +230,12 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
+          console.log('Whitelist API response (loadData):', data);
           const whitelistData = data.items || data.data || data.whitelisted_ips || [];
+          console.log('Extracted whitelist data (loadData):', whitelistData);
           setWhitelist(whitelistData);
+        } else {
+          console.error('Whitelist fetch failed (loadData):', res.status);
         }
       } else if (activeTab === 'false-positives') {
         const res = await fetch('/api/false-positives?limit=100&offset=0', {
@@ -223,9 +243,13 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
+          console.log('False-positives API response (loadData):', data);
           // API returns { false_positives: [...], pagination: {...}, count: X }
           const fpData = data.false_positives || data.data || [];
+          console.log('Extracted false-positives data (loadData):', fpData);
           setFalsePositives(fpData);
+        } else {
+          console.error('False-positives fetch failed (loadData):', res.status);
         }
       }
     } catch (error) {
