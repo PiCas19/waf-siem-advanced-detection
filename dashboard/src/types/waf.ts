@@ -61,6 +61,9 @@ export interface CustomRule extends WAFRule {
 }
 
 export interface RulesResponse {
+  // New pagination format
+  data?: CustomRule[];
+  // Old formats
   default_rules?: DefaultRule[];
   defaultRules?: DefaultRule[];
   custom_rules?: CustomRule[];
@@ -68,6 +71,12 @@ export interface RulesResponse {
   rules?: CustomRule[];
   total_rules?: number;
   totalRules?: number;
+  // Pagination metadata
+  pagination?: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
 }
 
 export interface RuleTestResult {
