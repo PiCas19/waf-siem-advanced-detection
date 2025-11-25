@@ -82,7 +82,7 @@ var RolePermissions = map[string][]string{
 		"rules_view", "rules_create", "rules_edit",  // Can create/edit but not delete
 		"blocklist_view", "blocklist_add", "blocklist_remove",
 		"whitelist_view", "whitelist_add", "whitelist_remove",
-		"false_positives_view", "false_positives_report",  // Can report but not resolve/delete
+		"false_positives_view", "false_positives_report", "false_positives_resolve", "false_positives_delete",  // Can manage all FP
 		"threats_block", "threats_unblock",
 		"access_control",
 		// NO: users_view, users_create, users_edit, users_delete, users_change_role
