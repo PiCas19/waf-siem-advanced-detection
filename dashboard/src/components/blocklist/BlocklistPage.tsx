@@ -151,23 +151,23 @@ const BlocklistPage: React.FC = () => {
       try {
         const token = localStorage.getItem('authToken');
 
-        // Load blocklist - API returns { data: [...], pagination: {...} }
+        // Load blocklist - API returns { items: [...], pagination: {...} }
         const blockRes = await fetch('/api/blocklist', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (blockRes.ok) {
           const data = await blockRes.json();
-          const blocklistData = data.data || data.blocked_ips || [];
+          const blocklistData = data.items || data.data || data.blocked_ips || [];
           setBlocklist(blocklistData);
         }
 
-        // Load whitelist - API returns { data: [...], pagination: {...} }
+        // Load whitelist - API returns { items: [...], pagination: {...} }
         const whiteRes = await fetch('/api/whitelist', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (whiteRes.ok) {
           const data = await whiteRes.json();
-          const whitelistData = data.data || data.whitelisted_ips || [];
+          const whitelistData = data.items || data.data || data.whitelisted_ips || [];
           setWhitelist(whitelistData);
         }
 
@@ -205,7 +205,7 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          const blocklistData = data.data || data.blocked_ips || [];
+          const blocklistData = data.items || data.data || data.blocked_ips || [];
           setBlocklist(blocklistData);
         }
       } else if (activeTab === 'whitelist') {
@@ -214,7 +214,7 @@ const BlocklistPage: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          const whitelistData = data.data || data.whitelisted_ips || [];
+          const whitelistData = data.items || data.data || data.whitelisted_ips || [];
           setWhitelist(whitelistData);
         }
       } else if (activeTab === 'false-positives') {
