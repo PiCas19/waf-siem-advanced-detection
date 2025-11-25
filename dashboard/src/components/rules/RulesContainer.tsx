@@ -34,8 +34,18 @@ export default function RulesContainer() {
 
       // API returns: { default_rules: [...], custom_rules: { items: [...], pagination: {...} } }
       const defaults = data.default_rules || data.defaultRules || [];
-      // Extract custom rules from the nested structure
-      const customs = data.custom_rules?.items || data.custom_rules || data.customRules || data.rules || [];
+      // Extract custom rules - handle both nested and flat structures
+      let customs: typeof data.customRules = [];
+      if (data.custom_rules) {
+        if (Array.isArray(data.custom_rules)) {
+          customs = data.custom_rules;
+        } else if ((data.custom_rules as any).items) {
+          customs = (data.custom_rules as any).items;
+        }
+      }
+      if (!customs || customs.length === 0) {
+        customs = data.customRules || data.rules || [];
+      }
 
       setDefaultRules(defaults);
       setCustomRules(customs);

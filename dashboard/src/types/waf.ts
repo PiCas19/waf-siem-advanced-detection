@@ -60,18 +60,20 @@ export interface CustomRule extends WAFRule {
   updated_at: string;
 }
 
+export interface CustomRulesNested {
+  items?: CustomRule[];
+  pagination?: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}
+
 export interface RulesResponse {
   // API returns nested structure: custom_rules: { items: [...], pagination: {...} }
   default_rules?: DefaultRule[];
   defaultRules?: DefaultRule[];
-  custom_rules?: {
-    items?: CustomRule[];
-    pagination?: {
-      total: number;
-      limit: number;
-      offset: number;
-    };
-  } | CustomRule[];
+  custom_rules?: CustomRulesNested | CustomRule[];
   customRules?: CustomRule[];
   rules?: CustomRule[];
   total_rules?: number;
