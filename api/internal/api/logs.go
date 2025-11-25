@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/helpers"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
@@ -193,19 +194,40 @@ func isDefaultThreatType(threatType string) bool {
 	return defaultThreats[threatType]
 }
 
-// NewGetLogsHandler returns security and audit logs with service layer
+// NewGetLogsHandler godoc
+// @Summary Get security and audit logs
+// @Description Returns paginated list of security logs with audit logs
+// @Tags Logs
+// @Accept json
+// @Produce json
+// @Param limit query int false "Number of items per page (default 20, max 100)" default(20)
+// @Param offset query int false "Pagination offset (default 0)" default(0)
+// @Param sort query string false "Sort field (id, client_ip, threat_type, severity, created_at, blocked)"
+// @Param order query string false "Sort order (asc or desc)" default(asc)
+// @Success 200 {object} map[string]interface{} "Security and audit logs with pagination"
+// @Failure 400 {object} map[string]interface{} "Invalid pagination parameters"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /logs [get]
+// @Security BearerAuth
 func NewGetLogsHandler(logService *service.LogService, auditLogService *service.AuditLogService, blocklistService *service.BlocklistService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Parse pagination parameters
+		limit, offset, _, _, err := helpers.ParsePaginationParams(c)
+		if err != nil {
+			BadRequestWithCode(c, ErrInvalidRequest, err.Error())
+			return
+		}
+
 		ctx := c.Request.Context()
 
-		// Fetch security logs
-		logs, err := logService.GetAllLogs(ctx)
+		// Fetch paginated security logs
+		logs, total, err := logService.GetLogsPaginated(ctx, offset, limit)
 		if err != nil {
 			InternalServerErrorWithCode(c, ErrServiceError, "Failed to fetch logs")
 			return
 		}
 
-		// Fetch audit logs
+		// Fetch audit logs (no pagination, for now get recent ones)
 		auditLogs, err := auditLogService.GetAllAuditLogs(ctx)
 		if err != nil {
 			// If audit logs fail, continue with just security logs
@@ -256,16 +278,30 @@ func NewGetLogsHandler(logService *service.LogService, auditLogService *service.
 			}
 		}
 
+		// Build paginated response for security logs
+		paginatedResponse := helpers.BuildStandardPaginatedResponse(logs, limit, offset, total)
+
 		c.JSON(200, gin.H{
-			"security_logs": logs,
+			"security_logs": paginatedResponse.Items,
+			"pagination":    paginatedResponse.Pagination,
 			"audit_logs":    auditLogs,
-			"logs":          logs, // Keep for backward compatibility
+			"logs":          paginatedResponse.Items, // Keep for backward compatibility
 		})
 	}
 }
 
-// NewUpdateThreatBlockStatusHandler updates the block status of a threat log
-// Used for manual blocking (sets blocked=true, blocked_by="manual") and unblocking
+// NewUpdateThreatBlockStatusHandler godoc
+// @Summary Update threat block status
+// @Description Updates the blocked status and blocked_by field for a threat
+// @Tags Logs
+// @Accept json
+// @Produce json
+// @Param request body object{ip=string,description=string,blocked=boolean,blocked_by=string} true "Block status update"
+// @Success 200 {object} map[string]interface{} "Threat block status updated"
+// @Failure 400 {object} map[string]interface{} "Invalid request"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /logs/threat-block-status [put]
+// @Security BearerAuth
 func NewUpdateThreatBlockStatusHandler(logService *service.LogService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {

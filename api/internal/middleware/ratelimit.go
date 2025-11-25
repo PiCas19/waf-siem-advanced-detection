@@ -9,7 +9,18 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 )
 
-// TokenBucket implementa un token bucket per rate limiting
+// TokenBucket implements a token bucket algorithm for rate limiting.
+//
+// Fields:
+//   - tokens (float64): Current number of available tokens
+//   - maxTokens (float64): Maximum token capacity
+//   - refillRate (float64): Tokens added per second
+//   - lastRefill (time.Time): Last refill timestamp
+//   - mu (sync.Mutex): Mutex for thread-safe operations
+//
+// Thread Safety: Thread-safe via internal mutex locking.
+//
+// See Also: NewTokenBucket(), Allow()
 type TokenBucket struct {
 	tokens    float64
 	maxTokens float64
@@ -47,7 +58,17 @@ func (tb *TokenBucket) Allow() bool {
 	return false
 }
 
-// RateLimiter contiene la configurazione per il rate limiting
+// RateLimiter manages per-IP rate limiting using token buckets.
+//
+// Fields:
+//   - buckets (map[string]*TokenBucket): Per-IP token buckets
+//   - mu (sync.RWMutex): Mutex for thread-safe bucket management
+//   - rps (float64): Requests per second limit
+//   - burst (int): Maximum burst size
+//
+// Thread Safety: Thread-safe via internal mutex locking.
+//
+// See Also: NewRateLimiter(), RateLimitMiddleware()
 type RateLimiter struct {
 	buckets map[string]*TokenBucket
 	mu      sync.RWMutex

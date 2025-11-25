@@ -1,0 +1,906 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "contact": {}
+    },
+    "paths": {
+        "/blocklist": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns paginated list of blocked IPs with optional filtering and sorting",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blocklist"
+                ],
+                "summary": "Get blocked IPs list",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Number of items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Pagination offset (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort field (id, ip_address, created_at, expires_at)",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "asc",
+                        "description": "Sort order (asc or desc)",
+                        "name": "order",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.StandardPaginatedResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/models.BlockedIP"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid pagination parameters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Returns detailed health status of all critical services",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Comprehensive health check",
+                "responses": {
+                    "200": {
+                        "description": "All services healthy",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.HealthCheckResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "One or more services unhealthy",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.HealthCheckResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/live": {
+            "get": {
+                "description": "Simple probe to check if service is running (Kubernetes compatible)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Kubernetes liveness probe",
+                "responses": {
+                    "200": {
+                        "description": "Service is alive",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health/ready": {
+            "get": {
+                "description": "Checks if service is ready to handle requests (Kubernetes compatible)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Kubernetes readiness probe",
+                "responses": {
+                    "200": {
+                        "description": "Service is ready",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Service not ready",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/waf/hmac-keys": {
+            "get": {
+                "tags": [
+                    "HMAC Keys"
+                ],
+                "summary": "List HMAC keys",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.HMACKey"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "HMAC Keys"
+                ],
+                "summary": "Create HMAC key",
+                "parameters": [
+                    {
+                        "description": "Key details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.HMACKeyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.HMACKey"
+                        }
+                    }
+                }
+            }
+        },
+        "/waf/hmac-keys/{id}": {
+            "delete": {
+                "tags": [
+                    "HMAC Keys"
+                ],
+                "summary": "Delete HMAC key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/waf/hmac-keys/{id}/rotate": {
+            "post": {
+                "tags": [
+                    "HMAC Keys"
+                ],
+                "summary": "Rotate HMAC key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Key ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.HMACKey"
+                        }
+                    }
+                }
+            }
+        },
+        "/waf/sources": {
+            "get": {
+                "description": "Get all trusted sources with optional filtering",
+                "tags": [
+                    "Trusted Sources"
+                ],
+                "summary": "List trusted sources",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Filter by enabled status",
+                        "name": "enabled",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by type",
+                        "name": "type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.TrustedSource"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Trusted Sources"
+                ],
+                "summary": "Create trusted source",
+                "parameters": [
+                    {
+                        "description": "Source details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.TrustedSourceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.TrustedSource"
+                        }
+                    }
+                }
+            }
+        },
+        "/waf/sources/by-ip/{ip}": {
+            "get": {
+                "tags": [
+                    "Trusted Sources"
+                ],
+                "summary": "Get trusted source by IP",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "IP address",
+                        "name": "ip",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.TrustedSource"
+                        }
+                    }
+                }
+            }
+        },
+        "/waf/sources/{id}": {
+            "get": {
+                "tags": [
+                    "Trusted Sources"
+                ],
+                "summary": "Get trusted source by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.TrustedSource"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Trusted Sources"
+                ],
+                "summary": "Update trusted source",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated source details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.TrustedSourceRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.TrustedSource"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Trusted Sources"
+                ],
+                "summary": "Delete trusted source",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/waf/sources/{id}/verify": {
+            "post": {
+                "tags": [
+                    "Trusted Sources"
+                ],
+                "summary": "Verify trusted source",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/whitelist": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns paginated list of whitelisted IPs",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Whitelist"
+                ],
+                "summary": "Get whitelisted IPs list",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Number of items per page (default 20, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Pagination offset (default 0)",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort field (id, ip_address, created_at)",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "asc",
+                        "description": "Sort order (asc or desc)",
+                        "name": "order",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.StandardPaginatedResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/models.WhitelistedIP"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid pagination parameters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "api.HMACKeyRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "secret"
+            ],
+            "properties": {
+                "is_active": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "name": {
+                    "type": "string"
+                },
+                "rotation_interval": {
+                    "description": "Days between rotations",
+                    "type": "integer"
+                },
+                "secret": {
+                    "type": "string"
+                },
+                "trusted_source_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.TrustedSourceRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "type"
+            ],
+            "properties": {
+                "allowed_header_fields": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "blocked_after_errors": {
+                    "type": "integer",
+                    "default": 10
+                },
+                "description": {
+                    "type": "string"
+                },
+                "geolocation_country": {
+                    "type": "string"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "ip_range": {
+                    "type": "string"
+                },
+                "is_enabled": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "location": {
+                    "type": "string"
+                },
+                "max_requests_per_min": {
+                    "type": "integer",
+                    "default": 0
+                },
+                "name": {
+                    "type": "string"
+                },
+                "require_signature": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "trusts_x_forwarded_for": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "trusts_x_public_ip": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "trusts_x_real_ip": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.PaginationInfo": {
+            "type": "object",
+            "properties": {
+                "has_next": {
+                    "type": "boolean"
+                },
+                "has_prev": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.StandardPaginatedResponse": {
+            "type": "object",
+            "properties": {
+                "items": {},
+                "pagination": {
+                    "$ref": "#/definitions/dto.PaginationInfo"
+                }
+            }
+        },
+        "handlers.HealthCheckResponse": {
+            "type": "object",
+            "properties": {
+                "services": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/handlers.ServiceStatus"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "uptime": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.ServiceStatus": {
+            "type": "object",
+            "properties": {
+                "details": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "\"healthy\", \"degraded\", \"unhealthy\"",
+                    "type": "string"
+                }
+            }
+        },
+        "models.BlockedIP": {
+            "type": "object",
+            "properties": {
+                "added_by": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "description": "Rule name/description (e.g. \"XSS\", \"Detect API Enumeration\")",
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "payload": {
+                    "description": "Detected payload/threat content",
+                    "type": "string"
+                },
+                "permanent": {
+                    "type": "boolean"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "url": {
+                    "description": "URL of the request that triggered the block",
+                    "type": "string"
+                },
+                "user_agent": {
+                    "description": "User agent of the request",
+                    "type": "string"
+                }
+            }
+        },
+        "models.HMACKey": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_used_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "next_rotation_date": {
+                    "type": "string"
+                },
+                "rotation_interval": {
+                    "description": "Days between rotations",
+                    "type": "integer"
+                },
+                "trusted_source": {
+                    "description": "Relationship",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.TrustedSource"
+                        }
+                    ]
+                },
+                "trusted_source_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.TrustedSource": {
+            "type": "object",
+            "properties": {
+                "allowed_header_fields": {
+                    "description": "Metadati di sicurezza",
+                    "type": "string"
+                },
+                "blocked_after_errors": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "description": "Audit",
+                    "type": "string"
+                },
+                "current_error_count": {
+                    "type": "integer"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "geolocation_country": {
+                    "type": "string"
+                },
+                "hmac_keys": {
+                    "description": "Relationships",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.HMACKey"
+                    }
+                },
+                "hmac_secret": {
+                    "description": "Non esportare in JSON nella risposta",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "ip_range": {
+                    "description": "CIDR range",
+                    "type": "string"
+                },
+                "is_enabled": {
+                    "type": "boolean"
+                },
+                "last_verified_at": {
+                    "type": "string"
+                },
+                "location": {
+                    "description": "Geolocation hints",
+                    "type": "string"
+                },
+                "max_requests_per_min": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "require_signature": {
+                    "type": "boolean"
+                },
+                "trusts_x_forwarded_for": {
+                    "type": "boolean"
+                },
+                "trusts_x_public_ip": {
+                    "description": "Configurazione header extraction",
+                    "type": "boolean"
+                },
+                "trusts_x_real_ip": {
+                    "type": "boolean"
+                },
+                "type": {
+                    "description": "reverse_proxy, dmz, tailscale, vpn, load_balancer, api_gateway, custom",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "updated_by": {
+                    "type": "string"
+                },
+                "verification_status": {
+                    "description": "verified, pending, failed",
+                    "type": "string"
+                }
+            }
+        },
+        "models.WhitelistedIP": {
+            "type": "object",
+            "properties": {
+                "added_by": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

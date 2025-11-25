@@ -103,3 +103,22 @@ func (r *GormWhitelistedIPRepository) ExistsSoftDeleted(ctx context.Context, ip 
 	}
 	return &whitelisted, err
 }
+
+func (r *GormWhitelistedIPRepository) FindPaginated(ctx context.Context, offset int, limit int) ([]models.WhitelistedIP, int64, error) {
+	var whitelisted []models.WhitelistedIP
+	var total int64
+
+	// Get total count
+	if err := r.db.WithContext(ctx).Model(&models.WhitelistedIP{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
+	err := r.db.WithContext(ctx).
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&whitelisted).Error
+
+	return whitelisted, total, err
+}

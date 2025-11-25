@@ -35,6 +35,7 @@ type RuleRepository interface {
 	ToggleEnabled(ctx context.Context, id uint, enabled bool) error
 	Count(ctx context.Context) (int64, error)
 	FindByType(ctx context.Context, threatType string) ([]models.Rule, error)
+	FindPaginated(ctx context.Context, offset int, limit int) ([]models.Rule, int64, error)
 }
 
 // BlockedIPRepository handles database operations for blocked IPs
@@ -48,6 +49,7 @@ type BlockedIPRepository interface {
 	IsBlocked(ctx context.Context, ip string) (bool, error)
 	Count(ctx context.Context) (int64, error)
 	FindByIPAndDescription(ctx context.Context, ip string, description string) (*models.BlockedIP, error)
+	FindPaginated(ctx context.Context, offset int, limit int) ([]models.BlockedIP, int64, error)
 }
 
 // WhitelistedIPRepository handles database operations for whitelisted IPs
@@ -61,6 +63,7 @@ type WhitelistedIPRepository interface {
 	Count(ctx context.Context) (int64, error)
 	Restore(ctx context.Context, ip string) (*models.WhitelistedIP, error)
 	ExistsSoftDeleted(ctx context.Context, ip string) (*models.WhitelistedIP, error)
+	FindPaginated(ctx context.Context, offset int, limit int) ([]models.WhitelistedIP, int64, error)
 }
 
 // AuditLogRepository handles database operations for audit logs
@@ -103,4 +106,5 @@ type UserRepository interface {
 	FindByRole(ctx context.Context, role string) ([]models.User, error)
 	CountByRole(ctx context.Context, role string) (int64, error)
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
+	FindPaginated(ctx context.Context, offset int, limit int) ([]models.User, int64, error)
 }

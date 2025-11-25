@@ -118,3 +118,22 @@ func (r *GormRuleRepository) FindByType(ctx context.Context, threatType string) 
 	err := r.db.WithContext(ctx).Where("type = ? AND enabled = ?", threatType, true).Order("created_at DESC").Find(&rules).Error
 	return rules, err
 }
+
+func (r *GormRuleRepository) FindPaginated(ctx context.Context, offset int, limit int) ([]models.Rule, int64, error) {
+	var rules []models.Rule
+	var total int64
+
+	// Get total count
+	if err := r.db.WithContext(ctx).Model(&models.Rule{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
+	err := r.db.WithContext(ctx).
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&rules).Error
+
+	return rules, total, err
+}

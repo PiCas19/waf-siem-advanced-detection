@@ -13,7 +13,16 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
 )
 
-// OTPConfig holds TOTP configuration
+// OTPConfig holds TOTP configuration for 2FA setup.
+//
+// Fields:
+//   - Secret (string): Base32-encoded TOTP secret
+//   - QRCodeURL (string): otpauth:// URL for QR code generation
+//   - BackupCodes ([]string): Array of 8-digit backup codes
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
+//
+// See Also: SetupTwoFA(), VerifyOTP(), VerifyBackupCode()
 type OTPConfig struct {
 	Secret      string
 	QRCodeURL   string

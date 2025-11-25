@@ -8,7 +8,19 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/repository"
 )
 
-// AuditLogService handles business logic for audit logs
+// AuditLogService handles business logic for audit logs, providing methods to query,
+// create, and analyze audit log entries.
+//
+// Fields:
+//   - auditLogRepo (repository.AuditLogRepository): Repository for database operations
+//
+// Example Usage:
+//   auditLogService := service.NewAuditLogService(auditLogRepo)
+//   logs, err := auditLogService.GetRecentAuditLogs(ctx, 100)
+//
+// Thread Safety: Thread-safe when using appropriate database transaction handling.
+//
+// See Also: AuditLog, AuditLogRepository
 type AuditLogService struct {
 	auditLogRepo repository.AuditLogRepository
 }

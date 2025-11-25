@@ -5,7 +5,39 @@ import (
 	"gorm.io/gorm"
 )
 
-// BlockedIP represents a blocked IP address for a specific threat/rule
+// BlockedIP represents a blocked IP address for a specific threat or rule.
+//
+// Fields:
+//   - ID (uint): Primary key identifier for the blocked IP entry
+//   - CreatedAt (time.Time): Timestamp when the IP was blocked
+//   - UpdatedAt (time.Time): Timestamp of last update
+//   - DeletedAt (gorm.DeletedAt): Soft delete timestamp (indexed)
+//   - IPAddress (string): The blocked IP address (indexed, required)
+//   - Description (string): Rule name/description (e.g., "XSS", "SQL Injection") (indexed, required)
+//   - Reason (string): Explanation for why this IP was blocked
+//   - ExpiresAt (*time.Time): Expiry timestamp for temporary blocks
+//   - Permanent (bool): Whether this is a permanent block (default: false)
+//   - AddedBy (uint): ID of the user who added this block
+//   - URL (string): URL of the request that triggered the block
+//   - UserAgent (string): User agent of the blocked request
+//   - Payload (string): Detected payload/threat content
+//
+// Note: The same IP can be blocked for different rules (composite unique index on IPAddress + Description).
+//
+// Example Usage:
+//   blockedIP := &models.BlockedIP{
+//       IPAddress: "198.51.100.42",
+//       Description: "XSS Attack",
+//       Reason: "Multiple XSS attempts detected",
+//       Permanent: true,
+//       AddedBy: operatorUserID,
+//   }
+//   db.Create(&blockedIP)
+//
+// Thread Safety: Not thread-safe. Use appropriate database transaction handling
+// when creating/modifying blocked IPs concurrently.
+//
+// See Also: BlockedIPRepository, BlocklistService
 type BlockedIP struct {
 	ID        uint           `gorm:"primarykey" json:"id"`
 	CreatedAt time.Time      `json:"created_at"`

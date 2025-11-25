@@ -77,3 +77,22 @@ func (r *GormBlockedIPRepository) FindByIPAndDescription(ctx context.Context, ip
 	}
 	return &blockedIP, err
 }
+
+func (r *GormBlockedIPRepository) FindPaginated(ctx context.Context, offset int, limit int) ([]models.BlockedIP, int64, error) {
+	var blockedIPs []models.BlockedIP
+	var total int64
+
+	// Get total count
+	if err := r.db.WithContext(ctx).Model(&models.BlockedIP{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
+	err := r.db.WithContext(ctx).
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&blockedIPs).Error
+
+	return blockedIPs, total, err
+}

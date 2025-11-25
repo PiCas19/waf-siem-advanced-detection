@@ -6,7 +6,51 @@ import (
 	"gorm.io/gorm"
 )
 
-// TrustedSource rappresenta una sorgente trusted (proxy, DMZ, Tailscale, ecc.)
+// TrustedSource represents a trusted network source (reverse proxy, DMZ, Tailscale, VPN, etc.)
+// that can provide reliable client IP information through HTTP headers.
+//
+// Fields:
+//   - ID (string): Primary key identifier for the trusted source
+//   - Name (string): Human-readable name of the trusted source
+//   - Type (string): Type of source - reverse_proxy, dmz, tailscale, vpn, load_balancer, api_gateway, custom
+//   - IP (string): Single IP address of the trusted source
+//   - IPRange (string): CIDR range for the trusted source
+//   - Description (string): Detailed description of this trusted source
+//   - IsEnabled (bool): Whether this source is currently enabled (default: true)
+//   - CreatedAt (time.Time): Timestamp when created
+//   - UpdatedAt (time.Time): Timestamp of last update
+//   - LastVerifiedAt (*time.Time): Timestamp of last verification check
+//   - VerificationStatus (string): Verification status - verified, pending, failed
+//   - TrustsXPublicIP (bool): Whether to trust X-Public-IP header (default: true)
+//   - TrustsXForwardedFor (bool): Whether to trust X-Forwarded-For header (default: true)
+//   - TrustsXRealIP (bool): Whether to trust X-Real-IP header (default: false)
+//   - RequireSignature (bool): Whether HMAC signature is required (default: false)
+//   - HMACSecret (string): HMAC secret for signature verification (not exported in JSON)
+//   - AllowedHeaderFields (string): JSON array of allowed header fields
+//   - MaxRequestsPerMin (int): Rate limit in requests per minute (0 = unlimited)
+//   - BlockedAfterErrors (int): Number of errors before blocking (default: 10)
+//   - CurrentErrorCount (int): Current error count (default: 0, resets hourly)
+//   - Location (string): Physical/logical location of the source
+//   - GeolocationCountry (string): Country code of the source
+//   - CreatedBy (string): User who created this source
+//   - UpdatedBy (string): User who last updated this source
+//   - HMACKeys ([]HMACKey): Associated HMAC keys for signature verification
+//
+// Example Usage:
+//   trustedSource := &models.TrustedSource{
+//       ID: "nginx-proxy-1",
+//       Name: "Main Nginx Proxy",
+//       Type: "reverse_proxy",
+//       IP: "10.0.1.5",
+//       TrustsXForwardedFor: true,
+//       IsEnabled: true,
+//   }
+//   db.Create(&trustedSource)
+//
+// Thread Safety: Not thread-safe. The BeforeUpdate hook modifies CurrentErrorCount
+// which requires proper database locking in concurrent environments.
+//
+// See Also: HMACKey, SourceValidationLog, TrustedSourcePolicy
 type TrustedSource struct {
 	ID                  string    `gorm:"primaryKey" json:"id"`
 	Name                string    `json:"name"`
@@ -45,13 +89,43 @@ type TrustedSource struct {
 	HMACKeys []HMACKey `json:"hmac_keys,omitempty" gorm:"foreignKey:TrustedSourceID"`
 }
 
-// TableName specifica il nome della tabella
+// TableName specifies the database table name for TrustedSource
 func (TrustedSource) TableName() string {
 	return "trusted_sources"
 }
 
-// HMACKey rappresenta una chiave HMAC per la firma dei header
-type HMACKey struct {
+// HMACKey represents an HMAC key used for signing and verifying HTTP headers from trusted sources.
+//
+// Fields:
+//   - ID (string): Primary key identifier for the HMAC key
+//   - Name (string): Human-readable name for this key
+//   - Secret (string): The HMAC secret key (never exported in JSON)
+//   - TrustedSourceID (string): Foreign key to the associated TrustedSource
+//   - CreatedAt (time.Time): Timestamp when created
+//   - UpdatedAt (time.Time): Timestamp of last update
+//   - LastUsedAt (*time.Time): Timestamp of last successful use
+//   - RotationInterval (int): Days between automatic key rotations
+//   - NextRotationDate (*time.Time): When this key should be rotated
+//   - IsActive (bool): Whether this key is currently active (default: true)
+//   - CreatedBy (string): User who created this key
+//   - TrustedSource (*TrustedSource): Associated TrustedSource object
+//
+// Example Usage:
+//   hmacKey := &models.HMACKey{
+//       ID: "key-1",
+//       Name: "Production Key",
+//       Secret: "secret-value-here",
+//       TrustedSourceID: "nginx-proxy-1",
+//       RotationInterval: 90,
+//       IsActive: true,
+//   }
+//   db.Create(&hmacKey)
+//
+// Thread Safety: Not thread-safe. Use appropriate database locking when updating
+// LastUsedAt or rotation fields concurrently.
+//
+// See Also: TrustedSource, GetSecretHash()
+type HMACKey struct{
 	ID               string    `gorm:"primaryKey" json:"id"`
 	Name             string    `json:"name"`
 	Secret           string    `json:"-"` // Non esportare mai il secret in JSON
@@ -68,12 +142,43 @@ type HMACKey struct {
 	TrustedSource *TrustedSource `json:"trusted_source,omitempty" gorm:"foreignKey:TrustedSourceID"`
 }
 
-// TableName specifica il nome della tabella
+// TableName specifies the database table name for HMACKey
 func (HMACKey) TableName() string {
 	return "hmac_keys"
 }
 
-// SourceValidationLog registra ogni validazione di una sorgente
+// SourceValidationLog records each validation attempt for a trusted source.
+//
+// Fields:
+//   - ID (string): Primary key identifier for the validation log entry
+//   - TrustedSourceID (string): Foreign key to the associated TrustedSource
+//   - IP (string): IP address being validated
+//   - IsValid (bool): Whether the validation succeeded
+//   - ValidationTimestamp (time.Time): When the validation occurred
+//   - ValidationDetails (string): Additional details about the validation
+//   - TrustScore (int): Calculated trust score (0-100)
+//   - SourceType (string): Type of source that was validated
+//   - ErrorMessage (string): Error message if validation failed
+//   - HeaderSignatureValid (bool): Whether the HMAC signature was valid
+//   - IsDMZ (bool): Whether the source is in a DMZ
+//   - IsTailscale (bool): Whether the source is a Tailscale endpoint
+//   - TrustedSource (*TrustedSource): Associated TrustedSource object
+//
+// Example Usage:
+//   validationLog := &models.SourceValidationLog{
+//       ID: "log-123",
+//       TrustedSourceID: "nginx-proxy-1",
+//       IP: "10.0.1.5",
+//       IsValid: true,
+//       TrustScore: 95,
+//       HeaderSignatureValid: true,
+//   }
+//   db.Create(&validationLog)
+//
+// Thread Safety: Not thread-safe. Use appropriate database transaction handling
+// when creating validation logs concurrently.
+//
+// See Also: TrustedSource
 type SourceValidationLog struct {
 	ID                 string    `gorm:"primaryKey" json:"id"`
 	TrustedSourceID    string    `json:"trusted_source_id"`
@@ -92,12 +197,44 @@ type SourceValidationLog struct {
 	TrustedSource *TrustedSource `json:"trusted_source,omitempty" gorm:"foreignKey:TrustedSourceID"`
 }
 
-// TableName specifica il nome della tabella
+// TableName specifies the database table name for SourceValidationLog
 func (SourceValidationLog) TableName() string {
 	return "source_validation_logs"
 }
 
-// TrustedSourcePolicy rappresenta una policy di trust
+// TrustedSourcePolicy represents a trust policy that can be applied to multiple trusted sources.
+//
+// Fields:
+//   - ID (string): Primary key identifier for the policy
+//   - Name (string): Human-readable name of the policy
+//   - Description (string): Detailed description of what this policy does
+//   - IsDefault (bool): Whether this is the default policy for new sources
+//   - IsEnabled (bool): Whether this policy is currently enabled (default: true)
+//   - CreatedAt (time.Time): Timestamp when created
+//   - UpdatedAt (time.Time): Timestamp of last update
+//   - DefaultTrustLevel (string): Default trust level - none, low, medium, high
+//   - RequireSignature (bool): Whether HMAC signature is required for all sources
+//   - EnableDMZDetection (bool): Whether DMZ detection is enabled
+//   - EnableTailscaleDetection (bool): Whether Tailscale detection is enabled
+//   - AutoBlockOnErrors (bool): Whether to automatically block sources after errors
+//   - Sources ([]TrustedSource): Associated trusted sources (many-to-many relationship)
+//   - Audit (string): JSON-encoded audit trail of policy changes
+//
+// Example Usage:
+//   policy := &models.TrustedSourcePolicy{
+//       ID: "policy-strict",
+//       Name: "Strict Verification Policy",
+//       Description: "Requires signature verification for all sources",
+//       DefaultTrustLevel: "high",
+//       RequireSignature: true,
+//       IsEnabled: true,
+//   }
+//   db.Create(&policy)
+//
+// Thread Safety: Not thread-safe. Use appropriate database transaction handling
+// when creating/modifying policies concurrently.
+//
+// See Also: TrustedSource
 type TrustedSourcePolicy struct {
 	ID          string    `gorm:"primaryKey" json:"id"`
 	Name        string    `json:"name"`

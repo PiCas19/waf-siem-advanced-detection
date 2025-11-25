@@ -1,0 +1,595 @@
+definitions:
+  api.HMACKeyRequest:
+    properties:
+      is_active:
+        default: true
+        type: boolean
+      name:
+        type: string
+      rotation_interval:
+        description: Days between rotations
+        type: integer
+      secret:
+        type: string
+      trusted_source_id:
+        type: string
+    required:
+    - name
+    - secret
+    type: object
+  api.TrustedSourceRequest:
+    properties:
+      allowed_header_fields:
+        items:
+          type: string
+        type: array
+      blocked_after_errors:
+        default: 10
+        type: integer
+      description:
+        type: string
+      geolocation_country:
+        type: string
+      ip:
+        type: string
+      ip_range:
+        type: string
+      is_enabled:
+        default: true
+        type: boolean
+      location:
+        type: string
+      max_requests_per_min:
+        default: 0
+        type: integer
+      name:
+        type: string
+      require_signature:
+        default: false
+        type: boolean
+      trusts_x_forwarded_for:
+        default: true
+        type: boolean
+      trusts_x_public_ip:
+        default: true
+        type: boolean
+      trusts_x_real_ip:
+        default: false
+        type: boolean
+      type:
+        type: string
+    required:
+    - name
+    - type
+    type: object
+  dto.PaginationInfo:
+    properties:
+      has_next:
+        type: boolean
+      has_prev:
+        type: boolean
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  dto.StandardPaginatedResponse:
+    properties:
+      items: {}
+      pagination:
+        $ref: '#/definitions/dto.PaginationInfo'
+    type: object
+  handlers.HealthCheckResponse:
+    properties:
+      services:
+        additionalProperties:
+          $ref: '#/definitions/handlers.ServiceStatus'
+        type: object
+      status:
+        type: string
+      timestamp:
+        type: string
+      uptime:
+        type: string
+    type: object
+  handlers.ServiceStatus:
+    properties:
+      details:
+        additionalProperties: true
+        type: object
+      message:
+        type: string
+      status:
+        description: '"healthy", "degraded", "unhealthy"'
+        type: string
+    type: object
+  models.BlockedIP:
+    properties:
+      added_by:
+        type: integer
+      created_at:
+        type: string
+      description:
+        description: Rule name/description (e.g. "XSS", "Detect API Enumeration")
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: integer
+      ip_address:
+        type: string
+      payload:
+        description: Detected payload/threat content
+        type: string
+      permanent:
+        type: boolean
+      reason:
+        type: string
+      updated_at:
+        type: string
+      url:
+        description: URL of the request that triggered the block
+        type: string
+      user_agent:
+        description: User agent of the request
+        type: string
+    type: object
+  models.HMACKey:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      last_used_at:
+        type: string
+      name:
+        type: string
+      next_rotation_date:
+        type: string
+      rotation_interval:
+        description: Days between rotations
+        type: integer
+      trusted_source:
+        allOf:
+        - $ref: '#/definitions/models.TrustedSource'
+        description: Relationship
+      trusted_source_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  models.TrustedSource:
+    properties:
+      allowed_header_fields:
+        description: Metadati di sicurezza
+        type: string
+      blocked_after_errors:
+        type: integer
+      created_at:
+        type: string
+      created_by:
+        description: Audit
+        type: string
+      current_error_count:
+        type: integer
+      description:
+        type: string
+      geolocation_country:
+        type: string
+      hmac_keys:
+        description: Relationships
+        items:
+          $ref: '#/definitions/models.HMACKey'
+        type: array
+      hmac_secret:
+        description: Non esportare in JSON nella risposta
+        type: string
+      id:
+        type: string
+      ip:
+        type: string
+      ip_range:
+        description: CIDR range
+        type: string
+      is_enabled:
+        type: boolean
+      last_verified_at:
+        type: string
+      location:
+        description: Geolocation hints
+        type: string
+      max_requests_per_min:
+        type: integer
+      name:
+        type: string
+      require_signature:
+        type: boolean
+      trusts_x_forwarded_for:
+        type: boolean
+      trusts_x_public_ip:
+        description: Configurazione header extraction
+        type: boolean
+      trusts_x_real_ip:
+        type: boolean
+      type:
+        description: reverse_proxy, dmz, tailscale, vpn, load_balancer, api_gateway,
+          custom
+        type: string
+      updated_at:
+        type: string
+      updated_by:
+        type: string
+      verification_status:
+        description: verified, pending, failed
+        type: string
+    type: object
+  models.WhitelistedIP:
+    properties:
+      added_by:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      ip_address:
+        type: string
+      reason:
+        type: string
+      updated_at:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /blocklist:
+    get:
+      consumes:
+      - application/json
+      description: Returns paginated list of blocked IPs with optional filtering and
+        sorting
+      parameters:
+      - default: 20
+        description: Number of items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Pagination offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      - description: Sort field (id, ip_address, created_at, expires_at)
+        in: query
+        name: sort
+        type: string
+      - default: asc
+        description: Sort order (asc or desc)
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.StandardPaginatedResponse'
+            - properties:
+                items:
+                  items:
+                    $ref: '#/definitions/models.BlockedIP'
+                  type: array
+              type: object
+        "400":
+          description: Invalid pagination parameters
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get blocked IPs list
+      tags:
+      - Blocklist
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Returns detailed health status of all critical services
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All services healthy
+          schema:
+            $ref: '#/definitions/handlers.HealthCheckResponse'
+        "503":
+          description: One or more services unhealthy
+          schema:
+            $ref: '#/definitions/handlers.HealthCheckResponse'
+      summary: Comprehensive health check
+      tags:
+      - Health
+  /health/live:
+    get:
+      description: Simple probe to check if service is running (Kubernetes compatible)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is alive
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Kubernetes liveness probe
+      tags:
+      - Health
+  /health/ready:
+    get:
+      description: Checks if service is ready to handle requests (Kubernetes compatible)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is ready
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service not ready
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Kubernetes readiness probe
+      tags:
+      - Health
+  /waf/hmac-keys:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.HMACKey'
+            type: array
+      summary: List HMAC keys
+      tags:
+      - HMAC Keys
+    post:
+      parameters:
+      - description: Key details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.HMACKeyRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.HMACKey'
+      summary: Create HMAC key
+      tags:
+      - HMAC Keys
+  /waf/hmac-keys/{id}:
+    delete:
+      parameters:
+      - description: Key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      summary: Delete HMAC key
+      tags:
+      - HMAC Keys
+  /waf/hmac-keys/{id}/rotate:
+    post:
+      parameters:
+      - description: Key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.HMACKey'
+      summary: Rotate HMAC key
+      tags:
+      - HMAC Keys
+  /waf/sources:
+    get:
+      description: Get all trusted sources with optional filtering
+      parameters:
+      - description: Filter by enabled status
+        in: query
+        name: enabled
+        type: boolean
+      - description: Filter by type
+        in: query
+        name: type
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.TrustedSource'
+            type: array
+      summary: List trusted sources
+      tags:
+      - Trusted Sources
+    post:
+      parameters:
+      - description: Source details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.TrustedSourceRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.TrustedSource'
+      summary: Create trusted source
+      tags:
+      - Trusted Sources
+  /waf/sources/{id}:
+    delete:
+      parameters:
+      - description: Source ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      summary: Delete trusted source
+      tags:
+      - Trusted Sources
+    get:
+      parameters:
+      - description: Source ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TrustedSource'
+      summary: Get trusted source by ID
+      tags:
+      - Trusted Sources
+    put:
+      parameters:
+      - description: Source ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated source details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.TrustedSourceRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TrustedSource'
+      summary: Update trusted source
+      tags:
+      - Trusted Sources
+  /waf/sources/{id}/verify:
+    post:
+      parameters:
+      - description: Source ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Verify trusted source
+      tags:
+      - Trusted Sources
+  /waf/sources/by-ip/{ip}:
+    get:
+      parameters:
+      - description: IP address
+        in: path
+        name: ip
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TrustedSource'
+      summary: Get trusted source by IP
+      tags:
+      - Trusted Sources
+  /whitelist:
+    get:
+      consumes:
+      - application/json
+      description: Returns paginated list of whitelisted IPs
+      parameters:
+      - default: 20
+        description: Number of items per page (default 20, max 100)
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Pagination offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      - description: Sort field (id, ip_address, created_at)
+        in: query
+        name: sort
+        type: string
+      - default: asc
+        description: Sort order (asc or desc)
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.StandardPaginatedResponse'
+            - properties:
+                items:
+                  items:
+                    $ref: '#/definitions/models.WhitelistedIP'
+                  type: array
+              type: object
+        "400":
+          description: Invalid pagination parameters
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get whitelisted IPs list
+      tags:
+      - Whitelist
+swagger: "2.0"

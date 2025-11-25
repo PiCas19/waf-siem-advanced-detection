@@ -8,7 +8,19 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/repository"
 )
 
-// LogService handles business logic for logs
+// LogService handles business logic for WAF security event logs, providing methods to
+// create, query, update, and delete security event entries.
+//
+// Fields:
+//   - logRepo (repository.LogRepository): Repository for log database operations
+//
+// Example Usage:
+//   logService := service.NewLogService(logRepo)
+//   logs, total, err := logService.GetLogsPaginated(ctx, 0, 50)
+//
+// Thread Safety: Thread-safe when using appropriate database transaction handling.
+//
+// See Also: Log, LogRepository
 type LogService struct {
 	logRepo repository.LogRepository
 }
@@ -23,6 +35,11 @@ func NewLogService(logRepo repository.LogRepository) *LogService {
 // GetAllLogs retrieves all logs
 func (s *LogService) GetAllLogs(ctx context.Context) ([]models.Log, error) {
 	return s.logRepo.FindAll(ctx)
+}
+
+// GetLogsPaginated retrieves paginated logs with total count
+func (s *LogService) GetLogsPaginated(ctx context.Context, offset, limit int) ([]models.Log, int64, error) {
+	return s.logRepo.FindPaginated(ctx, offset, limit)
 }
 
 // GetLogByID retrieves a log by ID

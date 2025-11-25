@@ -8,7 +8,19 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/repository"
 )
 
-// UserService handles business logic for users
+// UserService handles business logic for user management, providing methods to create,
+// update, delete, and query dashboard users with role-based access control.
+//
+// Fields:
+//   - userRepo (repository.UserRepository): Repository for user database operations
+//
+// Example Usage:
+//   userService := service.NewUserService(userRepo)
+//   user, err := userService.GetUserByEmail(ctx, "admin@example.com")
+//
+// Thread Safety: Thread-safe when using appropriate database transaction handling.
+//
+// See Also: User, UserRepository
 type UserService struct {
 	userRepo repository.UserRepository
 }
@@ -23,6 +35,11 @@ func NewUserService(userRepo repository.UserRepository) *UserService {
 // GetAllUsers retrieves all users
 func (s *UserService) GetAllUsers(ctx context.Context) ([]models.User, error) {
 	return s.userRepo.FindAll(ctx)
+}
+
+// GetUsersPaginated retrieves paginated users with total count
+func (s *UserService) GetUsersPaginated(ctx context.Context, offset, limit int) ([]models.User, int64, error) {
+	return s.userRepo.FindPaginated(ctx, offset, limit)
 }
 
 // GetUserByID retrieves a user by ID

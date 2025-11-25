@@ -7,7 +7,23 @@ import (
 	"time"
 )
 
-// Config contiene tutta la configurazione dell'applicazione
+// Config contains all application configuration loaded from environment variables.
+//
+// Fields:
+//   - Server (ServerConfig): HTTP server configuration
+//   - Database (DatabaseConfig): Database connection configuration
+//   - Auth (AuthConfig): Authentication and JWT configuration
+//   - Logger (LoggerConfig): Logging configuration
+//   - CORS (CORSConfig): CORS policy configuration
+//   - RateLimit (RateLimitConfig): Rate limiting configuration
+//
+// Example Usage:
+//   cfg := config.LoadFromEnv()
+//   server := NewServer(cfg)
+//
+// Thread Safety: Read-only after initialization, safe for concurrent use.
+//
+// See Also: LoadFromEnv()
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
@@ -17,14 +33,18 @@ type Config struct {
 	RateLimit RateLimitConfig
 }
 
-// ServerConfig contiene configurazione del server
+// ServerConfig contains HTTP server configuration.
+//
+// Thread Safety: Read-only after initialization, safe for concurrent use.
 type ServerConfig struct {
 	Port            int
 	Host            string
 	ShutdownTimeout time.Duration
 }
 
-// DatabaseConfig contiene configurazione database
+// DatabaseConfig contains database connection configuration.
+//
+// Thread Safety: Read-only after initialization, safe for concurrent use.
 type DatabaseConfig struct {
 	Path             string
 	MaxOpenConns     int
@@ -33,20 +53,26 @@ type DatabaseConfig struct {
 	LogQueries       bool
 }
 
-// AuthConfig contiene configurazione autenticazione
+// AuthConfig contains authentication and JWT configuration.
+//
+// Thread Safety: Read-only after initialization, safe for concurrent use.
 type AuthConfig struct {
 	JWTSecret       string
 	TokenExpiration time.Duration
 	OTPWindow       time.Duration
 }
 
-// LoggerConfig contiene configurazione logger
+// LoggerConfig contains logger configuration.
+//
+// Thread Safety: Read-only after initialization, safe for concurrent use.
 type LoggerConfig struct {
 	Level      string
 	OutputPath string
 }
 
-// CORSConfig contiene configurazione CORS
+// CORSConfig contains CORS policy configuration.
+//
+// Thread Safety: Read-only after initialization, safe for concurrent use.
 type CORSConfig struct {
 	AllowedOrigins   []string
 	AllowedMethods   []string
@@ -56,7 +82,9 @@ type CORSConfig struct {
 	AllowCredentials bool
 }
 
-// RateLimitConfig contiene configurazione rate limiting
+// RateLimitConfig contains rate limiting configuration.
+//
+// Thread Safety: Read-only after initialization, safe for concurrent use.
 type RateLimitConfig struct {
 	Enabled     bool
 	RPS         int           // Requests per second

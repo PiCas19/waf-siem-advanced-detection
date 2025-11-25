@@ -8,7 +8,17 @@ import (
 
 // Generic Response Envelope
 
-type ResponseEnvelope struct {
+// ResponseEnvelope is a standardized response wrapper for all API responses.
+//
+// Fields:
+//   - Success (bool): Whether the operation succeeded
+//   - Message (string): Human-readable message
+//   - Data (interface{}): Response payload
+//   - Error (string): Error message if operation failed
+//   - Timestamp (time.Time): Response timestamp
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
+type ResponseEnvelope struct{
 	Success   bool        `json:"success"`
 	Message   string      `json:"message,omitempty"`
 	Data      interface{} `json:"data,omitempty"`
@@ -16,8 +26,15 @@ type ResponseEnvelope struct {
 	Timestamp time.Time   `json:"timestamp"`
 }
 
-// StandardListResponse è il formato standard per tutte le risposte di lista
-// Sostituisce: blocked_ips, whitelisted_ips, rules, users, etc.
+// StandardListResponse is the standard format for all list responses.
+// Replaces: blocked_ips, whitelisted_ips, rules, users, etc.
+//
+// Fields:
+//   - Items (interface{}): Slice of items (BlockedIP, User, Rule, etc.)
+//   - Count (int): Number of items returned
+//   - Total (int64): Total count for pagination (optional)
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
 type StandardListResponse struct {
 	Items interface{} `json:"items"`       // Slice di items (BlockedIP, User, Rule, etc.)
 	Count int         `json:"count"`       // Numero di items
@@ -41,16 +58,42 @@ func NewStandardListResponseWithTotal(items interface{}, count int, total int64)
 	}
 }
 
+// PaginationParams holds pagination query parameters.
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
+type PaginationParams struct {
+	Limit  int    `json:"limit"`
+	Offset int    `json:"offset"`
+	Sort   string `json:"sort"`
+	Order  string `json:"order"` // asc or desc
+}
+
+// PaginatedResponse wraps data with pagination metadata.
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
 type PaginatedResponse struct {
 	Data       interface{}     `json:"data"`
 	Pagination PaginationInfo `json:"pagination"`
 }
 
-type PaginationInfo struct {
+// PaginationInfo contains metadata about paginated results.
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
+type PaginationInfo struct{
 	Page       int   `json:"page"`
 	PageSize   int   `json:"limit"`
 	Total      int64 `json:"total"`
 	TotalPages int   `json:"total_pages"`
+	HasNext    bool  `json:"has_next"`
+	HasPrev    bool  `json:"has_prev"`
+}
+
+// StandardPaginatedResponse combines items with pagination metadata.
+//
+// Thread Safety: Immutable after creation, safe for concurrent use.
+type StandardPaginatedResponse struct{
+	Items      interface{}  `json:"items"`
+	Pagination PaginationInfo `json:"pagination"`
 }
 
 // Rule Response DTOs

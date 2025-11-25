@@ -6,28 +6,64 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/helpers"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/service"
 )
 
-// NewGetFalsePositivesHandler - Returns the list of false positives
+// NewGetFalsePositivesHandler godoc
+// @Summary Get false positives list
+// @Description Returns paginated list of reported false positives
+// @Tags FalsePositives
+// @Accept json
+// @Produce json
+// @Param limit query int false "Number of items per page (default 20, max 100)" default(20)
+// @Param offset query int false "Pagination offset (default 0)" default(0)
+// @Success 200 {object} map[string]interface{} "False positives with pagination"
+// @Failure 400 {object} map[string]interface{} "Invalid parameters"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /false-positives [get]
+// @Security BearerAuth
 func NewGetFalsePositivesHandler(falsePositiveService *service.FalsePositiveService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Parse pagination parameters
+		limit, offset, _, _, err := helpers.ParsePaginationParams(c)
+		if err != nil {
+			BadRequestWithCode(c, ErrInvalidRequest, err.Error())
+			return
+		}
+
 		ctx := c.Request.Context()
 
-		falsePositives, err := falsePositiveService.GetAllFalsePositives(ctx)
+		// Fetch paginated false positives
+		falsePositives, total, err := falsePositiveService.GetFalsePositivesPaginated(ctx, offset, limit)
 		if err != nil {
 			InternalServerErrorWithCode(c, ErrServiceError, "Failed to fetch false positives")
 			return
 		}
 
+		// Build paginated response
+		response := helpers.BuildStandardPaginatedResponse(falsePositives, limit, offset, total)
+
 		c.JSON(200, gin.H{
-			"false_positives": falsePositives,
-			"count":           len(falsePositives),
+			"false_positives": response.Items,
+			"pagination":      response.Pagination,
+			"count":           len(response.Items.([]models.FalsePositive)),
 		})
 	}
 }
 
-// NewReportFalsePositiveHandler - Reports a threat as a false positive
+// NewReportFalsePositiveHandler godoc
+// @Summary Report false positive
+// @Description Reports a threat as a false positive
+// @Tags FalsePositives
+// @Accept json
+// @Produce json
+// @Param request body object{threat_type=string,description=string,client_ip=string,method=string,url=string,payload=string,user_agent=string} true "False positive report"
+// @Success 201 {object} map[string]interface{} "False positive reported successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid request"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /false-positives [post]
+// @Security BearerAuth
 func NewReportFalsePositiveHandler(falsePositiveService *service.FalsePositiveService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
@@ -42,6 +78,50 @@ func NewReportFalsePositiveHandler(falsePositiveService *service.FalsePositiveSe
 
 		if !ValidateJSON(c, &req) {
 			return
+		}
+
+		// Validate threat type
+		if err := helpers.ValidateNonEmpty(req.ThreatType, "Threat type"); err != nil {
+			BadRequestWithCode(c, ErrInvalidRequest, err.Error())
+			return
+		}
+
+		// Validate client IP
+		if err := helpers.ValidateIPAddress(req.ClientIP); err != nil {
+			BadRequestWithCode(c, ErrInvalidIP, "Invalid client IP: "+err.Error())
+			return
+		}
+
+		// Validate URL if provided
+		if req.URL != "" {
+			if err := helpers.ValidateURL(req.URL); err != nil {
+				BadRequestWithCode(c, ErrInvalidRequest, "Invalid URL: "+err.Error())
+				return
+			}
+		}
+
+		// Validate HTTP method if provided
+		if req.Method != "" {
+			if err := helpers.ValidateHTTPMethod(req.Method); err != nil {
+				BadRequestWithCode(c, ErrInvalidRequest, err.Error())
+				return
+			}
+		}
+
+		// Validate payload if provided
+		if req.Payload != "" {
+			if err := helpers.ValidatePayload(req.Payload); err != nil {
+				BadRequestWithCode(c, ErrInvalidRequest, err.Error())
+				return
+			}
+		}
+
+		// Validate user agent if provided
+		if req.UserAgent != "" {
+			if err := helpers.ValidateUserAgent(req.UserAgent); err != nil {
+				BadRequestWithCode(c, ErrInvalidRequest, err.Error())
+				return
+			}
 		}
 
 		ctx := c.Request.Context()
@@ -69,7 +149,19 @@ func NewReportFalsePositiveHandler(falsePositiveService *service.FalsePositiveSe
 	}
 }
 
-// NewUpdateFalsePositiveStatusHandler - Updates the status of a false positive
+// NewUpdateFalsePositiveStatusHandler godoc
+// @Summary Update false positive status
+// @Description Updates the status and review notes of a false positive
+// @Tags FalsePositives
+// @Accept json
+// @Produce json
+// @Param id path int true "False positive ID"
+// @Param request body object{status=string,review_notes=string} true "Status update"
+// @Success 200 {object} map[string]interface{} "Status updated successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid ID or status"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /false-positives/{id} [put]
+// @Security BearerAuth
 func NewUpdateFalsePositiveStatusHandler(falsePositiveService *service.FalsePositiveService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
@@ -89,8 +181,14 @@ func NewUpdateFalsePositiveStatusHandler(falsePositiveService *service.FalsePosi
 		}
 
 		// Validate status
-		if req.Status != "pending" && req.Status != "reviewed" && req.Status != "whitelisted" {
-			BadRequestWithCode(c, ErrInvalidRequest, "Invalid status value")
+		if err := helpers.ValidateFalsePositiveStatus(req.Status); err != nil {
+			BadRequestWithCode(c, ErrInvalidRequest, err.Error())
+			return
+		}
+
+		// Validate review notes if provided
+		if err := helpers.ValidateReviewNotes(req.ReviewNotes); err != nil {
+			BadRequestWithCode(c, ErrInvalidRequest, err.Error())
 			return
 		}
 
@@ -113,7 +211,18 @@ func NewUpdateFalsePositiveStatusHandler(falsePositiveService *service.FalsePosi
 	}
 }
 
-// NewDeleteFalsePositiveHandler - Deletes a false positive
+// NewDeleteFalsePositiveHandler godoc
+// @Summary Delete false positive
+// @Description Deletes a false positive entry
+// @Tags FalsePositives
+// @Accept json
+// @Produce json
+// @Param id path int true "False positive ID"
+// @Success 200 {object} map[string]interface{} "Entry deleted successfully"
+// @Failure 400 {object} map[string]interface{} "Invalid ID"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /false-positives/{id} [delete]
+// @Security BearerAuth
 func NewDeleteFalsePositiveHandler(falsePositiveService *service.FalsePositiveService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
