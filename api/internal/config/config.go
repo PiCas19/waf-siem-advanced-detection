@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -156,10 +157,13 @@ func getEnvAsStringSlice(name string, defaultValue []string) []string {
 		return defaultValue
 	}
 	// Parse comma-separated values
+	parts := strings.Split(val, ",")
 	var result []string
-	for _, v := range os.Getenv(name) {
-		if v != ',' {
-			result = append(result, string(v))
+	for _, part := range parts {
+		// Trim whitespace from each part
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			result = append(result, trimmed)
 		}
 	}
 	if len(result) == 0 {
