@@ -27,8 +27,8 @@ type CustomRulesResponse struct {
 // NewGetRulesHandler returns default and custom rules
 func NewGetRulesHandler(ruleService *service.RuleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get default rules
-		defaultRules := GetDefaultRules()
+		// Get default rules (cached, as they don't change at runtime)
+		defaultRules := GetDefaultRulesWithCache()
 
 		// Get custom rules from service
 		ctx := c.Request.Context()
