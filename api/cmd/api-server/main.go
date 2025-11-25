@@ -96,36 +96,8 @@ func main() {
 	engine.Use(middleware.RequestIDMiddleware())
 	engine.Use(middleware.ContextPropagationMiddleware())
 
-	// CORS middleware (con whitelist di domini)
-	engine.Use(func(c *gin.Context) {
-		origin := c.GetHeader("Origin")
-
-		// Verifica se l'origine è nella whitelist
-		allowed := false
-		for _, allowedOrigin := range cfg.CORS.AllowedOrigins {
-			if allowedOrigin == "*" || origin == allowedOrigin {
-				allowed = true
-				break
-			}
-		}
-
-		if allowed {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-		}
-
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
-		c.Writer.Header().Set("Access-Control-Expose-Headers", "X-Request-ID, Content-Length")
-		c.Writer.Header().Set("Access-Control-Max-Age", "300")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-
-		c.Next()
-	})
+	// CORS middleware (extracted to middleware/cors.go for reusability)
+	engine.Use(middleware.CORSMiddleware(&cfg.CORS))
 
 	// Aggiungi rate limiting se abilitato
 	var rateLimiter *middleware.RateLimiter
