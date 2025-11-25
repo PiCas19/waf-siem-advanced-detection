@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
 )
@@ -76,7 +77,7 @@ func ValidateFalsePositiveStatus(status string) error {
 	return nil
 }
 
-// ValidateURL validates a URL string
+// ValidateURL validates a URL string (supports full URLs and relative paths)
 func ValidateURL(url string) error {
 	if url == "" {
 		return nil // URL is optional
@@ -84,9 +85,13 @@ func ValidateURL(url string) error {
 	if len(url) > 2000 {
 		return fmt.Errorf("URL cannot exceed 2000 characters")
 	}
-	// Basic URL pattern validation
-	urlPattern := regexp.MustCompile(`^https?://[a-zA-Z0-9\-._~:/?#@!$&'()*+,;=]+$`)
-	if !urlPattern.MatchString(url) {
+	// Accept both full URLs (http://...) and relative paths (/path?query)
+	// Full URL pattern: http[s]://...
+	fullURLPattern := regexp.MustCompile(`^https?://[a-zA-Z0-9\-._~:/?#@!$&'()*+,;=]+$`)
+	// Relative path pattern: /path or path or /path?query=...
+	relativePath := regexp.MustCompile(`^/?[a-zA-Z0-9\-._~/?#@!$&'()*+,;=]+$`)
+
+	if !fullURLPattern.MatchString(url) && !relativePath.MatchString(url) {
 		return fmt.Errorf("invalid URL format")
 	}
 	return nil
@@ -183,12 +188,12 @@ func ValidateIPAddress(ip string) error {
 	if ip == "" {
 		return fmt.Errorf("IP address cannot be empty")
 	}
-	// Simple regex check for IPv4 and IPv6
-	ipv4Pattern := regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
-	ipv6Pattern := regexp.MustCompile(`^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$`)
 
-	if !ipv4Pattern.MatchString(ip) && !ipv6Pattern.MatchString(ip) {
+	// Use net.ParseIP for proper IP validation (supports both IPv4 and IPv6)
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
 		return fmt.Errorf("invalid IP address format")
 	}
+
 	return nil
 }
