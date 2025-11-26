@@ -13,6 +13,131 @@
     }
 }
 
+#========================================
+# PUBLIC WAN - Porta 9443 (HTTPS custom)
+# Finance & Industrial SOLO (NO Dashboard)
+# Accessibile da Internet pubblico
+#========================================
+:9443 {
+    # ============================================
+    # FINANCE BACKEND (pubblico)
+    # ============================================
+    handle /finance* {
+        waf {
+            log_file /var/log/caddy/waf_wan.log
+            block_mode true
+            api_endpoint http://localhost:8081/api
+            rules_endpoint http://localhost:8081/api/waf/custom-rules
+            blocklist_endpoint http://localhost:8081/api/waf/blocklist
+            whitelist_endpoint http://localhost:8081/api/waf/whitelist
+            turnstile_site_key {$TURNSTILE_SITE_KEY}
+
+            enable_hmac_signature_validation false
+            enable_tailscale_detection false
+            
+            enable_dmz_detection true
+            dmz_networks 172.16.216.0/24
+
+            trusted_proxies 127.0.0.1 ::1
+        }
+        
+        uri strip_prefix /finance
+        reverse_proxy 172.16.216.30:3000 {
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
+            
+            header_up X-Forwarded-For {http.request.remote}
+            header_up X-Real-IP {http.request.remote}
+            header_up X-Forwarded-Proto https
+            
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
+    }
+    
+    # ============================================
+    # INDUSTRIAL BACKEND (pubblico)
+    # ============================================
+    handle /industrial* {
+        waf {
+            log_file /var/log/caddy/waf_wan.log
+            block_mode true
+            api_endpoint http://localhost:8081/api
+            rules_endpoint http://localhost:8081/api/waf/custom-rules
+            blocklist_endpoint http://localhost:8081/api/waf/blocklist
+            whitelist_endpoint http://localhost:8081/api/waf/whitelist
+            turnstile_site_key {$TURNSTILE_SITE_KEY}
+
+            enable_hmac_signature_validation false
+            enable_tailscale_detection false
+            
+            enable_dmz_detection true
+            dmz_networks 172.16.216.0/24
+
+            trusted_proxies 127.0.0.1 ::1
+        }
+        
+        uri strip_prefix /industrial
+        reverse_proxy 172.16.216.20:3001 {
+            health_uri /health
+            health_interval 10s
+            health_timeout 2s
+            
+            header_up X-Forwarded-For {http.request.remote}
+            header_up X-Real-IP {http.request.remote}
+            header_up X-Forwarded-Proto https
+            
+            transport http {
+                read_timeout 30s
+                write_timeout 30s
+                dial_timeout 2s
+                keepalive 30s
+            }
+        }
+    }
+    
+    # ============================================
+    # BLOCCA tutto il resto (NO Dashboard da WAN)
+    # ============================================
+    handle {
+        respond "Access Denied - Finance and Industrial only" 403
+    }
+    
+    log {
+        output file /var/log/caddy/access_wan_public.log {
+            roll_size 100mb
+            roll_keep 10
+            roll_keep_for 720h
+        }
+        format json
+    }
+}
+
+#========================================
+# PUBLIC WAN - Porta 9080 (HTTP custom)
+# Redirect a HTTPS
+#========================================
+:9080 {
+    # Redirect HTTP -> HTTPS con porta custom
+    handle /finance* {
+        redir https://{host}:9443{uri} permanent
+    }
+    
+    handle /industrial* {
+        redir https://{host}:9443{uri} permanent
+    }
+    
+    handle {
+        respond "Use HTTPS port 9443" 403
+    }
+}
+
+
  #========================================
  # TAILSCALE SERVE - WAN (porta 8080)
  # via: tailscale serve --bg http://localhost:8080
