@@ -39,6 +39,7 @@ output.elasticsearch:
     enabled: true
     verification_mode: none
   index: "waf-%{+yyyy.MM.dd}"
+  pipeline: "threat-geoip-enrichment"
 
 setup.template.enabled: false
 
