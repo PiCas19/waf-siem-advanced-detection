@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Industrial Control System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1e293b 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e2e8f0;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: rgba(15, 23, 42, 0.9);
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 2px solid #3b82f6;
+        }
+        h1 {
+            color: #3b82f6;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1.1em;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: rgba(15, 23, 42, 0.9);
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 2px solid #334155;
+        }
+        .card h2 {
+            color: #3b82f6;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 3px;
+            font-size: 0.75em;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .status-online { background: #10b981; color: #000; }
+        .status-warning { background: #f59e0b; color: #000; }
+        .status-offline { background: #ef4444; color: #fff; }
+        .status-active { background: #3b82f6; color: #fff; }
+        .plc-item, .protocol-item, .sensor-item {
+            background: rgba(51, 65, 85, 0.5);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #3b82f6;
+        }
+        .plc-item:hover, .protocol-item:hover, .sensor-item:hover {
+            background: rgba(51, 65, 85, 0.8);
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 0.9em;
+        }
+        .metric-label {
+            color: #94a3b8;
+        }
+        .metric-value {
+            color: #e2e8f0;
+            font-weight: bold;
+        }
+        .server-info {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.9em;
+            opacity: 0.7;
+        }
+        .blink {
+            animation: blink 2s infinite;
+        }
+        @keyframes blink {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>INDUSTRIAL CONTROL SYSTEM</h1>
+            <p class="subtitle">Real-Time SCADA Monitoring & Protocol Management</p>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>PLC Status</h2>
+                <div id="plcStatus"></div>
+            </div>
+
+            <div class="card">
+                <h2>Active Protocols</h2>
+                <div id="protocolStatus"></div>
+            </div>
+
+            <div class="card">
+                <h2>Sensor Readings</h2>
+                <div id="sensorReadings"></div>
+            </div>
+        </div>
+
+        <div class="server-info">
+            <span class="blink">|</span> Server: 172.16.216.30 | System Status: <span id="status">Checking...</span>
+        </div>
+    </div>
+
+    <script>
+        async function loadPLC() {
+            try {
+                const res = await fetch('/api/plc-status');
+                const data = await res.json();
+                const container = document.getElementById('plcStatus');
+                container.innerHTML = '';
+                
+                data.plc_units.forEach(plc => {
+                    const statusClass = `status-${plc.status.toLowerCase()}`;
+                    const item = `
+                        <div class="plc-item">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <strong>${plc.id}</strong>
+                                <span class="status-badge ${statusClass}">${plc.status}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Location:</span>
+                                <span class="metric-value">${plc.location}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">CPU Load:</span>
+                                <span class="metric-value">${plc.cpu_load}%</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Temperature:</span>
+                                <span class="metric-value">${plc.temp}°C</span>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += item;
+                });
+            } catch (err) {
+                console.error('PLC load error:', err);
+            }
+        }
+
+        async function loadProtocols() {
+            try {
+                const res = await fetch('/api/protocols');
+                const data = await res.json();
+                const container = document.getElementById('protocolStatus');
+                container.innerHTML = '';
+                
+                data.active_protocols.forEach(proto => {
+                    const item = `
+                        <div class="protocol-item">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <strong>${proto.name}</strong>
+                                <span class="status-badge status-active">${proto.status}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Port:</span>
+                                <span class="metric-value">${proto.port}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Connections:</span>
+                                <span class="metric-value">${proto.connections}</span>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += item;
+                });
+            } catch (err) {
+                console.error('Protocol load error:', err);
+            }
+        }
+
+        async function loadSensors() {
+            try {
+                const res = await fetch('/api/sensors');
+                const data = await res.json();
+                const container = document.getElementById('sensorReadings');
+                container.innerHTML = '';
+                
+                data.readings.forEach(sensor => {
+                    const statusClass = sensor.status === 'NORMAL' ? 'status-online' : 'status-warning';
+                    const item = `
+                        <div class="sensor-item">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <strong>${sensor.sensor}</strong>
+                                <span class="status-badge ${statusClass}">${sensor.status}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Reading:</span>
+                                <span class="metric-value">${sensor.value} ${sensor.unit}</span>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += item;
+                });
+            } catch (err) {
+                console.error('Sensor load error:', err);
+            }
+        }
+
+        async function checkHealth() {
+            try {
+                const res = await fetch('/health');
+                const data = await res.json();
+                document.getElementById('status').textContent = 'OPERATIONAL';
+                document.getElementById('status').style.color = '#10b981';
+            } catch (err) {
+                document.getElementById('status').textContent = 'OFFLINE';
+                document.getElementById('status').style.color = '#ef4444';
+            }
+        }
+
+        function loadAll() {
+            loadPLC();
+            loadProtocols();
+            loadSensors();
+            checkHealth();
+        }
+
+        loadAll();
+        setInterval(loadAll, 5000); // Refresh every 5s
+    </script>
+</body>
+</html>
