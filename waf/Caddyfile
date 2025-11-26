@@ -30,8 +30,6 @@
             rules_endpoint http://localhost:8081/api/waf/custom-rules
             blocklist_endpoint http://localhost:8081/api/waf/blocklist
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
-            turnstile_site_key {$TURNSTILE_SITE_KEY}
-
             enable_hmac_signature_validation false
             enable_tailscale_detection false
             
@@ -71,8 +69,6 @@
             rules_endpoint http://localhost:8081/api/waf/custom-rules
             blocklist_endpoint http://localhost:8081/api/waf/blocklist
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
-            turnstile_site_key {$TURNSTILE_SITE_KEY}
-
             enable_hmac_signature_validation false
             enable_tailscale_detection false
             
