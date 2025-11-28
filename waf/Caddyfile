@@ -229,7 +229,6 @@
             rules_endpoint http://localhost:8081/api/waf/custom-rules
             blocklist_endpoint http://localhost:8081/api/waf/blocklist
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
-            turnstile_site_key {$TURNSTILE_SITE_KEY}
 
             # ============================================
             # ENTERPRISE-GRADE IP DETECTION (WAN - TAILSCALE)
