@@ -3,6 +3,17 @@ const express = require('express');
 const app = express();
 const PORT = 3001;
 
+app.get('/', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        service: 'industrial',
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+        endpoints: ['/health', '/api/plc-status', '/api/protocols', '/api/sensors']
+    });
+});
+
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'healthy', service: 'industrial', timestamp: new Date().toISOString() });
