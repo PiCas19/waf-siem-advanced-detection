@@ -23,6 +23,7 @@
     # FINANCE BACKEND (pubblico)
     # ============================================
     handle /finance* {
+        tls internal
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
