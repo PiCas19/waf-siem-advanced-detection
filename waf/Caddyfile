@@ -19,6 +19,9 @@
 # Accessibile da Internet pubblico
 #========================================
 :9443 {
+    
+    tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
+
     # ============================================
     # FINANCE BACKEND (pubblico)
     # ============================================
@@ -375,7 +378,7 @@
 
             # Trusted Proxies for internal LAN connections
             # LAN: 192.168.216.0/24, DMZ: 172.16.216.0/24
-            trusted_proxies 127.0.0.1 ::1 192.168.216.0/24 172.16.216.0/24
+            trusted_proxies 127.0.0.1 ::1 192.168.216.0/24 172.16.216.0/24tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
         }
 
         root * /var/www/html
