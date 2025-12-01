@@ -14,11 +14,12 @@
 }
 
 #========================================
-# PUBLIC WAN - Porta 9443 (HTTPS custom)
+# PUBLIC WAN - Porta 443 (HTTPS standard)
 # Finance & Industrial SOLO (NO Dashboard)
 # Accessibile da Internet pubblico
 #========================================
-:9443 {
+:443 {
+    bind 0.0.0.0
 
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
 
@@ -35,23 +36,23 @@
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
             enable_hmac_signature_validation false
             enable_tailscale_detection false
-            
+
             enable_dmz_detection true
             dmz_networks 172.16.216.0/24
 
             trusted_proxies 127.0.0.1 ::1
         }
-        
+
         uri strip_prefix /finance
         reverse_proxy 172.16.216.30:3000 {
             health_uri /health
             health_interval 10s
             health_timeout 2s
-            
+
             header_up X-Forwarded-For {http.request.remote}
             header_up X-Real-IP {http.request.remote}
             header_up X-Forwarded-Proto https
-            
+
             transport http {
                 read_timeout 30s
                 write_timeout 30s
@@ -60,7 +61,7 @@
             }
         }
     }
-    
+
     # ============================================
     # INDUSTRIAL BACKEND (pubblico)
     # ============================================
@@ -74,23 +75,23 @@
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
             enable_hmac_signature_validation false
             enable_tailscale_detection false
-            
+
             enable_dmz_detection true
             dmz_networks 172.16.216.0/24
 
             trusted_proxies 127.0.0.1 ::1
         }
-        
+
         uri strip_prefix /industrial
         reverse_proxy 172.16.216.20:3001 {
             health_uri /health
             health_interval 10s
             health_timeout 2s
-            
+
             header_up X-Forwarded-For {http.request.remote}
             header_up X-Real-IP {http.request.remote}
             header_up X-Forwarded-Proto https
-            
+
             transport http {
                 read_timeout 30s
                 write_timeout 30s
@@ -99,14 +100,14 @@
             }
         }
     }
-    
+
     # ============================================
     # BLOCCA tutto il resto (NO Dashboard da WAN)
     # ============================================
     handle {
         respond "Access Denied - Finance and Industrial only" 403
     }
-    
+
     log {
         output file /var/log/caddy/access_wan_public.log {
             roll_size 100mb
@@ -118,21 +119,22 @@
 }
 
 #========================================
-# PUBLIC WAN - Porta 9080 (HTTP custom)
+# PUBLIC WAN - Porta 80 (HTTP standard)
 # Redirect a HTTPS
 #========================================
-:9080 {
-    # Redirect HTTP -> HTTPS con porta custom
+:80 {
+    bind 0.0.0.0
+    # Redirect HTTP -> HTTPS con porta standard
     handle /finance* {
-        redir https://{host}:9443{uri} permanent
+        redir https://{host}{uri} permanent
     }
-    
+
     handle /industrial* {
-        redir https://{host}:9443{uri} permanent
+        redir https://{host}{uri} permanent
     }
-    
+
     handle {
-        respond "Use HTTPS port 9443" 403
+        respond "Use HTTPS port 443" 403
     }
 }
 
