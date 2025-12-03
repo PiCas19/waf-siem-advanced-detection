@@ -18,8 +18,8 @@
 # Finance & Industrial SOLO (NO Dashboard)
 # Accessibile da Internet pubblico
 #========================================
-https://172.16.216.10:9443 {
-    bind 172.16.216.10
+:9443 {
+    bind 0.0.0.0
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
 
     # ============================================
@@ -121,8 +121,8 @@ https://172.16.216.10:9443 {
 # PUBLIC WAN - Porta 9080 (HTTP standard)
 # Redirect a HTTPS
 #========================================
-http://172.16.216.10:9080 {
-    bind 172.16.216.10
+:9080 {
+    bind 0.0.0.0
     # Redirect HTTP -> HTTPS con porta custom
     handle /finance* {
         redir https://{host}:9443{uri} permanent
