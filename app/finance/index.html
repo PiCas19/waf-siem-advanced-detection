@@ -161,23 +161,41 @@
     </div>
 
     <script>
+        // Dynamic API Base URL - works with direct access and proxy
+        function getApiBase() {
+            const hostname = window.location.hostname;
+            const port = window.location.port;
+            const protocol = window.location.protocol;
+
+            // Check if accessing via proxy (path contains /finance)
+            if (window.location.pathname.includes('/finance')) {
+                // Via proxy: use current host with proxy path
+                return `${protocol}//${hostname}${port ? ':' + port : ''}/finance`;
+            } else {
+                // Direct access: use current host as-is
+                return `${protocol}//${hostname}${port ? ':' + port : ''}`;
+            }
+        }
+
+        const API_BASE = getApiBase();
+
         async function loadData() {
             try {
                 // Portfolio data
-                const portfolioRes = await fetch('/api/portfolio');
+                const portfolioRes = await fetch(`${API_BASE}/api/portfolio`);
                 const portfolio = await portfolioRes.json();
-                
+
                 document.getElementById('totalValue').textContent = portfolio.total_value.toLocaleString('en-US', {minimumFractionDigits: 2});
-                
+
                 const changeEl = document.getElementById('dailyChange');
                 const changeClass = portfolio.daily_change >= 0 ? 'positive' : 'negative';
                 changeEl.className = `stat-value ${changeClass}`;
                 changeEl.textContent = `$${portfolio.daily_change.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-                
+
                 const percentEl = document.getElementById('dailyPercent');
                 percentEl.className = `stat-value ${changeClass}`;
                 percentEl.textContent = `${portfolio.daily_change_percent > 0 ? '+' : ''}${portfolio.daily_change_percent}%`;
-                
+
                 // Assets table
                 const assetsTable = document.getElementById('assetsTable');
                 portfolio.assets.forEach(asset => {
@@ -191,11 +209,11 @@
                     `;
                     assetsTable.innerHTML += row;
                 });
-                
+
                 // Transactions
-                const transRes = await fetch('/api/transactions');
+                const transRes = await fetch(`${API_BASE}/api/transactions`);
                 const transactions = await transRes.json();
-                
+
                 const transTable = document.getElementById('transactionsTable');
                 transactions.recent.forEach(tx => {
                     const row = `
@@ -209,7 +227,7 @@
                     `;
                     transTable.innerHTML += row;
                 });
-                
+
                 document.getElementById('status').textContent = 'Online';
                 document.getElementById('status').style.color = '#10b981';
             } catch (err) {
@@ -217,7 +235,7 @@
                 document.getElementById('status').style.color = '#ef4444';
             }
         }
-        
+
         loadData();
         setInterval(loadData, 30000); // Refresh every 30s
     </script>
