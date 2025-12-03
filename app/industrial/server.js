@@ -1,18 +1,9 @@
 const express = require('express');
-
 const app = express();
 const PORT = 3001;
 
-app.get('/', (req, res) => {
-    res.json({ 
-        status: 'ok', 
-        service: 'industrial',
-        version: '1.0.0',
-        timestamp: new Date().toISOString(),
-        endpoints: ['/health', '/api/plc-status', '/api/protocols', '/api/sensors']
-    });
-});
-
+// Static files PRIMA di tutto
+app.use(express.static('public'));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -52,9 +43,6 @@ app.get('/api/sensors', (req, res) => {
         ]
     });
 });
-
-// Static files
-app.use(express.static('public'));
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Industrial Server running on http://0.0.0.0:${PORT}`);
