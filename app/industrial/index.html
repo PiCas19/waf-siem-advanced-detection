@@ -133,13 +133,31 @@
     </div>
 
     <script>
+        // Dynamic API Base URL - works with direct access and proxy
+        function getApiBase() {
+            const hostname = window.location.hostname;
+            const port = window.location.port;
+            const protocol = window.location.protocol;
+
+            // Check if accessing via proxy (path contains /industrial)
+            if (window.location.pathname.includes('/industrial')) {
+                // Via proxy: use current host with proxy path
+                return `${protocol}//${hostname}${port ? ':' + port : ''}/industrial`;
+            } else {
+                // Direct access: use current host as-is
+                return `${protocol}//${hostname}${port ? ':' + port : ''}`;
+            }
+        }
+
+        const API_BASE = getApiBase();
+
         async function loadPLC() {
             try {
-                const res = await fetch('/api/plc-status');
+                const res = await fetch(`${API_BASE}/api/plc-status`);
                 const data = await res.json();
                 const container = document.getElementById('plcStatus');
                 container.innerHTML = '';
-                
+
                 data.plc_units.forEach(plc => {
                     const statusClass = `status-${plc.status.toLowerCase()}`;
                     const item = `
@@ -171,11 +189,11 @@
 
         async function loadProtocols() {
             try {
-                const res = await fetch('/api/protocols');
+                const res = await fetch(`${API_BASE}/api/protocols`);
                 const data = await res.json();
                 const container = document.getElementById('protocolStatus');
                 container.innerHTML = '';
-                
+
                 data.active_protocols.forEach(proto => {
                     const item = `
                         <div class="protocol-item">
@@ -202,11 +220,11 @@
 
         async function loadSensors() {
             try {
-                const res = await fetch('/api/sensors');
+                const res = await fetch(`${API_BASE}/api/sensors`);
                 const data = await res.json();
                 const container = document.getElementById('sensorReadings');
                 container.innerHTML = '';
-                
+
                 data.readings.forEach(sensor => {
                     const statusClass = sensor.status === 'NORMAL' ? 'status-online' : 'status-warning';
                     const item = `
@@ -230,7 +248,7 @@
 
         async function checkHealth() {
             try {
-                const res = await fetch('/health');
+                const res = await fetch(`${API_BASE}/health`);
                 const data = await res.json();
                 document.getElementById('status').textContent = 'OPERATIONAL';
                 document.getElementById('status').style.color = '#10b981';
