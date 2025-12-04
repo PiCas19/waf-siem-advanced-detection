@@ -20,7 +20,13 @@
 #========================================
 https://172.16.216.10:9443 {
     bind 172.16.216.10
-    tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
+     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem {
+        # Forza TLS 1.2 (compatibilità Windows)
+        protocols tls1.2 tls1.3
+        
+        # Aggiungi cipher suite compatibili Windows
+        ciphers TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+    }
 
     # ============================================
     # FINANCE BACKEND (pubblico)
