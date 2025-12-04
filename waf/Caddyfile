@@ -18,8 +18,8 @@
 # Finance & Industrial SOLO (NO Dashboard)
 # Accessibile da Internet pubblico
 #========================================
-:9443 {
-    bind 0.0.0.0
+https://172.16.216.10:9443 {
+    bind 172.16.216.10
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
 
     # ============================================
@@ -117,26 +117,34 @@
     }
 }
 
-#========================================
-# PUBLIC WAN - Porta 9080 (HTTP standard)
-# Redirect a HTTPS
-#========================================
-:9080 {
-    bind 0.0.0.0
-    # Redirect HTTP -> HTTPS con porta custom
+http://172.16.216.10:9080 {
+    bind 172.16.216.10
+    
+    # Ottieni l'IP pubblico dalla richiesta originale
     handle /finance* {
-        redir https://{host}:9443{uri} permanent
+        @public_access {
+            remote_ip 10.246.50.0/24
+        }
+        redir @public_access https://10.246.50.241{uri} permanent
+        
+        # Fallback per accessi interni diretti
+        redir https://172.16.216.10:9443{uri} permanent
     }
-
+    
     handle /industrial* {
-        redir https://{host}:9443{uri} permanent
+        @public_access {
+            remote_ip 10.246.50.0/24
+        }
+        redir @public_access https://10.246.50.241{uri} permanent
+        
+        # Fallback per accessi interni diretti
+        redir https://172.16.216.10:9443{uri} permanent
     }
-
+    
     handle {
-        respond "Use HTTPS port 9443" 403
+        respond "Use HTTPS port 443" 403
     }
 }
-
 
  #========================================
  # TAILSCALE SERVE - WAN (porta 8080)

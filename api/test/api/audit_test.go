@@ -12,7 +12,13 @@ import (
 
 	internalapi "github.com/PiCas19/waf-siem-advanced-detection/api/internal/api"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database/models"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/logger"
 )
+
+func init() {
+	// Initialize logger for tests
+	logger.InitLogger("info", "stdout")
+}
 
 // TestLogAudit_Success tests successful audit log creation
 func TestLogAudit_Success(t *testing.T) {
@@ -664,9 +670,141 @@ func TestLogAudit_HandlesEmptyString(t *testing.T) {
 	assert.Equal(t, uint(14), auditLog.UserID)
 }
 
-// Note: The exact error logging path (lines 56-59) for db.Create failures cannot be
-// easily unit tested because logger.Log is a global singleton. However, all function
-// entry points are covered (88.9% coverage on LogAudit covers 8/9 statements).
+// TestLogAudit_DatabaseCreateError tests handling when db.Create fails
+func TestLogAudit_DatabaseCreateError(t *testing.T) {
+	// Create a database instance without migration
+	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	// Note: NOT migrating the table, so Create will fail
+
+	router := gin.New()
+	router.GET("/test", func(c *gin.Context) {
+		c.Set("user_id", uint(15))
+		c.Set("user_email", "user@example.com")
+
+		err := internalapi.LogAudit(
+			db,
+			c,
+			"test.action",
+			"TEST",
+			"Test database error",
+			"resource",
+			"res_15",
+			nil,
+			"success",
+			"",
+		)
+
+		// Should return error when database operation fails
+		assert.Error(t, err)
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	req, _ := http.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "192.168.1.15:8080"
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// TestLogAuditSimple_DatabaseCreateError tests simple audit when db.Create fails
+func TestLogAuditSimple_DatabaseCreateError(t *testing.T) {
+	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	// Note: NOT migrating
+
+	router := gin.New()
+	router.GET("/test", func(c *gin.Context) {
+		c.Set("user_id", uint(16))
+
+		err := internalapi.LogAuditSimple(
+			db,
+			c,
+			"simple.action",
+			"SIMPLE",
+			"Simple audit",
+			"success",
+		)
+
+		assert.Error(t, err)
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	req, _ := http.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "192.168.1.16:8080"
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// TestLogAuditWithError_DatabaseCreateError tests error audit when db.Create fails
+func TestLogAuditWithError_DatabaseCreateError(t *testing.T) {
+	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	// Note: NOT migrating
+
+	router := gin.New()
+	router.GET("/test", func(c *gin.Context) {
+		c.Set("user_id", uint(17))
+
+		err := internalapi.LogAuditWithError(
+			db,
+			c,
+			"error.action",
+			"ERROR",
+			"Error audit",
+			"resource",
+			"res_17",
+			nil,
+			"some error",
+		)
+
+		assert.Error(t, err)
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	req, _ := http.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "192.168.1.17:8080"
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// TestLogAuditSuccess_DatabaseCreateError tests success audit when db.Create fails
+func TestLogAuditSuccess_DatabaseCreateError(t *testing.T) {
+	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	// Note: NOT migrating
+
+	router := gin.New()
+	router.GET("/test", func(c *gin.Context) {
+		c.Set("user_id", uint(18))
+
+		err := internalapi.LogAuditSuccess(
+			db,
+			c,
+			"success.action",
+			"SUCCESS",
+			"Success audit",
+			"resource",
+			"res_18",
+			nil,
+		)
+
+		assert.Error(t, err)
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	req, _ := http.NewRequest("GET", "/test", nil)
+	req.RemoteAddr = "192.168.1.18:8080"
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
 
 // TestLogAudit_MultipleActions tests multiple sequential audit logs
 func TestLogAudit_MultipleActions(t *testing.T) {
