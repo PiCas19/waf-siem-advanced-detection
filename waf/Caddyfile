@@ -16,12 +16,11 @@
 # ==================================================================
 # PUBLIC WAN → Porta 9443 (HTTPS)
 # Finance & Industrial SOLO – NO Dashboard
-# Accetta sia Host: 172.16.216.10 che Host: 10.246.50.241 (e qualsiasi altro)
+# Accetta QUALSIASI Host header – decide tutto il path
 # ==================================================================
 :9443 {
     bind 172.16.216.10
 
-    # TLS con compatibilità Windows vecchi
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem {
         protocols tls1.2 tls1.3
         ciphers TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 \
@@ -30,15 +29,8 @@
                 TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
     }
 
-    # Matcher per accettare i due Host possibili (post-NAT e pre-NAT)
-    @valid_host {
-        host 172.16.216.10 10.246.50.241
-    }
-
-    # ----------------------------------------------------------------
-    # FINANCE BACKEND
-    # ----------------------------------------------------------------
-    handle /finance* @valid_host {
+    # -------------------------- FINANCE --------------------------
+    handle /finance* {
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
@@ -70,10 +62,8 @@
         }
     }
 
-    # ----------------------------------------------------------------
-    # INDUSTRIAL BACKEND
-    # ----------------------------------------------------------------
-    handle /industrial* @valid_host {
+    # -------------------------- INDUSTRIAL --------------------------
+    handle /industrial* {
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
@@ -105,16 +95,12 @@
         }
     }
 
-    # ----------------------------------------------------------------
-    # Tutto il resto → 403 (blocca Dashboard e qualsiasi altra roba)
-    # ----------------------------------------------------------------
+    # -------------------------- TUTTO IL RESTO 403 --------------------------
     handle {
         respond "Access Denied - Finance and Industrial only" 403
     }
 
-    # ----------------------------------------------------------------
-    # Logging
-    # ----------------------------------------------------------------
+    # -------------------------- LOG --------------------------
     log {
         output file /var/log/caddy/access_wan_public.log {
             roll_size 100mb
