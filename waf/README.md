@@ -5,23 +5,62 @@ Enterprise-grade Web Application Firewall with dual-layer protection: OWASP ModS
 ## Architecture
 
 ```
-Request → Coraza WAF (Layer 1) → Custom WAF (Layer 2) → Backend
-         [OWASP CRS]              [Business Logic]
+┌─────────────┐
+│   Request   │
+└──────┬──────┘
+       │
+       v
+┌────────────────────────────────────────────┐
+│ LAYER 1: Coraza WAF (OWASP CRS)           │
+│ - 200+ OWASP rules                         │
+│ - Evasion techniques                       │
+│ - Scanner detection                        │
+│ - Protocol validation                      │
+└──────┬─────────────────────────────────────┘
+       │ PASS
+       v
+┌────────────────────────────────────────────┐
+│ LAYER 2: Custom WAF (Business Logic)      │
+│                                            │
+│ ┌────────────────────────────────────┐    │
+│ │ 1. Whitelist Check                 │    │
+│ │    → Bypass all if whitelisted     │    │
+│ └────────────────────────────────────┘    │
+│ ┌────────────────────────────────────┐    │
+│ │ 2. Blocklist Check                 │    │
+│ │    → Block if blocklisted          │    │
+│ └────────────────────────────────────┘    │
+│ ┌────────────────────────────────────┐    │
+│ │ 3. Threat Detection (3 types)      │    │
+│ │    a) Default Rules (~100 builtin) │    │
+│ │    b) Custom Rules (database)      │    │
+│ │    c) Manual Block (priority)      │    │
+│ └────────────────────────────────────┘    │
+└──────┬─────────────────────────────────────┘
+       │ PASS
+       v
+┌────────────────────────────────────────────┐
+│         Backend Application                │
+└────────────────────────────────────────────┘
 ```
 
 ### Layer 1: Coraza WAF
 - OWASP ModSecurity Core Rule Set v4.0
 - 200+ automatic protection rules
 - XSS, SQLi, RCE, Path Traversal, Scanner Detection
+- Evasion techniques detection
 - Configuration: `coraza.conf`
 
-### Layer 2: Custom WAF
-- Dynamic rules from database (API-managed)
+### Layer 2: Custom WAF (3 Rule Types)
+1. **Default Rules:** ~100 builtin Go detectors (XSS, SQLi, SSRF, SSTI, XXE, NoSQL, LDAP, etc.)
+2. **Custom Rules:** Database-managed rules created via Dashboard (regex-based)
+3. **Manual Block Rules:** High-priority rules created when blocking specific threats
 - Blocklist/Whitelist IP management
 - IP Intelligence (Tailscale, DMZ, HMAC validation)
-- Advanced detectors (SSRF, SSTI, XXE, NoSQL, LDAP)
 - Blocking actions (block, drop, redirect, challenge)
 - Dashboard integration
+
+**See [ARCHITECTURE.md](ARCHITECTURE.md) for complete details.**
 
 ## Features
 
@@ -209,8 +248,9 @@ Features:
 
 ## Documentation
 
-- **Quick Start**: [DUAL-WAF-QUICKSTART.md](DUAL-WAF-QUICKSTART.md)
-- **Full Deployment Guide**: [CORAZA-DEPLOYMENT.md](CORAZA-DEPLOYMENT.md)
+- **Architecture Overview**: [ARCHITECTURE.md](ARCHITECTURE.md) - Complete dual-layer architecture explanation
+- **Quick Start**: [DUAL-WAF-QUICKSTART.md](DUAL-WAF-QUICKSTART.md) - Deploy in 3 steps
+- **Full Deployment Guide**: [CORAZA-DEPLOYMENT.md](CORAZA-DEPLOYMENT.md) - Detailed deployment instructions
 
 ## Project Structure
 
