@@ -13,25 +13,32 @@
     }
 }
 
-#========================================
-# PUBLIC WAN - Porta 9443 (HTTPS standard)
-# Finance & Industrial SOLO (NO Dashboard)
-# Accessibile da Internet pubblico
-#========================================
-https://172.16.216.10:9443 {
+# ==================================================================
+# PUBLIC WAN → Porta 9443 (HTTPS)
+# Finance & Industrial SOLO – NO Dashboard
+# Accetta sia Host: 172.16.216.10 che Host: 10.246.50.241 (e qualsiasi altro)
+# ==================================================================
+:9443 {
     bind 172.16.216.10
-     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem {
-        # Forza TLS 1.2 (compatibilità Windows)
+
+    # TLS con compatibilità Windows vecchi
+    tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem {
         protocols tls1.2 tls1.3
-        
-        # Aggiungi cipher suite compatibili Windows
-        ciphers TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        ciphers TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 \
+                TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 \
+                TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 \
+                TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
     }
 
-    # ============================================
-    # FINANCE BACKEND (pubblico)
-    # ============================================
-    handle /finance* {
+    # Matcher per accettare i due Host possibili (post-NAT e pre-NAT)
+    @valid_host {
+        host 172.16.216.10 10.246.50.241
+    }
+
+    # ----------------------------------------------------------------
+    # FINANCE BACKEND
+    # ----------------------------------------------------------------
+    handle /finance* @valid_host {
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
@@ -41,10 +48,8 @@ https://172.16.216.10:9443 {
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
             enable_hmac_signature_validation false
             enable_tailscale_detection false
-
             enable_dmz_detection true
             dmz_networks 172.16.216.0/24
-
             trusted_proxies 127.0.0.1 ::1
         }
 
@@ -53,11 +58,9 @@ https://172.16.216.10:9443 {
             health_uri /health
             health_interval 10s
             health_timeout 2s
-
-            header_up X-Forwarded-For {http.request.remote}
-            header_up X-Real-IP {http.request.remote}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP {remote_host}
             header_up X-Forwarded-Proto https
-
             transport http {
                 read_timeout 30s
                 write_timeout 30s
@@ -67,10 +70,10 @@ https://172.16.216.10:9443 {
         }
     }
 
-    # ============================================
-    # INDUSTRIAL BACKEND (pubblico)
-    # ============================================
-    handle /industrial* {
+    # ----------------------------------------------------------------
+    # INDUSTRIAL BACKEND
+    # ----------------------------------------------------------------
+    handle /industrial* @valid_host {
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
@@ -80,10 +83,8 @@ https://172.16.216.10:9443 {
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
             enable_hmac_signature_validation false
             enable_tailscale_detection false
-
             enable_dmz_detection true
             dmz_networks 172.16.216.0/24
-
             trusted_proxies 127.0.0.1 ::1
         }
 
@@ -92,11 +93,9 @@ https://172.16.216.10:9443 {
             health_uri /health
             health_interval 10s
             health_timeout 2s
-
-            header_up X-Forwarded-For {http.request.remote}
-            header_up X-Real-IP {http.request.remote}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP {remote_host}
             header_up X-Forwarded-Proto https
-
             transport http {
                 read_timeout 30s
                 write_timeout 30s
@@ -106,13 +105,16 @@ https://172.16.216.10:9443 {
         }
     }
 
-    # ============================================
-    # BLOCCA tutto il resto (NO Dashboard da WAN)
-    # ============================================
+    # ----------------------------------------------------------------
+    # Tutto il resto → 403 (blocca Dashboard e qualsiasi altra roba)
+    # ----------------------------------------------------------------
     handle {
         respond "Access Denied - Finance and Industrial only" 403
     }
 
+    # ----------------------------------------------------------------
+    # Logging
+    # ----------------------------------------------------------------
     log {
         output file /var/log/caddy/access_wan_public.log {
             roll_size 100mb
@@ -123,32 +125,36 @@ https://172.16.216.10:9443 {
     }
 }
 
-http://172.16.216.10:9080 {
+# ==================================================================
+# HTTP → Porta 9080
+# Unico scopo: redirigere TUTTO su https://172.16.216.10:9443
+# Nessuna distinzione LAN/WAN, niente 10.246.50.241
+# ==================================================================
+:9080 {
     bind 172.16.216.10
-    
-    # Ottieni l'IP pubblico dalla richiesta originale
+
+    # Redirezione universale per /finance* e /industrial*
     handle /finance* {
-        @public_access {
-            remote_ip 10.246.50.0/24
-        }
-        redir @public_access https://10.246.50.241{uri} permanent
-        
-        # Fallback per accessi interni diretti
         redir https://172.16.216.10:9443{uri} permanent
     }
-    
+
     handle /industrial* {
-        @public_access {
-            remote_ip 10.246.50.0/24
-        }
-        redir @public_access https://10.246.50.241{uri} permanent
-        
-        # Fallback per accessi interni diretti
         redir https://172.16.216.10:9443{uri} permanent
     }
-    
+
+    # Qualsiasi altro path (bloccato, non deve esistere niente in HTTP)
     handle {
-        respond "Use HTTPS port 443" 403
+        respond "HTTPS only – use port 9443" 403
+    }
+
+    # Log leggero (facoltativo)
+    log {
+        output file /var/log/caddy/access_http_9080.log {
+            roll_size 50mb
+            roll_keep 5
+            roll_keep_for 720h
+        }
+        format json
     }
 }
 
