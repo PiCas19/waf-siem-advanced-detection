@@ -211,7 +211,6 @@ Features:
 
 - **Quick Start**: [DUAL-WAF-QUICKSTART.md](DUAL-WAF-QUICKSTART.md)
 - **Full Deployment Guide**: [CORAZA-DEPLOYMENT.md](CORAZA-DEPLOYMENT.md)
-- **Legacy Configuration**: [archive/README.md](archive/README.md)
 
 ## Project Structure
 
@@ -226,7 +225,6 @@ waf/
 │   ├── rules/              # Rules engine
 │   └── metrics/            # Metrics collection
 ├── pkg/waf/                # Caddy middleware
-├── archive/                # Legacy files (obsolete)
 ├── tests/                  # Tests
 ├── Caddyfile               # Caddy configuration
 ├── coraza.conf             # Coraza WAF configuration
