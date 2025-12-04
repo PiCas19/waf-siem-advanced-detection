@@ -1,7 +1,8 @@
 {
     email pierpaolo.casati@student.supsi.ch
     auto_https off
-    order waf before file_server
+    order coraza_waf first
+    order waf before reverse_proxy
     servers {
         protocols h1 h2 h3
         timeouts {
@@ -31,6 +32,14 @@
 
     # -------------------------- FINANCE --------------------------
     handle /finance* {
+        # Layer 1: Coraza WAF (OWASP ModSecurity Core Rule Set)
+        coraza_waf {
+            directives `
+                Include /etc/caddy/waf/coraza.conf
+            `
+        }
+
+        # Layer 2: Custom WAF (Business Logic, Custom Rules, IP Intelligence)
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
@@ -64,6 +73,14 @@
 
     # -------------------------- INDUSTRIAL --------------------------
     handle /industrial* {
+        # Layer 1: Coraza WAF (OWASP ModSecurity Core Rule Set)
+        coraza_waf {
+            directives `
+                Include /etc/caddy/waf/coraza.conf
+            `
+        }
+
+        # Layer 2: Custom WAF (Business Logic, Custom Rules, IP Intelligence)
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
@@ -231,6 +248,14 @@
     
     # Tutto il resto (HTML, routing SPA) con WAF
     handle {
+        # Layer 1: Coraza WAF (OWASP ModSecurity Core Rule Set)
+        coraza_waf {
+            directives `
+                Include /etc/caddy/waf/coraza.conf
+            `
+        }
+
+        # Layer 2: Custom WAF (Business Logic, Custom Rules, IP Intelligence)
         waf {
             log_file /var/log/caddy/waf_wan.log
             block_mode true
@@ -239,31 +264,22 @@
             blocklist_endpoint http://localhost:8081/api/waf/blocklist
             whitelist_endpoint http://localhost:8081/api/waf/whitelist
 
-            # ============================================
-            # ENTERPRISE-GRADE IP DETECTION (WAN - TAILSCALE)
-            # ============================================
-
             # HMAC Signature Validation for X-Public-IP
-            # Prevents spoofing of self-reported IPs from Tailscale clients
             enable_hmac_signature_validation true
             hmac_shared_secret "change-this-to-your-production-secret-key-minimum-32-characters"
 
             # Tailscale Network Detection
-            # Automatically recognizes Tailscale IPs (100.64.0.0/10)
-            # Your MacBook: 100.115.217.37 will be detected as Tailscale
             enable_tailscale_detection true
             tailscale_networks 100.64.0.0/10
 
             # DMZ Network Detection
-            # Detects traffic from DMZ (172.16.216.0/24)
             enable_dmz_detection true
             dmz_networks 172.16.216.0/24
 
-            # Trusted Proxies for X-Forwarded-For validation
-            # WAN: Only localhost (strict, no internal proxies)
+            # Trusted Proxies
             trusted_proxies 127.0.0.1 ::1 100.64.0.0/10
         }
-        
+
         root * /var/www/html
         try_files {path} /index.html
         file_server
@@ -368,23 +384,25 @@
 
     # Resto con WAF
     handle {
+        # Layer 1: Coraza WAF (OWASP ModSecurity Core Rule Set)
+        coraza_waf {
+            directives `
+                Include /etc/caddy/waf/coraza.conf
+            `
+        }
+
+        # Layer 2: Custom WAF (Business Logic, Custom Rules, IP Intelligence)
         waf {
             log_file /var/log/caddy/waf_lan.log
             block_mode true
             api_endpoint http://localhost:8081/api
             rules_endpoint http://localhost:8081/api/waf/custom-rules
 
-            # ============================================
-            # ENTERPRISE-GRADE IP DETECTION (LAN HTTPS)
-            # ============================================
-
             # DMZ Network Detection
-            # Detects traffic from DMZ (172.16.216.0/24)
             enable_dmz_detection true
             dmz_networks 172.16.216.0/24
 
-            # Trusted Proxies for internal LAN connections
-            # LAN: 192.168.216.0/24, DMZ: 172.16.216.0/24
+            # Trusted Proxies
             trusted_proxies 127.0.0.1 ::1 192.168.216.0/24 172.16.216.0/24
         }
 
@@ -456,53 +474,55 @@ http://172.16.216.10 {
             trusted_proxies 127.0.0.1 ::1
         }
     }
-    
+
     # File statici
     handle /assets/* {
         root * /var/www/html
         file_server
         header Cache-Control "public, max-age=31536000"
     }
-    
+
     handle /favicon.ico {
         root * /var/www/html
         file_server
     }
-    
+
     handle /manifest.json {
         root * /var/www/html
         file_server
     }
-    
+
     handle /robots.txt {
         root * /var/www/html
         file_server
     }
-    
+
     handle /vite.svg {
         root * /var/www/html
-        file_server 
+        file_server
     }
-    
+
     # Resto con WAF
     handle {
+        # Layer 1: Coraza WAF (OWASP ModSecurity Core Rule Set)
+        coraza_waf {
+            directives `
+                Include /etc/caddy/waf/coraza.conf
+            `
+        }
+
+        # Layer 2: Custom WAF (Business Logic, Custom Rules, IP Intelligence)
         waf {
             log_file /var/log/caddy/waf_lan.log
             block_mode true
             api_endpoint http://localhost:8081/api
             rules_endpoint http://localhost:8081/api/waf/custom-rules
 
-            # ============================================
-            # ENTERPRISE-GRADE IP DETECTION (LAN HTTP)
-            # ============================================
-
             # DMZ Network Detection
-            # Detects traffic from DMZ (172.16.216.0/24)
             enable_dmz_detection true
             dmz_networks 172.16.216.0/24
 
-            # Trusted Proxies for internal LAN connections
-            # LAN: 192.168.216.0/24, DMZ: 172.16.216.0/24
+            # Trusted Proxies
             trusted_proxies 127.0.0.1 ::1 192.168.216.0/24 172.16.216.0/24
         }
 
