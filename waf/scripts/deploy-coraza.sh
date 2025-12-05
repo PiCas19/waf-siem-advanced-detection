@@ -5,6 +5,9 @@
 
 set -e
 
+# Add Go to PATH
+export PATH=$PATH:/usr/local/go/bin:/usr/local/bin:$HOME/go/bin
+
 echo "[INFO] Deploying Dual-Layer WAF..."
 echo "[INFO]   Layer 1: Coraza WAF (OWASP ModSecurity Core Rule Set)"
 echo "[INFO]   Layer 2: Custom WAF (Business Logic, IP Intelligence)"
