@@ -10,6 +10,10 @@ echo "[INFO]   Layer 1: Coraza WAF (OWASP ModSecurity Core Rule Set)"
 echo "[INFO]   Layer 2: Custom WAF (Business Logic, IP Intelligence)"
 echo ""
 
+# Get absolute path to project directory (before any cd commands)
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WAF_DIR="$PROJECT_DIR"
+
 # 1. Create directories
 echo "[STEP 1/12] Creating directories..."
 sudo mkdir -p /etc/caddy/waf
@@ -64,11 +68,11 @@ rm -rf "$TMPDIR"
 
 # 3. Copy Coraza configuration
 echo "[STEP 3/12] Copying Coraza configuration..."
-sudo cp ~/waf-siem-advanced-detection/waf/coraza.conf /etc/caddy/waf/coraza.conf
+sudo cp "$WAF_DIR/coraza.conf" /etc/caddy/waf/coraza.conf
 
 # 4. Copy updated Caddyfile
 echo "[STEP 4/12] Copying updated Caddyfile..."
-sudo cp ~/waf-siem-advanced-detection/waf/Caddyfile /etc/caddy/Caddyfile
+sudo cp "$WAF_DIR/Caddyfile" /etc/caddy/Caddyfile
 
 # 5. Set proper permissions
 echo "[STEP 5/12] Setting permissions..."
@@ -79,7 +83,7 @@ sudo chmod 644 /etc/caddy/Caddyfile
 
 # 6. Build Caddy with all modules
 echo "[STEP 6/12] Building Caddy with Coraza + Custom WAF + Tailscale..."
-cd ~/waf-siem-advanced-detection/waf
+cd "$WAF_DIR"
 chmod +x build-caddy-coraza.sh
 ./build-caddy-coraza.sh
 
