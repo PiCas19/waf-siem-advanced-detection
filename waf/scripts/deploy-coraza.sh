@@ -116,8 +116,9 @@ sudo mv "$WAF_DIR/caddy" /usr/bin/caddy
 sudo chmod +x /usr/bin/caddy
 sudo setcap CAP_NET_BIND_SERVICE=+eip /usr/bin/caddy
 
-# 9. Validate Caddyfile
-echo "[STEP 9/12] Validating Caddyfile..."
+# 9. Format and validate Caddyfile
+echo "[STEP 9/12] Formatting and validating Caddyfile..."
+sudo caddy fmt --overwrite /etc/caddy/Caddyfile
 sudo caddy validate --config /etc/caddy/Caddyfile
 
 # 10. Start Caddy service
