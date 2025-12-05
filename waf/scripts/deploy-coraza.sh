@@ -36,10 +36,18 @@ echo "[INFO]   Configs directory: $CONFIGS_DIR"
 echo "[INFO]   Scripts directory: $SCRIPT_DIR"
 echo ""
 
-# 1. Create directories
-echo "[STEP 1/12] Creating directories..."
+# 1. Create directories and log files
+echo "[STEP 1/12] Creating directories and log files..."
 sudo mkdir -p /etc/caddy/waf
 sudo mkdir -p /var/log/caddy
+
+# Create Coraza log files with correct permissions
+sudo touch /var/log/caddy/coraza_audit.log
+sudo touch /var/log/caddy/coraza_debug.log
+sudo chown caddy:caddy /var/log/caddy/coraza_audit.log
+sudo chown caddy:caddy /var/log/caddy/coraza_debug.log
+sudo chmod 644 /var/log/caddy/coraza_audit.log
+sudo chmod 644 /var/log/caddy/coraza_debug.log
 
 # 2. Download OWASP Core Rule Set
 echo "[STEP 2/12] Downloading OWASP Core Rule Set v4.7.0..."
