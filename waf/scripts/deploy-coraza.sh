@@ -44,13 +44,8 @@ echo "[STEP 1/12] Creating directories and log files..."
 sudo mkdir -p /etc/caddy/waf
 sudo mkdir -p /var/log/caddy
 
-# Create Coraza log files with correct permissions
-sudo touch /var/log/caddy/coraza_audit.log
-sudo touch /var/log/caddy/coraza_debug.log
-sudo chown caddy:caddy /var/log/caddy/coraza_audit.log
-sudo chown caddy:caddy /var/log/caddy/coraza_debug.log
-sudo chmod 644 /var/log/caddy/coraza_audit.log
-sudo chmod 644 /var/log/caddy/coraza_debug.log
+# Coraza logging disabled - Custom WAF handles all logging
+# (No need for coraza_audit.log or coraza_debug.log)
 
 # 2. Download OWASP Core Rule Set
 echo "[STEP 2/12] Downloading OWASP Core Rule Set v4.7.0..."
@@ -127,19 +122,8 @@ sudo mv "$WAF_DIR/caddy" /usr/bin/caddy
 sudo chmod +x /usr/bin/caddy
 sudo setcap CAP_NET_BIND_SERVICE=+eip /usr/bin/caddy
 
-# 8b. Build and install Coraza Log Forwarder
-echo "[STEP 8b/12] Building Coraza Log Forwarder..."
-cd "$WAF_DIR"
-go build -o coraza-forwarder ./cmd/coraza-forwarder/
-sudo mv coraza-forwarder /usr/local/bin/
-sudo chmod +x /usr/local/bin/coraza-forwarder
-
-# Install systemd service
-echo "[STEP 8c/12] Installing Coraza Forwarder service..."
-sudo cp "$CONFIGS_DIR/coraza-forwarder.service" /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable coraza-forwarder
-sudo systemctl restart coraza-forwarder
+# Coraza Forwarder removed - Custom WAF logs everything directly
+# (Coraza doesn't log anymore, Custom WAF sees all requests first)
 
 # 9. Format and validate Caddyfile
 echo "[STEP 9/12] Formatting and validating Caddyfile..."
@@ -155,40 +139,38 @@ echo "[STEP 11/12] Verifying WAF modules..."
 caddy list-modules | grep -E '(coraza|waf|tailscale)' || true
 
 # 12. Check status
-echo "[STEP 12/12] Checking services status..."
+echo "[STEP 12/12] Checking service status..."
 echo ""
-echo "=== Caddy Status ==="
+echo "=== Caddy Status (Dual-Layer WAF) ==="
 sudo systemctl status caddy --no-pager
-echo ""
-echo "=== Coraza Forwarder Status ==="
-sudo systemctl status coraza-forwarder --no-pager
 
 echo ""
 echo "[SUCCESS] Dual-Layer WAF deployment completed!"
 echo ""
 echo "[INFO] Architecture:"
-echo "   Request -> Coraza WAF (Layer 1) -> Custom WAF (Layer 2) -> Backend"
-echo "            └─> Coraza Forwarder -> Dashboard API + WAF Logs"
+echo "   Request -> Custom WAF (Layer 1: Detect + Log) -> Coraza WAF (Layer 2: Validate) -> Backend"
+echo "            └─> Dashboard API + waf_wan.log / waf_lan.log"
 echo ""
 echo "[INFO] Services:"
-echo "   Caddy:             systemctl status caddy"
-echo "   Coraza Forwarder:  systemctl status coraza-forwarder"
+echo "   Caddy:  systemctl status caddy"
 echo ""
 echo "[INFO] Monitoring:"
-echo "   Coraza logs:     tail -f /var/log/caddy/coraza_audit.log"
-echo "   Custom WAF logs: tail -f /var/log/caddy/waf_wan.log"
-echo "   Caddy access:    tail -f /var/log/caddy/access_wan.log"
-echo "   Forwarder logs:  journalctl -u coraza-forwarder -f"
+echo "   WAF WAN logs: tail -f /var/log/caddy/waf_wan.log"
+echo "   WAF LAN logs: tail -f /var/log/caddy/waf_lan.log"
+echo "   Caddy access: tail -f /var/log/caddy/access_wan.log"
+echo "   Caddy errors: journalctl -u caddy -f"
 echo ""
 echo "[TEST] WAF blocking (XSS):"
 echo "   curl -k 'https://172.16.216.10:9443/finance?test=<script>alert(1)</script>'"
-echo "   Expected: 403 Forbidden (blocked by Coraza Layer 1)"
+echo "   Expected: 403 Forbidden (logged in waf_wan.log, validated by Coraza)"
 echo ""
 echo "[TEST] WAF blocking (SQLi):"
 echo "   curl -k 'https://172.16.216.10:9443/industrial?id=1%20OR%201=1'"
-echo "   Expected: 403 Forbidden (blocked by Coraza Layer 1)"
+echo "   Expected: 403 Forbidden (logged in waf_wan.log, validated by Coraza)"
 echo ""
-echo "[INFO] Custom WAF features (Layer 2):"
-echo "   - Blocklist IP: Add IP via dashboard -> blocked by Layer 2"
-echo "   - Whitelist IP: Add IP via dashboard -> bypass both layers"
-echo "   - Custom Rules: Create via dashboard -> enforced by Layer 2"
+echo "[INFO] Custom WAF features:"
+echo "   - Detects all threats and logs to waf_wan.log/waf_lan.log"
+echo "   - Sends events to Dashboard API in real-time"
+echo "   - Blocklist IP: Add via dashboard -> blocked by Custom WAF"
+echo "   - Whitelist IP: Add via dashboard -> bypass both layers"
+echo "   - Custom Rules: Create via dashboard -> enforced immediately"
