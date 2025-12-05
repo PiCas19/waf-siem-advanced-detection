@@ -106,26 +106,26 @@ Enterprise-grade Web Application Firewall with dual-layer protection: OWASP ModS
 
 ```bash
 # 1. Copy files to server
-scp build-caddy-coraza.sh deploy-coraza.sh coraza.conf Caddyfile caddy@server:~/waf-siem-advanced-detection/waf/
+scp -r scripts configs caddy@server:~/waf-siem-advanced-detection/waf/
 
 # 2. SSH to server
 ssh caddy@server
 cd ~/waf-siem-advanced-detection/waf
 
 # 3. Run deployment script
-chmod +x deploy-coraza.sh
-./deploy-coraza.sh
+chmod +x scripts/deploy-coraza.sh
+scripts/deploy-coraza.sh
 ```
 
 ### Manual Build
 
 ```bash
 # Build Caddy with all modules
-chmod +x build-caddy-coraza.sh
-./build-caddy-coraza.sh
+chmod +x scripts/build-caddy-coraza.sh
+scripts/build-caddy-coraza.sh
 
 # Verify modules loaded
-./caddy list-modules | grep -E '(coraza|waf|tailscale)'
+scripts/caddy list-modules | grep -E '(coraza|custom_waf|tailscale)'
 ```
 
 ### Build Command
@@ -144,7 +144,7 @@ xcaddy build v2.10.2 \
 ```caddy
 {
     order coraza_waf first
-    order waf before reverse_proxy
+    order custom_waf before reverse_proxy
 }
 
 :443 {
@@ -156,7 +156,7 @@ xcaddy build v2.10.2 \
     }
 
     # Layer 2: Custom WAF (Business Logic)
-    waf {
+    custom_waf {
         log_file /var/log/caddy/waf.log
         block_mode true
         api_endpoint http://localhost:8081/api
@@ -179,7 +179,7 @@ xcaddy build v2.10.2 \
 
 ### Coraza Configuration
 
-Edit `coraza.conf` to customize OWASP rules and add custom protection rules.
+Edit `configs/coraza.conf` to customize OWASP rules and add custom protection rules.
 
 ### Custom WAF Configuration
 
@@ -266,10 +266,13 @@ waf/
 │   └── metrics/            # Metrics collection
 ├── pkg/waf/                # Caddy middleware
 ├── tests/                  # Tests
-├── Caddyfile               # Caddy configuration
-├── coraza.conf             # Coraza WAF configuration
-├── build-caddy-coraza.sh   # Build script
-└── deploy-coraza.sh        # Deployment script
+├── configs/                # Configuration files
+│   ├── Caddyfile           # Caddy configuration
+│   ├── coraza.conf         # Coraza WAF configuration
+│   └── filebeat.yml        # Filebeat configuration
+└── scripts/                # Deployment scripts
+    ├── build-caddy-coraza.sh   # Build script
+    └── deploy-coraza.sh        # Deployment script
 ```
 
 ## Development
@@ -300,7 +303,7 @@ go test -cover ./...
 
 ```bash
 # Verify modules loaded
-caddy list-modules | grep -E '(coraza|waf)'
+caddy list-modules | grep -E '(coraza|custom_waf)'
 
 # Check Coraza config
 ls -la /etc/caddy/waf/coraza.conf
