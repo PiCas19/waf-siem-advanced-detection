@@ -1,38 +1,25 @@
-Unit]
-Description=Coraza Log Forwarder (Layer 1 → Layer 2 + Dashboard)
-Documentation=https://github.com/PiCas19/waf-siem-advanced-detection
+[Unit]
+Description=Coraza Log Forwarder
 After=network.target caddy.service
-Wants=caddy.service
 
 [Service]
 Type=simple
 User=caddy
 Group=caddy
-
-ExecStart=/usr/bin/stdbuf -oL -- /usr/local/bin/coraza-forwarder \
+ExecStart=/usr/local/bin/coraza-forwarder \
     -coraza-log=/var/log/caddy/coraza_audit.log \
     -waf-log=/var/log/caddy/waf_wan.log \
     -api=http://localhost:8081/api \
-    -poll=300ms
-
+    -poll=200ms
 Restart=always
-RestartSec=2
-RestartPreventExitStatus=
-
-# Security hardening (le tieni tutte, sono ottime)
+RestartSec=3
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/log/caddy
-
-# Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=coraza-forwarder
-
-# In caso di problemi riapre automaticamente il file se cambia inode
-WatchdogSec=15
 
 [Install]
 WantedBy=multi-user.target
