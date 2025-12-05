@@ -8,6 +8,7 @@ import (
 	"flag"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -43,41 +44,71 @@ type CorazaAuditLog struct {
 
 type Config struct {
 	CorazaLogFile string
-	WafLogFile    string
+	WafWanLogFile string
+	WafLanLogFile string
 	APIEndpoint   string
 	PollInterval  time.Duration
 }
 
 var (
-	wafLogger *logger.Logger // globale così lo possiamo chiudere con defer
+	wafWanLogger *logger.Logger // Logger per traffico WAN
+	wafLanLogger *logger.Logger // Logger per traffico LAN
+
+	// Reti LAN/interne (basate su Caddyfile)
+	lanNetworks = []string{
+		"192.168.0.0/16",     // RFC 1918 private
+		"172.16.0.0/12",      // RFC 1918 private
+		"10.0.0.0/8",         // RFC 1918 private
+		"100.64.0.0/10",      // Tailscale/CGNAT
+		"127.0.0.0/8",        // Loopback
+		"::1/128",            // IPv6 loopback
+		"fe80::/10",          // IPv6 link-local
+		"fc00::/7",           // IPv6 unique local
+	}
+	lanCIDRs []*net.IPNet
 )
 
 func main() {
 	config := Config{}
 
 	flag.StringVar(&config.CorazaLogFile, "coraza-log", "/var/log/caddy/coraza_audit.log", "Coraza audit log file")
-	flag.StringVar(&config.WafLogFile, "waf-log", "/var/log/caddy/waf_wan.log", "WAF log file to write to")
+	flag.StringVar(&config.WafWanLogFile, "waf-wan-log", "/var/log/caddy/waf_wan.log", "WAF WAN log file")
+	flag.StringVar(&config.WafLanLogFile, "waf-lan-log", "/var/log/caddy/waf_lan.log", "WAF LAN log file")
 	flag.StringVar(&config.APIEndpoint, "api", "http://localhost:8081/api", "API endpoint for dashboard")
 	flag.DurationVar(&config.PollInterval, "poll", 1*time.Second, "Poll interval")
 	flag.Parse()
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
-	log.Printf("[INFO] Coraza Log Forwarder starting")
-	log.Printf("[INFO] Coraza log → %s", config.CorazaLogFile)
-	log.Printf("[INFO] WAF log    → %s", config.WafLogFile)
-	log.Printf("[INFO] API        → %s/waf/event", config.APIEndpoint)
+	log.Printf("[INFO] Coraza Log Forwarder starting - Auto LAN/WAN detection")
+	log.Printf("[INFO] Coraza log     → %s", config.CorazaLogFile)
+	log.Printf("[INFO] WAF WAN log    → %s", config.WafWanLogFile)
+	log.Printf("[INFO] WAF LAN log    → %s", config.WafLanLogFile)
+	log.Printf("[INFO] API            → %s/waf/event", config.APIEndpoint)
 
-	// === INIZIALIZZAZIONE LOGGER WAF (CRITICA) ===
+	// === INIZIALIZZAZIONE RETI LAN ===
+	initLANNetworks()
+
+	// === INIZIALIZZAZIONE LOGGER WAF WAN ===
 	var err error
-	wafLogger, err = logger.NewLogger(config.WafLogFile)
+	wafWanLogger, err = logger.NewLogger(config.WafWanLogFile)
 	if err != nil {
-		// NON morire, ma avvisa forte e disabilita scrittura su file
-		log.Printf("[CRITICAL] Impossibile aprire %s in scrittura: %v", config.WafLogFile, err)
-		log.Printf("[CRITICAL] Gli eventi Coraza verranno inviati all'API ma NON salvati in waf_wan.log")
-		wafLogger = nil
+		log.Printf("[CRITICAL] Impossibile aprire %s: %v", config.WafWanLogFile, err)
+		log.Printf("[CRITICAL] Eventi WAN non verranno salvati su file")
+		wafWanLogger = nil
 	} else {
-		log.Printf("[INFO] Logger WAF inizializzato correttamente: %s", config.WafLogFile)
-		defer wafLogger.Close() // importantissimo!
+		log.Printf("[INFO] Logger WAF WAN inizializzato: %s", config.WafWanLogFile)
+		defer wafWanLogger.Close()
+	}
+
+	// === INIZIALIZZAZIONE LOGGER WAF LAN ===
+	wafLanLogger, err = logger.NewLogger(config.WafLanLogFile)
+	if err != nil {
+		log.Printf("[CRITICAL] Impossibile aprire %s: %v", config.WafLanLogFile, err)
+		log.Printf("[CRITICAL] Eventi LAN non verranno salvati su file")
+		wafLanLogger = nil
+	} else {
+		log.Printf("[INFO] Logger WAF LAN inizializzato: %s", config.WafLanLogFile)
+		defer wafLanLogger.Close()
 	}
 
 	// === APERTURA FILE CORAZA AUDIT LOG ===
@@ -187,8 +218,17 @@ func processCorazaLog(line string, apiEndpoint string) {
 		ts = time.Now()
 	}
 
-	// === SCRITTURA SU waf_wan.log (solo se logger valido) ===
-	if wafLogger != nil {
+	// === DETERMINA SE LAN O WAN ===
+	isLAN := isLANIP(corazaLog.Transaction.ClientIP)
+	logType := "WAN"
+	targetLogger := wafWanLogger
+	if isLAN {
+		logType = "LAN"
+		targetLogger = wafLanLogger
+	}
+
+	// === SCRITTURA SU waf_wan.log O waf_lan.log ===
+	if targetLogger != nil {
 		entry := logger.LogEntry{
 			Timestamp:        ts,
 			ThreatType:      threatType,
@@ -196,7 +236,7 @@ func processCorazaLog(line string, apiEndpoint string) {
 			Description:      threatMsg,
 			ClientIP:        corazaLog.Transaction.ClientIP,
 			ClientIPSource:  "remote-addr",
-			ClientIPTrusted: false,
+			ClientIPTrusted: isLAN,
 			Method:          corazaLog.Transaction.Request.Method,
 			URL:             corazaLog.Transaction.Request.URI,
 			UserAgent:       userAgent,
@@ -205,11 +245,11 @@ func processCorazaLog(line string, apiEndpoint string) {
 			BlockedBy:       "coraza",
 		}
 
-		if err := wafLogger.Log(entry); err != nil {
-			log.Printf("[ERROR] Scrittura waf_wan.log fallita: %v", err)
+		if err := targetLogger.Log(entry); err != nil {
+			log.Printf("[ERROR] Scrittura waf_%s.log fallita: %v", strings.ToLower(logType), err)
 		} else {
-			log.Printf("[INFO] Coraza → waf_wan.log | %s | %s | %s", 
-				corazaLog.Transaction.ClientIP, threatType, corazaLog.Transaction.Request.URI)
+			log.Printf("[INFO] Coraza → waf_%s.log | %s | %s | %s",
+				strings.ToLower(logType), corazaLog.Transaction.ClientIP, threatType, corazaLog.Transaction.Request.URI)
 		}
 	}
 
@@ -254,4 +294,35 @@ func sendToAPI(corazaLog CorazaAuditLog, apiEndpoint string) {
 		log.Printf("[INFO] Evento Coraza inviato al dashboard | IP: %s | Code: %d",
 			corazaLog.Transaction.ClientIP, corazaLog.Transaction.Response.HTTPCode)
 	}
+}
+
+// initLANNetworks inizializza le reti LAN in formato CIDR
+func initLANNetworks() {
+	lanCIDRs = make([]*net.IPNet, 0, len(lanNetworks))
+	for _, cidr := range lanNetworks {
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			log.Printf("[WARN] Errore parsing CIDR %s: %v", cidr, err)
+			continue
+		}
+		lanCIDRs = append(lanCIDRs, network)
+	}
+	log.Printf("[INFO] %d reti LAN caricate per auto-detection", len(lanCIDRs))
+}
+
+// isLANIP verifica se un IP appartiene a una rete LAN/interna
+func isLANIP(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false // IP non valido → considera WAN per sicurezza
+	}
+
+	// Controlla se appartiene a una delle reti LAN
+	for _, network := range lanCIDRs {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+
+	return false
 }
