@@ -1,0 +1,31 @@
+[Unit]
+Description=Coraza Log Forwarder
+Documentation=https://github.com/PiCas19/waf-siem-advanced-detection
+After=network.target caddy.service
+
+[Service]
+Type=simple
+User=caddy
+Group=caddy
+ExecStart=/usr/local/bin/coraza-forwarder \
+    -coraza-log=/var/log/caddy/coraza_audit.log \
+    -waf-log=/var/log/caddy/waf_wan.log \
+    -api=http://localhost:8081/api \
+    -poll=1s
+Restart=always
+RestartSec=5
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/caddy
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=coraza-forwarder
+
+[Install]
+WantedBy=multi-user.target

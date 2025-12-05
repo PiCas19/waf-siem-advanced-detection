@@ -124,6 +124,20 @@ sudo mv "$WAF_DIR/caddy" /usr/bin/caddy
 sudo chmod +x /usr/bin/caddy
 sudo setcap CAP_NET_BIND_SERVICE=+eip /usr/bin/caddy
 
+# 8b. Build and install Coraza Log Forwarder
+echo "[STEP 8b/12] Building Coraza Log Forwarder..."
+cd "$WAF_DIR"
+go build -o coraza-forwarder ./cmd/coraza-forwarder/
+sudo mv coraza-forwarder /usr/local/bin/
+sudo chmod +x /usr/local/bin/coraza-forwarder
+
+# Install systemd service
+echo "[STEP 8c/12] Installing Coraza Forwarder service..."
+sudo cp "$CONFIGS_DIR/coraza-forwarder.service" /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable coraza-forwarder
+sudo systemctl restart coraza-forwarder
+
 # 9. Format and validate Caddyfile
 echo "[STEP 9/12] Formatting and validating Caddyfile..."
 sudo caddy fmt --overwrite /etc/caddy/Caddyfile
@@ -138,19 +152,30 @@ echo "[STEP 11/12] Verifying WAF modules..."
 caddy list-modules | grep -E '(coraza|waf|tailscale)' || true
 
 # 12. Check status
-echo "[STEP 12/12] Checking Caddy status..."
+echo "[STEP 12/12] Checking services status..."
+echo ""
+echo "=== Caddy Status ==="
 sudo systemctl status caddy --no-pager
+echo ""
+echo "=== Coraza Forwarder Status ==="
+sudo systemctl status coraza-forwarder --no-pager
 
 echo ""
 echo "[SUCCESS] Dual-Layer WAF deployment completed!"
 echo ""
 echo "[INFO] Architecture:"
 echo "   Request -> Coraza WAF (Layer 1) -> Custom WAF (Layer 2) -> Backend"
+echo "            └─> Coraza Forwarder -> Dashboard API + WAF Logs"
+echo ""
+echo "[INFO] Services:"
+echo "   Caddy:             systemctl status caddy"
+echo "   Coraza Forwarder:  systemctl status coraza-forwarder"
 echo ""
 echo "[INFO] Monitoring:"
 echo "   Coraza logs:     tail -f /var/log/caddy/coraza_audit.log"
 echo "   Custom WAF logs: tail -f /var/log/caddy/waf_wan.log"
 echo "   Caddy access:    tail -f /var/log/caddy/access_wan.log"
+echo "   Forwarder logs:  journalctl -u coraza-forwarder -f"
 echo ""
 echo "[TEST] WAF blocking (XSS):"
 echo "   curl -k 'https://172.16.216.10:9443/finance?test=<script>alert(1)</script>'"
