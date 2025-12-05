@@ -40,6 +40,9 @@ sudo mkdir -p /var/log/caddy
 # 2. Download OWASP Core Rule Set
 echo "[STEP 2/12] Downloading OWASP Core Rule Set v4.0..."
 
+# Remove old coreruleset if exists
+sudo rm -rf /etc/caddy/waf/coreruleset
+
 # Download directly to /etc/caddy/waf (has more space)
 cd /etc/caddy/waf
 
