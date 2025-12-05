@@ -8,11 +8,14 @@ set -e
 # Add Go and xcaddy to PATH
 export PATH=$PATH:/usr/local/go/bin:/usr/local/bin:$HOME/go/bin
 
-echo "[INFO] Building Caddy with all modules..."
+echo "[INFO] Building Caddy with Dual-Layer WAF..."
 echo "[INFO]   - Caddy v2.10.2"
-echo "[INFO]   - Coraza WAF (OWASP ModSecurity Core Rule Set)"
-echo "[INFO]   - Custom WAF (Business Logic + IP Intelligence)"
+echo "[INFO]   - Custom WAF (Layer 1: Detection + Logging + IP Intelligence)"
+echo "[INFO]   - Coraza WAF (Layer 2: OWASP CRS Validation)"
 echo "[INFO]   - Tailscale VPN"
+echo ""
+echo "[INFO] Architecture:"
+echo "   Request -> Custom WAF (detects + logs) -> Coraza (validates) -> Backend"
 echo ""
 
 # Get absolute path to WAF module (parent directory of scripts/)

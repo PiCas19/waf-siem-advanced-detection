@@ -6,9 +6,9 @@
     email pierpaolo.casati@student.supsi.ch
     auto_https off
 
-    # WAF execution order
-    order coraza_waf first
-    order custom_waf before reverse_proxy
+    # WAF execution order (INVERTED: Custom WAF logs everything, Coraza validates)
+    order custom_waf first
+    order coraza_waf before reverse_proxy
 
     servers {
         protocols h1 h2 h3
