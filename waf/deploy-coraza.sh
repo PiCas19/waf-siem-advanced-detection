@@ -40,8 +40,9 @@ sudo mkdir -p /var/log/caddy
 # 2. Download OWASP Core Rule Set
 echo "[STEP 2/12] Downloading OWASP Core Rule Set v4.0..."
 
-# Create temporary directory with proper permissions
-TMPDIR=$(mktemp -d)
+# Create temporary directory in home (avoid /tmp space issues)
+TMPDIR=$(mktemp -d -p "$HOME")
+echo "[INFO] Using temporary directory: $TMPDIR"
 cd "$TMPDIR"
 
 # Download with progress and retries
