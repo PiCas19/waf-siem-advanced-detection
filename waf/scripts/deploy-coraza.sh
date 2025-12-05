@@ -42,7 +42,7 @@ sudo mkdir -p /etc/caddy/waf
 sudo mkdir -p /var/log/caddy
 
 # 2. Download OWASP Core Rule Set
-echo "[STEP 2/12] Downloading OWASP Core Rule Set v4.0..."
+echo "[STEP 2/12] Downloading OWASP Core Rule Set v4.7.0..."
 
 # Remove old coreruleset if exists
 sudo rm -rf /etc/caddy/waf/coreruleset
@@ -50,10 +50,10 @@ sudo rm -rf /etc/caddy/waf/coreruleset
 # Download directly to /etc/caddy/waf (has more space)
 cd /etc/caddy/waf
 
-# Download with progress and retries
+# Download with progress and retries (OWASP ModSecurity CRS, not Coraza wrapper)
 sudo wget --show-progress --tries=3 --timeout=30 \
     -O coreruleset.tar.gz \
-    https://github.com/corazawaf/coraza-coreruleset/archive/refs/tags/v4.0.0.tar.gz
+    https://github.com/coreruleset/coreruleset/archive/refs/tags/v4.7.0.tar.gz
 
 # Verify download succeeded
 if [ ! -f coreruleset.tar.gz ]; then
@@ -73,14 +73,14 @@ echo "[STEP 2/12] Extracting OWASP Core Rule Set..."
 sudo tar -xzf coreruleset.tar.gz
 
 # Verify extraction succeeded
-if [ ! -d coraza-coreruleset-4.0.0 ]; then
+if [ ! -d coreruleset-4.7.0 ]; then
     echo "[ERROR] Extraction failed"
     sudo rm -f coreruleset.tar.gz
     exit 1
 fi
 
 # Move to final location
-sudo mv coraza-coreruleset-4.0.0 coreruleset
+sudo mv coreruleset-4.7.0 coreruleset
 
 # Cleanup
 sudo rm -f coreruleset.tar.gz
