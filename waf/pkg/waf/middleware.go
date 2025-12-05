@@ -43,7 +43,7 @@ func loadEnvFile() error {
 
 func init() {
 	caddy.RegisterModule(Middleware{})
-	httpcaddyfile.RegisterHandlerDirective("waf", parseCaddyfile)
+	httpcaddyfile.RegisterHandlerDirective("custom_waf", parseCaddyfile)
 }
 
 // RequestFingerprint represents a unique request to deduplicate retries
@@ -123,7 +123,7 @@ type Middleware struct {
 // CaddyModule returns the Caddy module information
 func (Middleware) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
-		ID:  "http.handlers.waf",
+		ID:  "http.handlers.custom_waf",
 		New: func() caddy.Module { return new(Middleware) },
 	}
 }

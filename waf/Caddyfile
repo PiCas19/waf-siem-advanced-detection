@@ -8,7 +8,7 @@
 
     # WAF execution order
     order coraza_waf first
-    order waf before reverse_proxy
+    order custom_waf before reverse_proxy
 
     servers {
         protocols h1 h2 h3
@@ -34,7 +34,7 @@
 }
 
 (waf_wan) {
-    waf {
+    custom_waf {
         log_file /var/log/caddy/waf_wan.log
         block_mode true
         api_endpoint http://localhost:8081/api
@@ -49,7 +49,7 @@
 }
 
 (waf_wan_full) {
-    waf {
+    custom_waf {
         log_file /var/log/caddy/waf_wan.log
         block_mode true
         api_endpoint http://localhost:8081/api
@@ -67,7 +67,7 @@
 }
 
 (waf_lan) {
-    waf {
+    custom_waf {
         log_file /var/log/caddy/waf_lan.log
         block_mode true
         api_endpoint http://localhost:8081/api
