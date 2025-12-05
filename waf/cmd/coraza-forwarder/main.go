@@ -1,3 +1,4 @@
+// cmd/coraza-forwarder/main.go
 package main
 
 import (
@@ -17,14 +18,13 @@ import (
 	"github.com/PiCas19/waf-siem-advanced-detection/waf/internal/logger"
 )
 
-// CorazaAuditLog represents Coraza audit log entry
 type CorazaAuditLog struct {
 	Transaction struct {
 		ClientIP  string `json:"client_ip"`
 		Timestamp string `json:"timestamp"`
 		Request   struct {
-			Method string `json:"method"`
-			URI    string `json:"uri"`
+			Method  string              `json:"method"`
+			URI     string              `json:"uri"`
 			Headers map[string][]string `json:"headers"`
 		} `json:"request"`
 		Response struct {
@@ -48,39 +48,51 @@ type Config struct {
 	PollInterval  time.Duration
 }
 
+var (
+	wafLogger *logger.Logger // globale così lo possiamo chiudere con defer
+)
+
 func main() {
 	config := Config{}
+
 	flag.StringVar(&config.CorazaLogFile, "coraza-log", "/var/log/caddy/coraza_audit.log", "Coraza audit log file")
 	flag.StringVar(&config.WafLogFile, "waf-log", "/var/log/caddy/waf_wan.log", "WAF log file to write to")
 	flag.StringVar(&config.APIEndpoint, "api", "http://localhost:8081/api", "API endpoint for dashboard")
-	flag.DurationVar(&config.PollInterval, "poll", 1*time.Second, "Poll interval for log file")
+	flag.DurationVar(&config.PollInterval, "poll", 1*time.Second, "Poll interval")
 	flag.Parse()
 
-	log.Printf("[INFO] Coraza Log Forwarder starting...")
-	log.Printf("[INFO]   Coraza log: %s", config.CorazaLogFile)
-	log.Printf("[INFO]   WAF log:    %s", config.WafLogFile)
-	log.Printf("[INFO]   API:        %s", config.APIEndpoint)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+	log.Printf("[INFO] Coraza Log Forwarder starting")
+	log.Printf("[INFO] Coraza log → %s", config.CorazaLogFile)
+	log.Printf("[INFO] WAF log    → %s", config.WafLogFile)
+	log.Printf("[INFO] API        → %s/waf/event", config.APIEndpoint)
 
-	// Create WAF logger
-	wafLogger, err := logger.NewLogger(config.WafLogFile)
+	// === INIZIALIZZAZIONE LOGGER WAF (CRITICA) ===
+	var err error
+	wafLogger, err = logger.NewLogger(config.WafLogFile)
 	if err != nil {
-		log.Fatalf("[ERROR] Failed to create WAF logger: %v", err)
+		// NON morire, ma avvisa forte e disabilita scrittura su file
+		log.Printf("[CRITICAL] Impossibile aprire %s in scrittura: %v", config.WafLogFile, err)
+		log.Printf("[CRITICAL] Gli eventi Coraza verranno inviati all'API ma NON salvati in waf_wan.log")
+		wafLogger = nil
+	} else {
+		log.Printf("[INFO] Logger WAF inizializzato correttamente: %s", config.WafLogFile)
+		defer wafLogger.Close() // importantissimo!
 	}
 
-	// Open Coraza log file
+	// === APERTURA FILE CORAZA AUDIT LOG ===
 	file, err := os.Open(config.CorazaLogFile)
 	if err != nil {
-		log.Fatalf("[ERROR] Failed to open Coraza log: %v", err)
+		log.Fatalf("[FATAL] Impossibile aprire il log Coraza %s: %v", config.CorazaLogFile, err)
 	}
 	defer file.Close()
 
-	// Seek to end of file to only process new entries
-	_, err = file.Seek(0, io.SeekEnd)
-	if err != nil {
-		log.Fatalf("[ERROR] Failed to seek to end of file: %v", err)
+	// Vai in fondo al file per leggere solo le nuove righe
+	if _, err := file.Seek(0, io.SeekEnd); err != nil {
+		log.Fatalf("[FATAL] Seek fallito: %v", err)
 	}
 
-	// Setup signal handling for graceful shutdown
+	// Segnali per shutdown pulito
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -88,173 +100,158 @@ func main() {
 	ticker := time.NewTicker(config.PollInterval)
 	defer ticker.Stop()
 
-	log.Printf("[INFO] Monitoring Coraza log file...")
+	log.Printf("[INFO] Monitoring Coraza audit log attivo... premi Ctrl+C per fermare")
 
 	for {
 		select {
 		case <-sigChan:
-			log.Printf("[INFO] Shutting down...")
+			log.Printf("[INFO] Segnale di terminazione ricevuto, esco...")
 			return
 
 		case <-ticker.C:
-			// Read new lines from file
 			for {
 				line, err := reader.ReadString('\n')
 				if err != nil {
 					if err == io.EOF {
-						break
+						break // niente di nuovo
 					}
-					log.Printf("[ERROR] Error reading log: %v", err)
+					log.Printf("[ERROR] Errore lettura log: %v", err)
 					break
 				}
 
-				// Process log line
-				if strings.TrimSpace(line) != "" {
-					processCorazaLog(line, wafLogger, config.APIEndpoint)
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
 				}
+
+				processCorazaLog(line, config.APIEndpoint)
 			}
 		}
 	}
 }
 
-func processCorazaLog(line string, wafLogger *logger.Logger, apiEndpoint string) {
+func processCorazaLog(line string, apiEndpoint string) {
 	var corazaLog CorazaAuditLog
 	if err := json.Unmarshal([]byte(line), &corazaLog); err != nil {
-		// Not JSON, might be plain text log - skip
+		// Non è JSON valido → ignora (può essere header o riga di debug)
 		return
 	}
 
-	// Only process blocked requests (403, 4xx, 5xx)
+	// Ignora richieste non bloccate (solo 4xx/5xx)
 	if corazaLog.Transaction.Response.HTTPCode < 400 {
 		return
 	}
 
-	// Extract threat information from messages
+	// Estrai dati minaccia
 	threatType := "unknown"
 	threatMsg := "OWASP CRS violation"
 	payload := ""
 
 	if len(corazaLog.Transaction.Messages) > 0 {
-		msg := corazaLog.Transaction.Messages[0]
-		if msg.Data.Msg != "" {
-			threatMsg = msg.Data.Msg
+		m := corazaLog.Transaction.Messages[0]
+		if m.Data.Msg != "" {
+			threatMsg = m.Data.Msg
 		}
-		if msg.Message != "" {
-			payload = msg.Message
+		if m.Message != "" {
+			payload = m.Message
 		}
 
-		// Determine threat type from rule file
-		if strings.Contains(msg.Data.File, "XSS") {
+		file := strings.ToUpper(m.Data.File)
+		switch {
+		case strings.Contains(file, "XSS"):
 			threatType = "xss"
-		} else if strings.Contains(msg.Data.File, "SQLI") {
+		case strings.Contains(file, "SQLI"):
 			threatType = "sqli"
-		} else if strings.Contains(msg.Data.File, "RCE") {
+		case strings.Contains(file, "RCE"), strings.Contains(file, "COMMAND"):
 			threatType = "command_injection"
-		} else if strings.Contains(msg.Data.File, "LFI") {
+		case strings.Contains(file, "LFI"), strings.Contains(file, "TRAVERSAL"):
 			threatType = "path_traversal"
-		} else if strings.Contains(msg.Data.File, "RFI") {
+		case strings.Contains(file, "RFI"):
 			threatType = "rfi"
-		} else if strings.Contains(msg.Data.File, "SCANNER") {
-			threatType = "scanner_detection"
-		} else if strings.Contains(msg.Data.File, "PROTOCOL") {
+		case strings.Contains(file, "SCANNER"), strings.Contains(file, "BOT"):
+			threatType = "scanner"
+		case strings.Contains(file, "PROTOCOL"):
 			threatType = "protocol_violation"
 		}
 	}
 
-	// Get User-Agent
+	// User-Agent
 	userAgent := ""
 	if ua, ok := corazaLog.Transaction.Request.Headers["User-Agent"]; ok && len(ua) > 0 {
 		userAgent = ua[0]
 	}
 
-	// Parse timestamp
-	timestamp, _ := time.Parse(time.RFC3339, corazaLog.Transaction.Timestamp)
-	if timestamp.IsZero() {
-		timestamp = time.Now()
+	// Timestamp
+	ts, _ := time.Parse(time.RFC3339, corazaLog.Transaction.Timestamp)
+	if ts.IsZero() {
+		ts = time.Now()
 	}
 
-	// Create LogEntry for WAF log
-	logEntry := logger.LogEntry{
-		Timestamp:       timestamp,
-		ThreatType:      threatType,
-		Severity:        "high",
-		Description:     threatMsg,
-		ClientIP:        corazaLog.Transaction.ClientIP,
-		ClientIPSource:  "remote-addr", // Coraza uses direct IP
-		ClientIPTrusted: false,
-		Method:          corazaLog.Transaction.Request.Method,
-		URL:             corazaLog.Transaction.Request.URI,
-		UserAgent:       userAgent,
-		Payload:         payload,
-		Blocked:         true,
-		BlockedBy:       "coraza", // Blocked by Coraza Layer 1
+	// === SCRITTURA SU waf_wan.log (solo se logger valido) ===
+	if wafLogger != nil {
+		entry := logger.LogEntry{
+			Timestamp:        ts,
+			ThreatType:      threatType,
+			Severity:       "high",
+			Description:      threatMsg,
+			ClientIP:        corazaLog.Transaction.ClientIP,
+			ClientIPSource:  "remote-addr",
+			ClientIPTrusted: false,
+			Method:          corazaLog.Transaction.Request.Method,
+			URL:             corazaLog.Transaction.Request.URI,
+			UserAgent:       userAgent,
+			Payload:         payload,
+			Blocked:         true,
+			BlockedBy:       "coraza",
+		}
+
+		if err := wafLogger.Log(entry); err != nil {
+			log.Printf("[ERROR] Scrittura waf_wan.log fallita: %v", err)
+		} else {
+			log.Printf("[INFO] Coraza → waf_wan.log | %s | %s | %s", 
+				corazaLog.Transaction.ClientIP, threatType, corazaLog.Transaction.Request.URI)
+		}
 	}
 
-	// Write to WAF log
-	if err := wafLogger.Log(logEntry); err != nil {
-		log.Printf("[ERROR] Failed to write to WAF log: %v", err)
-	} else {
-		log.Printf("[INFO] Logged Coraza block: IP=%s, Threat=%s, URL=%s",
-			logEntry.ClientIP, logEntry.ThreatType, logEntry.URL)
-	}
-
-	// Send to dashboard API
-	sendToAPI(logEntry, apiEndpoint)
+	// === INVIO ALL'API (sempre, anche se logger fallisce) ===
+	sendToAPI(corazaLog, apiEndpoint)
 }
 
-func sendToAPI(logEntry logger.LogEntry, apiEndpoint string) {
-	eventPayload := map[string]interface{}{
-		"ip":               logEntry.ClientIP,
-		"ip_source":        logEntry.ClientIPSource,
-		"ip_trusted":       logEntry.ClientIPTrusted,
-		"ip_vpn_reported":  logEntry.ClientIPVPNReport,
-		"threat":           logEntry.ThreatType,
-		"description":      logEntry.Description,
-		"method":           logEntry.Method,
-		"path":             logEntry.URL,
-		"query":            "",
-		"user_agent":       logEntry.UserAgent,
-		"payload":          logEntry.Payload,
-		"timestamp":        logEntry.Timestamp.Format(time.RFC3339),
-		"blocked":          logEntry.Blocked,
-		"blocked_by":       logEntry.BlockedBy,
-
-		// IP detection defaults for Coraza (no advanced detection)
-		"ip_source_type":           "direct",
-		"ip_classification":        "untrusted",
+func sendToAPI(corazaLog CorazaAuditLog, apiEndpoint string) {
+	payload := map[string]interface{}{
+		"ip":                   corazaLog.Transaction.ClientIP,
+		"ip_source":            "direct",
+		"ip_trusted":           false,
+		"ip_source_type":       "direct",
+		"ip_classification":     "untrusted",
+		"threat":               "coraza_crs", // o estrai tipo come sopra se vuoi
+		"description":          "OWASP CRS rule triggered",
+		"method":              corazaLog.Transaction.Request.Method,
+		"path":               corazaLog.Transaction.Request.URI,
+		"user_agent":          "", // puoi estrarlo come sopra se vuoi
+		"payload":             "", // idem
+		"timestamp":           corazaLog.Transaction.Timestamp,
+		"blocked":             true,
+		"blocked_by":          "coraza",
 		"ip_header_signature_valid": false,
 		"ip_is_dmz":                 false,
 		"ip_is_tailscale":           false,
 		"ip_trust_score":            0,
-		"ip_validation_details":     "",
 	}
 
-	jsonData, err := json.Marshal(eventPayload)
-	if err != nil {
-		log.Printf("[ERROR] Failed to marshal event: %v", err)
-		return
-	}
+	jsonData, _ := json.Marshal(payload)
 
-	req, err := http.NewRequest("POST", apiEndpoint+"/waf/event", bytes.NewBuffer(jsonData))
+	resp, err := http.Post(apiEndpoint+"/waf/event", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("[ERROR] Failed to create API request: %v", err)
-		return
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Printf("[ERROR] Failed to send event to API: %v", err)
+		log.Printf("[ERROR] Invio API fallito: %v", err)
 		return
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		log.Printf("[WARN] API returned status %d", resp.StatusCode)
+	if resp.StatusCode >= 300 {
+		log.Printf("[WARN] API ha risposto con status %d", resp.StatusCode)
 	} else {
-		log.Printf("[INFO] Event sent to dashboard: IP=%s, Threat=%s",
-			logEntry.ClientIP, logEntry.ThreatType)
+		log.Printf("[INFO] Evento Coraza inviato al dashboard | IP: %s | Code: %d",
+			corazaLog.Transaction.ClientIP, corazaLog.Transaction.Response.HTTPCode)
 	}
 }
