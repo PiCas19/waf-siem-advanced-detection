@@ -10,26 +10,30 @@ echo "[INFO]   Layer 1: Coraza WAF (OWASP ModSecurity Core Rule Set)"
 echo "[INFO]   Layer 2: Custom WAF (Business Logic, IP Intelligence)"
 echo ""
 
-# Get absolute path to project directory (before any cd commands)
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WAF_DIR="$PROJECT_DIR"
+# Get absolute paths
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WAF_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONFIGS_DIR="$WAF_DIR/configs"
 
 # Verify required files exist
 echo "[INFO] Verifying required files..."
-if [ ! -f "$WAF_DIR/coraza.conf" ]; then
-    echo "[ERROR] coraza.conf not found in $WAF_DIR"
+if [ ! -f "$CONFIGS_DIR/coraza.conf" ]; then
+    echo "[ERROR] coraza.conf not found in $CONFIGS_DIR"
     exit 1
 fi
-if [ ! -f "$WAF_DIR/Caddyfile" ]; then
-    echo "[ERROR] Caddyfile not found in $WAF_DIR"
+if [ ! -f "$CONFIGS_DIR/Caddyfile" ]; then
+    echo "[ERROR] Caddyfile not found in $CONFIGS_DIR"
     exit 1
 fi
-if [ ! -f "$WAF_DIR/build-caddy-coraza.sh" ]; then
-    echo "[ERROR] build-caddy-coraza.sh not found in $WAF_DIR"
+if [ ! -f "$SCRIPT_DIR/build-caddy-coraza.sh" ]; then
+    echo "[ERROR] build-caddy-coraza.sh not found in $SCRIPT_DIR"
     exit 1
 fi
 
-echo "[INFO] All required files found in $WAF_DIR"
+echo "[INFO] All required files found"
+echo "[INFO]   WAF directory:    $WAF_DIR"
+echo "[INFO]   Configs directory: $CONFIGS_DIR"
+echo "[INFO]   Scripts directory: $SCRIPT_DIR"
 echo ""
 
 # 1. Create directories
@@ -83,11 +87,11 @@ sudo rm -f coreruleset.tar.gz
 
 # 3. Copy Coraza configuration
 echo "[STEP 3/12] Copying Coraza configuration..."
-sudo cp "$WAF_DIR/coraza.conf" /etc/caddy/waf/coraza.conf
+sudo cp "$CONFIGS_DIR/coraza.conf" /etc/caddy/waf/coraza.conf
 
 # 4. Copy updated Caddyfile
 echo "[STEP 4/12] Copying updated Caddyfile..."
-sudo cp "$WAF_DIR/Caddyfile" /etc/caddy/Caddyfile
+sudo cp "$CONFIGS_DIR/Caddyfile" /etc/caddy/Caddyfile
 
 # 5. Set proper permissions
 echo "[STEP 5/12] Setting permissions..."
@@ -98,7 +102,7 @@ sudo chmod 644 /etc/caddy/Caddyfile
 
 # 6. Build Caddy with all modules
 echo "[STEP 6/12] Building Caddy with Coraza + Custom WAF + Tailscale..."
-cd "$WAF_DIR"
+cd "$SCRIPT_DIR"
 chmod +x build-caddy-coraza.sh
 ./build-caddy-coraza.sh
 

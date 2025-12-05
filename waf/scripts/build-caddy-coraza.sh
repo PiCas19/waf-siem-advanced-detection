@@ -15,8 +15,9 @@ echo "[INFO]   - Custom WAF (Business Logic + IP Intelligence)"
 echo "[INFO]   - Tailscale VPN"
 echo ""
 
-# Get absolute path to WAF module
-WAF_MODULE_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Get absolute path to WAF module (parent directory of scripts/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WAF_MODULE_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "[INFO] WAF module path: $WAF_MODULE_PATH"
 echo ""
