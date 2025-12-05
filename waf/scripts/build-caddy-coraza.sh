@@ -33,15 +33,18 @@ echo "[INFO] xcaddy version:"
 xcaddy version
 echo ""
 
+# Build in WAF directory (not in scripts/)
+cd "$WAF_MODULE_PATH"
+
 # Build Caddy with all modules
-echo "[INFO] Building Caddy..."
+echo "[INFO] Building Caddy in $WAF_MODULE_PATH..."
 xcaddy build v2.10.2 \
     --with github.com/corazawaf/coraza-caddy/v2@latest \
     --with github.com/PiCas19/waf-siem-advanced-detection/waf="$WAF_MODULE_PATH" \
     --with github.com/tailscale/caddy-tailscale
 
 # Verify build succeeded
-if [ ! -f "./caddy" ]; then
+if [ ! -f "$WAF_MODULE_PATH/caddy" ]; then
     echo "[ERROR] Build failed - caddy binary not found"
     exit 1
 fi
@@ -52,14 +55,14 @@ echo ""
 
 # Show binary info
 echo "[INFO] Binary info:"
-ls -lh ./caddy
+ls -lh "$WAF_MODULE_PATH/caddy"
 echo ""
 
 # List loaded modules
 echo "[INFO] Verifying modules..."
-./caddy list-modules | grep -E '(coraza|waf|tailscale)' || true
+"$WAF_MODULE_PATH/caddy" list-modules | grep -E '(coraza|waf|tailscale)' || true
 echo ""
 
 echo "[SUCCESS] Build complete!"
-echo "[INFO] Binary location: ./caddy"
+echo "[INFO] Binary location: $WAF_MODULE_PATH/caddy"
 echo "[INFO] To install: sudo cp ./caddy /usr/bin/caddy"
