@@ -17,10 +17,10 @@ sudo mkdir -p /var/log/caddy
 
 # 2. Download OWASP Core Rule Set
 echo "[STEP 2/12] Downloading OWASP Core Rule Set v4.0..."
-cd /tmp
 
-# Remove old file if exists
-rm -f coreruleset.tar.gz
+# Create temporary directory with proper permissions
+TMPDIR=$(mktemp -d)
+cd "$TMPDIR"
 
 # Download with progress and retries
 wget --show-progress --tries=3 --timeout=30 \
@@ -30,32 +30,37 @@ wget --show-progress --tries=3 --timeout=30 \
 # Verify download succeeded
 if [ ! -f coreruleset.tar.gz ]; then
     echo "[ERROR] Download failed"
+    cd - > /dev/null
+    rm -rf "$TMPDIR"
     exit 1
 fi
 
 # Verify file is not empty
 if [ ! -s coreruleset.tar.gz ]; then
     echo "[ERROR] Downloaded file is empty"
-    rm -f coreruleset.tar.gz
+    cd - > /dev/null
+    rm -rf "$TMPDIR"
     exit 1
 fi
 
 # Extract
 echo "[STEP 2/12] Extracting OWASP Core Rule Set..."
-sudo tar -xzf coreruleset.tar.gz -C /etc/caddy/waf/
+tar -xzf coreruleset.tar.gz
 
 # Verify extraction succeeded
-if [ ! -d /etc/caddy/waf/coraza-coreruleset-4.0.0 ]; then
+if [ ! -d coraza-coreruleset-4.0.0 ]; then
     echo "[ERROR] Extraction failed"
-    rm -f coreruleset.tar.gz
+    cd - > /dev/null
+    rm -rf "$TMPDIR"
     exit 1
 fi
 
 # Move to final location
-sudo mv /etc/caddy/waf/coraza-coreruleset-4.0.0 /etc/caddy/waf/coreruleset
+sudo mv coraza-coreruleset-4.0.0 /etc/caddy/waf/coreruleset
 
 # Cleanup
-rm -f coreruleset.tar.gz
+cd - > /dev/null
+rm -rf "$TMPDIR"
 
 # 3. Copy Coraza configuration
 echo "[STEP 3/12] Copying Coraza configuration..."
