@@ -5,8 +5,8 @@
 
 set -e
 
-# Add Go to PATH
-export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
+# Add Go and xcaddy to PATH
+export PATH=$PATH:/usr/local/go/bin:/usr/local/bin:$HOME/go/bin
 
 echo "[INFO] Building Caddy with all modules..."
 echo "[INFO]   - Caddy v2.10.2"
