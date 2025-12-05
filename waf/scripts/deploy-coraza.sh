@@ -112,7 +112,7 @@ sudo systemctl stop caddy
 
 # 8. Replace Caddy binary
 echo "[STEP 8/12] Replacing Caddy binary..."
-sudo cp ./caddy /usr/bin/caddy
+sudo mv "$WAF_DIR/caddy" /usr/bin/caddy
 sudo chmod +x /usr/bin/caddy
 sudo setcap CAP_NET_BIND_SERVICE=+eip /usr/bin/caddy
 
