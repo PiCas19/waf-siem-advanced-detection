@@ -14,6 +14,24 @@ echo ""
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WAF_DIR="$PROJECT_DIR"
 
+# Verify required files exist
+echo "[INFO] Verifying required files..."
+if [ ! -f "$WAF_DIR/coraza.conf" ]; then
+    echo "[ERROR] coraza.conf not found in $WAF_DIR"
+    exit 1
+fi
+if [ ! -f "$WAF_DIR/Caddyfile" ]; then
+    echo "[ERROR] Caddyfile not found in $WAF_DIR"
+    exit 1
+fi
+if [ ! -f "$WAF_DIR/build-caddy-coraza.sh" ]; then
+    echo "[ERROR] build-caddy-coraza.sh not found in $WAF_DIR"
+    exit 1
+fi
+
+echo "[INFO] All required files found in $WAF_DIR"
+echo ""
+
 # 1. Create directories
 echo "[STEP 1/12] Creating directories..."
 sudo mkdir -p /etc/caddy/waf
