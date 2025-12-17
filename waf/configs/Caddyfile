@@ -109,32 +109,112 @@
         import tls_config
     }
 
-    # Finance Application
-    route /finance* {
+    # Finance Application - Express Server
+    handle /finance* {
         import coraza_layer
         import waf_wan
         
-        # Riscrivi tutto a / (root del backend)
-        rewrite * /
-        reverse_proxy 172.16.216.30:3000 {
-            import reverse_proxy_config
+        # 1. API routes - rimuovi /finance prefix
+        @api {
+            path /finance/api/*
+        }
+        handle @api {
+            uri strip_prefix /finance
+            reverse_proxy 172.16.216.30:3000 {
+                import reverse_proxy_config
+            }
+        }
+        
+        # 2. Health check - rimuovi /finance prefix
+        @health {
+            path /finance/health
+        }
+        handle @health {
+            uri strip_prefix /finance
+            reverse_proxy 172.16.216.30:3000 {
+                import reverse_proxy_config
+            }
+        }
+        
+        # 3. File statici - rimuovi /finance prefix
+        @static {
+            path_regexp \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map|json)$
+        }
+        handle @static {
+            uri strip_prefix /finance
+            reverse_proxy 172.16.216.30:3000 {
+                import reverse_proxy_config
+            }
+        }
+        
+        # 4. SPA - tutto va alla root del backend
+        handle {
+            rewrite * /
+            reverse_proxy 172.16.216.30:3000 {
+                import reverse_proxy_config
+                header_up X-Original-Path {http.request.uri}
+            }
         }
     }
 
-    # Industrial Application
-    route /industrial* {
+    # Industrial Application - Express Server
+    handle /industrial* {
         import coraza_layer
         import waf_wan
         
-        # Riscrivi tutto a / (root del backend)
-        rewrite * /
-        reverse_proxy 172.16.216.20:3001 {
-            import reverse_proxy_config
+        # 1. API routes - rimuovi /industrial prefix
+        @api {
+            path /industrial/api/*
+        }
+        handle @api {
+            uri strip_prefix /industrial
+            reverse_proxy 172.16.216.20:3001 {
+                import reverse_proxy_config
+            }
+        }
+        
+        # 2. Health check - rimuovi /industrial prefix
+        @health {
+            path /industrial/health
+        }
+        handle @health {
+            uri strip_prefix /industrial
+            reverse_proxy 172.16.216.20:3001 {
+                import reverse_proxy_config
+            }
+        }
+        
+        # 3. File statici - rimuovi /industrial prefix
+        @static {
+            path_regexp \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|map|json)$
+        }
+        handle @static {
+            uri strip_prefix /industrial
+            reverse_proxy 172.16.216.20:3001 {
+                import reverse_proxy_config
+            }
+        }
+        
+        # 4. SPA - tutto va alla root del backend
+        handle {
+            rewrite * /
+            reverse_proxy 172.16.216.20:3001 {
+                import reverse_proxy_config
+                header_up X-Original-Path {http.request.uri}
+            }
         }
     }
 
     # Block everything else
-    respond "Not Found" 404
+    handle {
+        respond "Not Found" 404
+    }
+
+    # Logging
+    log {
+        output file /var/log/caddy/access_wan.log
+        format json
+    }
 }
 
 # ==============================================================================
