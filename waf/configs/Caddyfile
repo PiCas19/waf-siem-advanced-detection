@@ -109,23 +109,33 @@
         import tls_config
     }
 
-    # Finance Application
+    # Finance Application - SIMPLE FIX
     handle /finance* {
         import coraza_layer
         import waf_wan
-
-       try_files {path} /finance/index.html
+        
+        # Riscrivi la root a index.html
+        @root path /finance /finance/
+        handle @root {
+            rewrite * /finance/index.html
+        }
+        
         reverse_proxy 172.16.216.30:3000 {
             import reverse_proxy_config
         }
     }
 
-    # Industrial Application
+    # Industrial Application - SIMPLE FIX
     handle /industrial* {
         import coraza_layer
         import waf_wan
-
-        try_files {path} /industrial/index.html
+        
+        # Riscrivi la root a index.html
+        @root path /industrial /industrial/
+        handle @root {
+            rewrite * /industrial/index.html
+        }
+        
         reverse_proxy 172.16.216.20:3001 {
             import reverse_proxy_config
         }
@@ -142,6 +152,7 @@
         format json
     }
 }
+
 
 # ==============================================================================
 # LAN - Port 8080 (HTTP) - Full Dashboard Access
