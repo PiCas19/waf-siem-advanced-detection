@@ -114,7 +114,6 @@
         import coraza_layer
         import waf_wan
 
-        uri strip_prefix /finance
         reverse_proxy 172.16.216.30:3000 {
             import reverse_proxy_config
         }
@@ -125,7 +124,6 @@
         import coraza_layer
         import waf_wan
 
-        uri strip_prefix /industrial
         reverse_proxy 172.16.216.20:3001 {
             import reverse_proxy_config
         }
