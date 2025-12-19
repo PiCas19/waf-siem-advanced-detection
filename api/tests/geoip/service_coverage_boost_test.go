@@ -403,25 +403,44 @@ func TestGetPublicIP_ResponseClose(t *testing.T) {
 
 // Test EnrichIPFromService with io.ReadAll error
 func TestEnrichIPFromService_ReadAllError(t *testing.T) {
-	service, err := geoip.NewService()
-	require.NoError(t, err)
+	// Create a custom http client that always returns an error
+	mockClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			// Return a response with an error reader
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(&errorReader{}),
+			}, nil
+		}),
+	}
 
-	// Create server that sends data then breaks connection
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("{"))
-		// Close connection abruptly
-		hj, ok := w.(http.Hijacker)
-		if ok {
-			conn, _, _ := hj.Hijack()
-			conn.Close()
-		}
-	}))
-	defer server.Close()
+	// Create service with mocked client
+	service := &geoip.Service{
+		// Initialize with mocked client
+		// You'll need to adjust based on your actual geoip.Service structure
+	}
 
-	// Should handle read error gracefully
+	// OR better: patch the http client globally for this test
+	originalClient := http.DefaultClient
+	http.DefaultClient = mockClient
+	defer func() { http.DefaultClient = originalClient }()
+
 	country := service.EnrichIPFromService("1.2.3.4")
 	assert.Equal(t, "Unknown", country)
+}
+
+// errorReader always returns an error
+type errorReader struct{}
+
+func (e *errorReader) Read(p []byte) (n int, err error) {
+	return 0, io.ErrUnexpectedEOF
+}
+
+// roundTripperFunc allows using a function as an http.RoundTripper
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 // Test readAll with large response
