@@ -104,6 +104,30 @@ export default [
       '@typescript-eslint/no-unsafe-function-type': 'off',
     },
   },
+  // TypeScript declaration files
+  {
+    files: ['**/*.d.ts'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: {
+        ...globals.browser,
+      },
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      ...tseslint.configs['recommended'].rules,
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
+  },
   // Config files
   {
     files: ['*.config.{ts,js,mjs}', 'vite.config.ts', 'vitest.config.ts', 'cypress.config.ts'],
