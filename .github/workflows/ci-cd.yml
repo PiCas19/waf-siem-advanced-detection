@@ -340,13 +340,10 @@ jobs:
           path: waf/coverage.html
           retention-days: 7
 
-  # ============================================
-  # TEST DASHBOARD MODIFICATO
-  # ============================================
   test-dashboard:
     name: Test Dashboard
     runs-on: ubuntu-latest
-    timeout-minutes: 20  # Aumentato da default
+    timeout-minutes: 20
     needs: install-and-lint
 
     steps:
@@ -360,37 +357,26 @@ jobs:
           echo "Current timezone: $(cat /etc/timezone)"
           echo "Current time: $(date)"
 
-      - name: Setup Node.js with cache
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: dashboard/package-lock.json
+          cache-dependency-path: 'dashboard/package-lock.json'
 
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        id: npm-cache
-        with:
-          path: |
-            ~/.npm
-            dashboard/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('dashboard/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+      - name: Create npm cache directory if not exists
+        run: |
+          mkdir -p ~/.npm
+          echo "npm cache directory created at: $(ls -la ~/.npm 2>/dev/null || echo 'not exists')"
 
-      - name: Check package-lock.json
+      - name: Install dependencies
         working-directory: ./dashboard
         run: |
-          if [ ! -f "package-lock.json" ]; then
-            echo "Error: package-lock.json not found in test-dashboard"
-            echo "Generating package-lock.json..."
-            npm install --package-lock-only --no-audit
-          fi
-
-      - name: Install dependencies with optimizations
-        working-directory: ./dashboard
-        run: |
-          npm ci --no-optional --ignore-scripts
+          # Clean npm cache first
+          npm cache clean --force
+          
+          # Install with optimizations for CI
+          npm ci --no-optional --ignore-scripts --no-audit --no-fund
 
       - name: Check system resources
         working-directory: ./dashboard
@@ -401,16 +387,17 @@ jobs:
           echo "CPU cores: $(nproc)"
           echo "Memory:"
           free -h
-          echo "=== Node.js memory ==="
-          node -e "console.log('Memory usage:', JSON.stringify(process.memoryUsage(), null, 2))"
+          echo "=== Current directory ==="
+          pwd
+          ls -la
 
-      - name: Set Node.js timezone environment
+      - name: Set environment variables
         run: |
           echo "NODE_TZ=Europe/Zurich" >> $GITHUB_ENV
           echo "TZ=Europe/Zurich" >> $GITHUB_ENV
           echo "CI=true" >> $GITHUB_ENV
 
-      - name: Run unit tests with increased timeout
+      - name: Run unit tests with optimizations
         working-directory: ./dashboard
         env:
           TZ: Europe/Zurich
@@ -419,21 +406,36 @@ jobs:
           CI: true
         run: |
           # Configura Node.js per CI
-          export NODE_OPTIONS="--max-old-space-size=4096 --max-semi-space-size=512"
+          export NODE_OPTIONS="--max-old-space-size=4096"
           
-          echo "Running tests with CI optimizations..."
+          echo "=== Running tests in CI mode ==="
           
-          # Primo tentativo con timeout aumentato
-          npm run test:run -- \
-            --no-watch \
-            --reporter=verbose \
-            --testTimeout=30000 \
-            --hookTimeout=30000 \
-            --maxWorkers=2 \
-            --bail=0 \
-            --poolOptions.threads.singleThread=true
+          # Controlla se package.json ha script test:run
+          echo "Available npm scripts:"
+          npm run
+          
+          # Esegui i test con timeout aumentato
+          # Se hai uno script test:run nel package.json
+          if grep -q '"test:run"' package.json; then
+            echo "Using npm run test:run"
+            npm run test:run -- \
+              --no-watch \
+              --reporter=verbose \
+              --testTimeout=30000 \
+              --hookTimeout=30000 \
+              --maxWorkers=2
+          else
+            echo "Using npx vitest directly"
+            npx vitest run \
+              --no-watch \
+              --reporter=verbose \
+              --testTimeout=30000 \
+              --hookTimeout=30000 \
+              --maxWorkers=2
+          fi
 
-      - name: Generate coverage
+      - name: Generate coverage (se il test passa)
+        if: success()
         working-directory: ./dashboard
         env:
           TZ: Europe/Zurich
@@ -442,12 +444,23 @@ jobs:
           CI: true
         run: |
           export NODE_OPTIONS="--max-old-space-size=4096"
-          npm run test:coverage -- \
-            --testTimeout=30000 \
-            --hookTimeout=30000 \
-            --maxWorkers=1
+          
+          if grep -q '"test:coverage"' package.json; then
+            echo "Using npm run test:coverage"
+            npm run test:coverage -- \
+              --testTimeout=30000 \
+              --hookTimeout=30000 \
+              --maxWorkers=1
+          else
+            echo "Using npx vitest coverage directly"
+            npx vitest run --coverage \
+              --testTimeout=30000 \
+              --hookTimeout=30000 \
+              --maxWorkers=1
+          fi
 
       - name: Upload coverage
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: dashboard-coverage
