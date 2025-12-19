@@ -16,6 +16,10 @@ jobs:
   gosec:
     name: Go Security Scan (gosec)
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
 
     steps:
       - name: Checkout code
@@ -34,14 +38,14 @@ jobs:
           args: '-fmt sarif -out gosec-waf-results.sarif ./waf/...'
 
       - name: Upload Gosec results (API)
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always() && hashFiles('gosec-api-results.sarif') != ''
         with:
           sarif_file: gosec-api-results.sarif
           category: gosec-api
 
       - name: Upload Gosec results (WAF)
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always() && hashFiles('gosec-waf-results.sarif') != ''
         with:
           sarif_file: gosec-waf-results.sarif
@@ -126,15 +130,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
 
