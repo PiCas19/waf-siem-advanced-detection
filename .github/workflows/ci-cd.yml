@@ -39,23 +39,61 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            api/go.sum
+            waf/go.sum
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Tidy Go modules (API)
+      - name: Cache Go modules (API)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            api/.cache/go-build
+          key: ${{ runner.os }}-go-api-${{ hashFiles('api/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-api-
+
+      - name: Cache Go modules (WAF)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            waf/.cache/go-build
+          key: ${{ runner.os }}-go-waf-${{ hashFiles('waf/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-waf-
+
+      - name: Generate go.sum if missing (API)
         working-directory: ./api
         run: |
-          go mod tidy
-          go mod verify
+          if [ ! -f "go.sum" ]; then
+            echo "go.sum not found, generating with go mod tidy..."
+            go mod tidy
+            echo "go.sum generated successfully"
+          else
+            echo "go.sum exists, verifying..."
+            go mod tidy
+            go mod verify
+          fi
 
-      - name: Tidy Go modules (WAF)
+      - name: Generate go.sum if missing (WAF)
         working-directory: ./waf
         run: |
-          go mod tidy
-          go mod verify
+          if [ ! -f "go.sum" ]; then
+            echo "go.sum not found, generating with go mod tidy..."
+            go mod tidy
+            echo "go.sum generated successfully"
+          else
+            echo "go.sum exists, verifying..."
+            go mod tidy
+            go mod verify
+          fi
 
       - name: Install Go dependencies (API)
         working-directory: ./api
@@ -72,7 +110,6 @@ jobs:
       - name: Check and create package-lock.json if missing
         working-directory: ./dashboard
         run: |
-          # Check if package-lock.json exists
           if [ ! -f "package-lock.json" ]; then
             echo "package-lock.json not found, generating..."
             npm install --package-lock-only --no-audit
@@ -81,11 +118,6 @@ jobs:
             echo "package-lock.json found, proceeding with npm ci"
           fi
 
-      - name: Install Node.js dependencies (Dashboard)
-        working-directory: ./dashboard
-        run: npm ci
-
-      # Cache npm dependencies
       - name: Cache npm dependencies
         uses: actions/cache@v4
         with:
@@ -93,6 +125,10 @@ jobs:
           key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-npm-
+
+      - name: Install Node.js dependencies (Dashboard)
+        working-directory: ./dashboard
+        run: npm ci
 
       - name: Lint Dashboard
         working-directory: ./dashboard
@@ -121,6 +157,46 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: api/go.sum
+
+      - name: Cache Go modules for API tests
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            api/.cache/go-build
+          key: ${{ runner.os }}-go-api-tests-${{ hashFiles('api/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-api-tests-
+
+      - name: Debug directory structure (API)
+        working-directory: ./api
+        run: |
+          echo "=== API Directory structure ==="
+          find . -type f -name "*.go" | head -20
+          echo "=== API Test files ==="
+          find . -name "*_test.go" | head -20
+          echo "=== go.mod content ==="
+          cat go.mod
+          echo "=== go.sum exists? ==="
+          ls -la go.sum 2>/dev/null || echo "go.sum not found"
+
+      - name: Verify go.sum exists (API)
+        working-directory: ./api
+        run: |
+          if [ ! -f "go.sum" ]; then
+            echo "ERROR: go.sum not found! Generating..."
+            go mod tidy
+            if [ ! -f "go.sum" ]; then
+              echo "CRITICAL ERROR: Failed to generate go.sum!"
+              exit 1
+            fi
+            echo "go.sum generated successfully"
+          else
+            echo "go.sum exists"
+            go mod verify
+          fi
 
       - name: Tidy Go modules
         working-directory: ./api
@@ -128,11 +204,29 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./api
-        run: go mod download
+        run: |
+          go mod download
+          go mod verify
 
       - name: Run API tests with coverage
         working-directory: ./api
-        run: go test -coverprofile=coverage.out ./tests/... -coverpkg=./internal/... -v
+        env:
+          NODE_ENV: "test"
+          TZ: "Europe/Zurich"
+          DB_CONNECTION: "sqlite://:memory:"
+          TEST_MODE: "true"
+        run: |
+          echo "Running API tests..."
+          if [ -d "./tests" ]; then
+            echo "Running tests from ./tests/ directory..."
+            go test -coverprofile=coverage.out ./tests/... -coverpkg=./internal/... -v
+          elif [ -d "./test" ]; then
+            echo "Running tests from ./test/ directory..."
+            go test -coverprofile=coverage.out ./test/... -coverpkg=./internal/... -v
+          else
+            echo "No specific tests directory found, running all tests..."
+            go test -coverprofile=coverage.out ./... -v
+          fi
 
       - name: Generate coverage report
         working-directory: ./api
@@ -165,6 +259,46 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: waf/go.sum
+
+      - name: Cache Go modules for WAF tests
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            waf/.cache/go-build
+          key: ${{ runner.os }}-go-waf-tests-${{ hashFiles('waf/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-waf-tests-
+
+      - name: Debug directory structure (WAF)
+        working-directory: ./waf
+        run: |
+          echo "=== WAF Directory structure ==="
+          find . -type f -name "*.go" | head -20
+          echo "=== WAF Test files ==="
+          find . -name "*_test.go" | head -20
+          echo "=== go.mod content ==="
+          cat go.mod
+          echo "=== go.sum exists? ==="
+          ls -la go.sum 2>/dev/null || echo "go.sum not found"
+
+      - name: Verify go.sum exists (WAF)
+        working-directory: ./waf
+        run: |
+          if [ ! -f "go.sum" ]; then
+            echo "ERROR: go.sum not found! Generating..."
+            go mod tidy
+            if [ ! -f "go.sum" ]; then
+              echo "CRITICAL ERROR: Failed to generate go.sum!"
+              exit 1
+            fi
+            echo "go.sum generated successfully"
+          else
+            echo "go.sum exists"
+            go mod verify
+          fi
 
       - name: Tidy Go modules
         working-directory: ./waf
@@ -172,11 +306,28 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./waf
-        run: go mod download
+        run: |
+          go mod download
+          go mod verify
 
       - name: Run WAF tests with coverage
         working-directory: ./waf
-        run: go test -coverprofile=coverage.out ./tests/... -coverpkg=./internal/... -v
+        env:
+          NODE_ENV: "test"
+          TZ: "Europe/Zurich"
+          TEST_MODE: "true"
+        run: |
+          echo "Running WAF tests..."
+          if [ -d "./tests" ]; then
+            echo "Running tests from ./tests/ directory..."
+            go test -coverprofile=coverage.out ./tests/... -coverpkg=./internal/... -v
+          elif [ -d "./test" ]; then
+            echo "Running tests from ./test/ directory..."
+            go test -coverprofile=coverage.out ./test/... -coverpkg=./internal/... -v
+          else
+            echo "No specific tests directory found, running all tests..."
+            go test -coverprofile=coverage.out ./... -v
+          fi
 
       - name: Generate coverage report
         working-directory: ./waf
@@ -210,7 +361,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # First restore npm cache
       - name: Restore npm cache
         uses: actions/cache@v4
         with:
@@ -232,7 +382,6 @@ jobs:
         working-directory: ./dashboard
         run: npm ci
 
-      # Set timezone also for Node.js tests
       - name: Set Node.js timezone environment
         run: |
           echo "NODE_TZ=Europe/Zurich" >> $GITHUB_ENV
@@ -243,6 +392,7 @@ jobs:
         env:
           TZ: Europe/Zurich
           NODE_TZ: Europe/Zurich
+          NODE_ENV: test
         run: npm run test:run
 
       - name: Generate coverage
@@ -250,6 +400,7 @@ jobs:
         env:
           TZ: Europe/Zurich
           NODE_TZ: Europe/Zurich
+          NODE_ENV: test
         run: npm run test:coverage
 
       - name: Upload coverage
@@ -281,6 +432,31 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: api/go.sum
+
+      - name: Cache Go modules for API build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            api/.cache/go-build
+          key: ${{ runner.os }}-go-api-build-${{ hashFiles('api/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-api-build-
+
+      - name: Verify go.sum exists (API Build)
+        working-directory: ./api
+        run: |
+          if [ ! -f "go.sum" ]; then
+            echo "ERROR: go.sum not found! Generating..."
+            go mod tidy
+            if [ ! -f "go.sum" ]; then
+              echo "CRITICAL ERROR: Failed to generate go.sum!"
+              exit 1
+            fi
+            echo "go.sum generated successfully"
+          fi
 
       - name: Tidy Go modules
         working-directory: ./api
@@ -288,11 +464,14 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./api
-        run: go mod download
+        run: |
+          go mod download
+          go mod verify
 
       - name: Build API server
         working-directory: ./api
         run: |
+          mkdir -p bin
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/api-server-linux-amd64 ./cmd/api-server
           CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/api-server-darwin-amd64 ./cmd/api-server
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/api-server-darwin-arm64 ./cmd/api-server
@@ -324,6 +503,31 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: waf/go.sum
+
+      - name: Cache Go modules for WAF build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            waf/.cache/go-build
+          key: ${{ runner.os }}-go-waf-build-${{ hashFiles('waf/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-waf-build-
+
+      - name: Verify go.sum exists (WAF Build)
+        working-directory: ./waf
+        run: |
+          if [ ! -f "go.sum" ]; then
+            echo "ERROR: go.sum not found! Generating..."
+            go mod tidy
+            if [ ! -f "go.sum" ]; then
+              echo "CRITICAL ERROR: Failed to generate go.sum!"
+              exit 1
+            fi
+            echo "go.sum generated successfully"
+          fi
 
       - name: Tidy Go modules
         working-directory: ./waf
@@ -331,7 +535,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./waf
-        run: go mod download
+        run: |
+          go mod download
+          go mod verify
 
       - name: Install xcaddy
         run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
@@ -380,7 +586,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # First restore npm cache
       - name: Restore npm cache
         uses: actions/cache@v4
         with:
@@ -455,25 +660,20 @@ jobs:
 
       - name: Copy configurations and scripts
         run: |
-          # Copy WAF configs
           mkdir -p ./release/waf/configs
           cp -r waf/configs/* ./release/waf/configs/ 2>/dev/null || true
 
-          # Copy WAF scripts
           mkdir -p ./release/waf/scripts
           cp -r waf/scripts/* ./release/waf/scripts/ 2>/dev/null || true
 
-          # Copy API scripts
           mkdir -p ./release/api/scripts
           cp -r api/scripts/* ./release/api/scripts/ 2>/dev/null || true
 
-          # Copy documentation
           mkdir -p ./release/docs
           cp -r docs/* ./release/docs/ 2>/dev/null || true
           cp README.md ./release/ 2>/dev/null || true
           cp LICENSE ./release/ 2>/dev/null || true
 
-          # Copy sample apps
           mkdir -p ./release/app
           cp -r app/* ./release/app/ 2>/dev/null || true
 
