@@ -357,47 +357,69 @@ jobs:
           echo "Current timezone: $(cat /etc/timezone)"
           echo "Current time: $(date)"
 
-      - name: Setup Node.js
+      - name: Setup Node.js (SENZA CACHE)
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: 'dashboard/package-lock.json'
-
-      - name: Create npm cache directory if not exists
-        run: |
-          mkdir -p ~/.npm
-          echo "npm cache directory created at: $(ls -la ~/.npm 2>/dev/null || echo 'not exists')"
+          # NIENTE CACHE - rimuoviamo il problema
 
       - name: Install dependencies
         working-directory: ./dashboard
         run: |
-          # Clean npm cache first
-          npm cache clean --force
+          # Pulisci cache manualmente
+          npm cache clean --force 2>/dev/null || true
           
-          # Install with optimizations for CI
-          npm ci --no-optional --ignore-scripts --no-audit --no-fund
+          # Installa normalmente
+          npm ci
 
-      - name: Check system resources
+      - name: Increase test timeout globally
         working-directory: ./dashboard
         run: |
-          echo "=== System Information ==="
-          echo "Node.js version: $(node --version)"
-          echo "NPM version: $(npm --version)"
-          echo "CPU cores: $(nproc)"
-          echo "Memory:"
-          free -h
-          echo "=== Current directory ==="
-          pwd
-          ls -la
+          # Aggiungi timeout globale nel package.json o crea file di configurazione
+          if [ -f "vitest.config.ts" ] || [ -f "vitest.config.js" ]; then
+            echo "Vitest config found, modifying..."
+            # Crea backup e modifica
+            cp vitest.config.ts vitest.config.ts.backup 2>/dev/null || cp vitest.config.js vitest.config.js.backup 2>/dev/null || true
+            
+            # Crea config temporaneo
+            cat > vitest.config.ci.ts << 'EOF'
+            import { defineConfig } from 'vitest/config';
+            import react from '@vitejs/plugin-react';
 
-      - name: Set environment variables
-        run: |
-          echo "NODE_TZ=Europe/Zurich" >> $GITHUB_ENV
-          echo "TZ=Europe/Zurich" >> $GITHUB_ENV
-          echo "CI=true" >> $GITHUB_ENV
+            export default defineConfig({
+              plugins: [react()],
+              test: {
+                environment: 'jsdom',
+                globals: true,
+                testTimeout: 30000,
+                hookTimeout: 30000,
+                setupFiles: ['./src/test/setup.ts'],
+              },
+            });
+            EOF
+            
+            # Usa config CI
+            cp vitest.config.ci.ts vitest.config.ts 2>/dev/null || cp vitest.config.ci.ts vitest.config.js 2>/dev/null || true
+          else
+            echo "Creating vitest config for CI..."
+            cat > vitest.config.ts << 'EOF'
+            import { defineConfig } from 'vitest/config';
+            import react from '@vitejs/plugin-react';
 
-      - name: Run unit tests with optimizations
+            export default defineConfig({
+              plugins: [react()],
+              test: {
+                environment: 'jsdom',
+                globals: true,
+                testTimeout: 30000,
+                hookTimeout: 30000,
+                setupFiles: ['./src/test/setup.ts'],
+              },
+            });
+            EOF
+          fi
+
+      - name: Run tests with increased timeout
         working-directory: ./dashboard
         env:
           TZ: Europe/Zurich
@@ -405,36 +427,24 @@ jobs:
           NODE_ENV: test
           CI: true
         run: |
-          # Configura Node.js per CI
+          # Aumenta memoria Node.js
           export NODE_OPTIONS="--max-old-space-size=4096"
           
-          echo "=== Running tests in CI mode ==="
+          echo "=== Running tests with 30s timeout ==="
           
-          # Controlla se package.json ha script test:run
-          echo "Available npm scripts:"
-          npm run
-          
-          # Esegui i test con timeout aumentato
-          # Se hai uno script test:run nel package.json
-          if grep -q '"test:run"' package.json; then
-            echo "Using npm run test:run"
-            npm run test:run -- \
-              --no-watch \
-              --reporter=verbose \
-              --testTimeout=30000 \
-              --hookTimeout=30000 \
-              --maxWorkers=2
+          # Controlla quale comando esiste
+          if grep -q '"test"' package.json; then
+            echo "Running: npm test"
+            npm test -- --testTimeout=30000 --hookTimeout=30000 --no-watch --reporter=verbose 2>&1
+          elif grep -q '"test:run"' package.json; then
+            echo "Running: npm run test:run"
+            npm run test:run -- --testTimeout=30000 --hookTimeout=30000 --no-watch --reporter=verbose 2>&1
           else
-            echo "Using npx vitest directly"
-            npx vitest run \
-              --no-watch \
-              --reporter=verbose \
-              --testTimeout=30000 \
-              --hookTimeout=30000 \
-              --maxWorkers=2
+            echo "Running: npx vitest run"
+            npx vitest run --testTimeout=30000 --hookTimeout=30000 --no-watch --reporter=verbose 2>&1
           fi
 
-      - name: Generate coverage (se il test passa)
+      - name: Generate coverage
         if: success()
         working-directory: ./dashboard
         env:
@@ -446,17 +456,9 @@ jobs:
           export NODE_OPTIONS="--max-old-space-size=4096"
           
           if grep -q '"test:coverage"' package.json; then
-            echo "Using npm run test:coverage"
-            npm run test:coverage -- \
-              --testTimeout=30000 \
-              --hookTimeout=30000 \
-              --maxWorkers=1
+            npm run test:coverage 2>&1
           else
-            echo "Using npx vitest coverage directly"
-            npx vitest run --coverage \
-              --testTimeout=30000 \
-              --hookTimeout=30000 \
-              --maxWorkers=1
+            npx vitest run --coverage 2>&1
           fi
 
       - name: Upload coverage
