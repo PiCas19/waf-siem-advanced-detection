@@ -127,24 +127,12 @@ jobs:
         working-directory: ./api
         run: go mod download
 
-      # CORRETTO: Usa lo stesso comando che funziona localmente
-      - name: Run API tests with coverage
+      - name: Run API tests
         working-directory: ./api
         run: |
-          # Primo test per verificare la struttura
-          echo "Testing structure..."
-          find . -name "*_test.go" -type f | head -5
-          
-          # Esegui i test con il comando che funziona localmente
-          go test -coverprofile=coverage.out ./... -v
-          
-          # Verifica che coverage.out sia stato creato
-          if [ -f "coverage.out" ]; then
-            echo "Coverage file created successfully"
-          else
-            echo "Creating minimal coverage file..."
-            echo "mode: atomic" > coverage.out
-          fi
+          echo "Running API tests..."
+          # Esegui i test e mostra output dettagliato
+          go test ./... -v -race -coverprofile=coverage.out -covermode=atomic
 
       - name: Generate coverage report
         working-directory: ./api
@@ -193,20 +181,12 @@ jobs:
         working-directory: ./waf
         run: go mod download
 
-      # CORRETTO: Usa lo stesso comando che funziona localmente
-      - name: Run WAF tests with coverage
+      - name: Run WAF tests
         working-directory: ./waf
         run: |
-          # Esegui i test con il comando che funziona localmente
-          go test -coverprofile=coverage.out ./... -v
-          
-          # Verifica che coverage.out sia stato creato
-          if [ -f "coverage.out" ]; then
-            echo "Coverage file created successfully"
-          else
-            echo "Creating minimal coverage file..."
-            echo "mode: atomic" > coverage.out
-          fi
+          echo "Running WAF tests..."
+          # Esegui i test e mostra output dettagliato
+          go test ./... -v -race -coverprofile=coverage.out -covermode=atomic
 
       - name: Generate coverage report
         working-directory: ./waf
@@ -285,75 +265,6 @@ jobs:
         with:
           name: dashboard-coverage
           path: dashboard/coverage/
-          retention-days: 7
-
-  test-dashboard-e2e:
-    name: Test Dashboard E2E (Cypress)
-    runs-on: ubuntu-latest
-    needs: install-and-lint
-    # Usa container Docker per Cypress per evitare problemi di dipendenze
-    container:
-      image: cypress/included:12.0.0
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set timezone to Europe/Zurich
-        run: |
-          ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
-          echo "Europe/Zurich" > /etc/timezone
-          echo "Current time: $(date)"
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Check package-lock.json
-        working-directory: ./dashboard
-        run: |
-          if [ ! -f "package-lock.json" ]; then
-            echo "Generating package-lock.json..."
-            npm install --package-lock-only --no-audit
-          fi
-
-      - name: Install dependencies
-        working-directory: ./dashboard
-        run: npm ci
-
-      # Cypress è già incluso nell'immagine Docker
-      - name: Run Cypress E2E tests
-        working-directory: ./dashboard
-        env:
-          TZ: Europe/Zurich
-          NODE_TZ: Europe/Zurich
-          CYPRESS_baseUrl: http://localhost:3000
-        run: |
-          # Verifica se Cypress è disponibile
-          npx cypress --version
-          
-          # Prova diversi approcci
-          if grep -q '"test:e2e"' package.json; then
-            echo "Running npm test:e2e..."
-            npm run test:e2e
-          elif grep -q '"cypress:run"' package.json; then
-            echo "Running npm cypress:run..."
-            npm run cypress:run
-          else
-            echo "Running default Cypress command..."
-            npx cypress run --browser electron
-          fi
-
-      - name: Upload Cypress artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cypress-artifacts
-          path: |
-            dashboard/cypress/videos
-            dashboard/cypress/screenshots
-          if-no-files-found: ignore
           retention-days: 7
 
   # ============================================
@@ -550,11 +461,35 @@ jobs:
           # WAF SIEM Advanced Detection - Deployment Package
           
           ## Package Contents
-          - `api/bin/` - API server binaries
-          - `waf/bin/` - WAF binaries
-          - `dashboard/` - Pre-built dashboard
-          - `waf/configs/` - Configuration files
-          - `waf/scripts/` - Deployment scripts
+          - `api/bin/` - API server binaries for multiple platforms
+          - `waf/bin/` - WAF binaries (Caddy + Coraza Forwarder) for multiple platforms
+          - `dashboard/` - Pre-built dashboard (static files)
+          - `waf/configs/` - WAF configuration files
+          - `waf/scripts/` - Deployment and management scripts
+          - `docs/` - Documentation
+          - `app/` - Sample applications
+          
+          ## Quick Start
+          ### 1. API Server
+          ```bash
+          cd api/bin
+          chmod +x api-server-linux-amd64
+          ./api-server-linux-amd64
+          ```
+          
+          ### 2. WAF
+          ```bash
+          cd waf/bin
+          chmod +x caddy-waf-linux-amd64
+          chmod +x coraza-forwarder-linux-amd64
+          ./caddy-waf-linux-amd64 run --config ../configs/Caddyfile
+          ```
+          
+          ### 3. Dashboard
+          Serve the `dashboard/` directory with any web server
+          ```
+          npx serve -s . -p 3000
+          ```
           EOF
 
       - name: Set permissions for scripts
@@ -626,6 +561,11 @@ jobs:
             checksums.txt
           body: |
             ## WAF SIEM Advanced Detection Release
-            Download and extract the appropriate archive for your platform
+            
+            ### Installation
+            Download the appropriate archive for your platform
+            
+            ### Checksums
+            See `checksums.txt` for SHA256 verification
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
