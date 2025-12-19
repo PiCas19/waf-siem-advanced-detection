@@ -103,6 +103,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+      
+      - name: Create package-lock.json if missing [KEY STEP]
+        working-directory: ./dashboard
+        run: npm install --package-lock-only
 
       - name: Run npm audit (Dashboard)
         working-directory: ./dashboard
