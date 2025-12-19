@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '../../../test/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import { render, screen } from '../../../test/test-utils';
 import Snackbar, { SnackbarMessage } from '../Snackbar';
 import { userEvent } from '@testing-library/user-event';
 
 describe('Snackbar', () => {
-  let mockOnClose: ReturnType<typeof vi.fn>;
+  let mockOnClose: Mock<(id: string) => void>;
 
   beforeEach(() => {
-    mockOnClose = vi.fn();
+    mockOnClose = vi.fn(); // vi.fn() già restituisce Mock, non serve ReturnType
     vi.useFakeTimers();
   });
 

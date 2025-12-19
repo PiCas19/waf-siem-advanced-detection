@@ -41,20 +41,46 @@ global.ResizeObserver = class ResizeObserver {
   unobserve() {}
 } as any;
 
-// Mock localStorage
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
+// Mock localStorage with actual storage and spies
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+
+  return {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value.toString();
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
+    // Expose store for testing if needed
+    _getStore: () => store,
+    _setStore: (newStore: Record<string, string>) => { store = newStore; },
+  };
+})();
 global.localStorage = localStorageMock as any;
 
-// Mock sessionStorage
-const sessionStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
+// Mock sessionStorage with actual storage and spies
+const sessionStorageMock = (() => {
+  let store: Record<string, string> = {};
+
+  return {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value.toString();
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
+    // Expose store for testing if needed
+    _getStore: () => store,
+    _setStore: (newStore: Record<string, string>) => { store = newStore; },
+  };
+})();
 global.sessionStorage = sessionStorageMock as any;

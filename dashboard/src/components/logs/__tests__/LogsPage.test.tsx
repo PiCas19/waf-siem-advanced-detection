@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, cleanup, within } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, cleanup} from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import LogsPage from '../LogsPage';
 
@@ -3265,10 +3265,7 @@ describe('LogsPage', () => {
       expect(screen.queryByText('Loading logs...')).not.toBeInTheDocument();
     });
 
-    // Guarda nel codice: per severità sconosciute mostra "N/A" o la severità in uppercase
-    // Usa queryByText invece di getByText per evitare errori se non trova il testo
-    const unknownSeverityElement = screen.queryByText('UNKNOWN_SEVERITY');
-    const naElement = screen.queryByText('N/A');
+
 
     // Il componente potrebbe mostrare "N/A" o la severità originale
     // Il test principale è che il componente non crashi

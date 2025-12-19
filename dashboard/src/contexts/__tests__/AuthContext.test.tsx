@@ -5,7 +5,7 @@ import axios from 'axios';
 
 // MOCK DI AXIOS
 vi.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+const mockedAxios = vi.mocked(axios, true);
 
 // Crea un mock storage GLOBALE che funziona
 class LocalStorageMock {

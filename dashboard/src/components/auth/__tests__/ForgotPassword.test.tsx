@@ -77,19 +77,6 @@ describe('ForgotPassword', () => {
         });
       }
 
-      // Controlla se l'errore viene visualizzato
-      // Potrebbe essere che il componente non mostra un errore specifico per email vuota
-      // Verifica quale testo viene effettivamente mostrato
-      const errorMessages = [
-        'Please enter your email address',
-        'Email is required',
-        'Please provide an email address',
-        'Email cannot be empty'
-      ];
-      
-      const foundError = errorMessages.some(message => 
-        screen.queryByText(message, { exact: false }) !== null
-      );
       
       // Se non trova nessun errore, potrebbe essere che il componente usa la validazione HTML5
       // In quel caso, verifica se l'input ha l'attributo required

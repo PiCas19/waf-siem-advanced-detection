@@ -16,13 +16,6 @@ global.fetch = vi.fn();
 const mockOnRuleAdded = vi.fn();
 const mockOnCancel = vi.fn();
 
-// Funzione helper per trovare elementi quando i label non sono associati
-const getByTextContent = (text: string) => {
-  return screen.getByText((content, element) => {
-    return element?.textContent === text;
-  });
-};
-
 describe('AddRule', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -486,8 +479,8 @@ describe('AddRule', () => {
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalled();
       const call = (global.fetch as any).mock.calls[0];
-      // Il token dovrebbe essere 'Bearer undefined' quando non c'è token
-      expect(call[1].headers.Authorization).toBe('Bearer undefined');
+      // Il token dovrebbe essere 'Bearer null' quando non c'è token (localStorage.getItem ritorna null)
+      expect(call[1].headers.Authorization).toBe('Bearer null');
     });
   });
 

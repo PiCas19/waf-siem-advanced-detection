@@ -391,8 +391,7 @@ describe('RBAC Types', () => {
 
   describe('Integration Tests', () => {
     it('should maintain permission hierarchy correctly', () => {
-      // Admin > Operator > Analyst > User
-      const roles: UserRole[] = ['admin', 'operator', 'analyst', 'user'];
+
       
       // Conta il numero di permissions true per ogni ruolo
       const countPermissions = (role: UserRole): number => {

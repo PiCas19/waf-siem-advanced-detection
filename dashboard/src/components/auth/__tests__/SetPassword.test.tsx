@@ -1,14 +1,28 @@
 // SetPassword.test.tsx
-import React from 'react'
-import { describe, it, expect, vi, beforeEach, Mock } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, useNavigate, useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import SetPassword from '../SetPassword'
 import { useAuth } from '@/contexts/AuthContext'
 
-// Mock delle dipendenze
-vi.mock('axios')
+// Mock corretto di axios
+vi.mock('axios', () => {
+  const mockAxios = {
+    post: vi.fn(),
+    defaults: {
+      headers: {
+        common: {}
+      }
+    }
+  }
+  return {
+    default: mockAxios,
+    ...mockAxios,
+    __esModule: true,
+  }
+})
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
   return {
@@ -28,7 +42,8 @@ vi.mock('lucide-react', () => ({
   EyeOff: () => <svg data-testid="eyeoff-icon" />,
 }))
 
-const mockedAxios = axios as Mock
+// Usa un type assertion per accedere ai metodi mock
+const mockedAxios = axios as any
 const mockedNavigate = vi.fn()
 const mockSetAuthToken = vi.fn()
 const mockSetUser = vi.fn()
@@ -36,6 +51,36 @@ const mockSetRequiresTwoFASetup = vi.fn()
 
 // Mock di useAuth
 const mockUseAuth = vi.mocked(useAuth)
+
+// Helper per creare mock completo basato sugli errori ricevuti
+const createMockAuthContext = () => ({
+  user: null,
+  token: null,
+  isLoading: false,
+  error: null,
+  setToken: mockSetAuthToken,
+  setUser: mockSetUser,
+  setRequiresTwoFASetup: mockSetRequiresTwoFASetup,
+  login: vi.fn(),
+  logout: vi.fn(),
+  clearError: vi.fn(),
+  setError: vi.fn(),
+  setIsLoading: vi.fn(),
+  checkAuth: vi.fn(),
+  setUserProfile: vi.fn(),
+  userProfile: null,
+  isAdmin: false,
+  requiresTwoFASetup: false,
+  // Aggiungi le proprietà mancanti segnalate nell'errore
+  verifyOTP: vi.fn(),
+  setupTwoFA: vi.fn(),
+  completeTwoFASetup: vi.fn(),
+  disableTwoFA: vi.fn(),
+  twoFAStatus: undefined,
+  setTwoFAStatus: vi.fn(),
+  refreshAuth: vi.fn(),
+  // Aggiungi altre proprietà se necessario
+})
 
 describe('SetPassword Component', () => {
   beforeEach(() => {
@@ -47,14 +92,10 @@ describe('SetPassword Component', () => {
       new URLSearchParams('token=test-token'),
       vi.fn()
     ])
-    mockUseAuth.mockReturnValue({
-      setToken: mockSetAuthToken,
-      setUser: mockSetUser,
-      setRequiresTwoFASetup: mockSetRequiresTwoFASetup,
-    })
+    mockUseAuth.mockReturnValue(createMockAuthContext() as any)
 
-    // Mock axios
-    mockedAxios.post.mockReset()
+    // Mock axios - reset manuale
+    mockedAxios.post.mockReset?.()
     
     // Mock localStorage
     Object.defineProperty(window, 'localStorage', {
@@ -390,7 +431,6 @@ describe('SetPassword Component', () => {
       </MemoryRouter>
     )
 
-    const title = screen.getByText('Set your password')
     // Il titolo è dentro un div con classe bg-gray-800
     const container = screen.getByText('Set your password').closest('.bg-gray-800')
     expect(container).toBeInTheDocument()
