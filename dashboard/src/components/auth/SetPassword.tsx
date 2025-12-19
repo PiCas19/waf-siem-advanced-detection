@@ -58,9 +58,10 @@ const SetPassword: React.FC = () => {
         {success && <div className="bg-green-500/20 border border-green-500 text-green-300 px-4 py-3 rounded mb-3">{success}</div>}
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-300 mb-1">New password</label>
+            <label htmlFor="new-password" className="block text-sm text-gray-300 mb-1">New password</label>
             <div className="relative">
               <input
+                id="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 type={showPassword ? 'text' : 'password'}
@@ -76,9 +77,10 @@ const SetPassword: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm text-gray-300 mb-1">Confirm password</label>
+            <label htmlFor="confirm-password" className="block text-sm text-gray-300 mb-1">Confirm password</label>
             <div className="relative">
               <input
+                id="confirm-password" 
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 type={showConfirm ? 'text' : 'password'}

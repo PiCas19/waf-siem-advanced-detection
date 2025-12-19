@@ -257,13 +257,6 @@ func UnblockIP(c *gin.Context) {
 	BadRequest(c, "use NewUnblockIPHandler")
 }
 
-// refreshStatsOnClients notifica i client di ricaricare gli stats
-// Il frontend farà un fetch a /api/stats per ottenere i dati aggiornati
-func refreshStatsOnClients() {
-	// Nota: Il WebSocket viene usato per notificare i client, ma il valore
-	// di stats aggiornato verrà fetched dal frontend da /api/stats endpoint
-	// che legge direttamente dal database
-}
 
 // IsIPBlocked - Checks if an IP is blocked for a specific rule/description in the database
 // Note: This function is deprecated and should use BlocklistService instead

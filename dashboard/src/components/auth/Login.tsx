@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
@@ -11,8 +11,15 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login, verifyOTP, requiresTwoFA, requiresTwoFASetup, currentUserEmail } = useAuth()
+  const { login, verifyOTP, requiresTwoFA, requiresTwoFASetup, currentUserEmail, user } = useAuth()
   const navigate = useNavigate()
+
+  // Auto-redirect to dashboard when logged in successfully without 2FA requirements
+  useEffect(() => {
+    if (user && !requiresTwoFA && !requiresTwoFASetup && !loading) {
+      navigate('/dashboard')
+    }
+  }, [user, requiresTwoFA, requiresTwoFASetup, loading, navigate])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,7 +30,7 @@ const Login: React.FC = () => {
       await login(email, password)
       // The requiresTwoFASetup state will be updated by AuthContext
       // The Login component will then render the "2FA Setup Required" screen via the conditional below
-      // No need to navigate manually - the component will re-render with the updated state
+      // Navigation is handled by useEffect above
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed')
     } finally {

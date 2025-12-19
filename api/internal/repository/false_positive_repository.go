@@ -33,7 +33,7 @@ func (r *GormFalsePositiveRepository) FindByID(ctx context.Context, id uint) (*m
 func (r *GormFalsePositiveRepository) FindByIP(ctx context.Context, ip string) ([]models.FalsePositive, error) {
 	var falsePositives []models.FalsePositive
 	err := r.db.WithContext(ctx).
-		Where("ip_address = ?", ip).
+		Where("client_ip = ?", ip).
 		Order("created_at DESC").
 		Find(&falsePositives).Error
 	return falsePositives, err
@@ -42,7 +42,7 @@ func (r *GormFalsePositiveRepository) FindByIP(ctx context.Context, ip string) (
 func (r *GormFalsePositiveRepository) FindUnresolved(ctx context.Context) ([]models.FalsePositive, error) {
 	var falsePositives []models.FalsePositive
 	err := r.db.WithContext(ctx).
-		Where("resolved = ?", false).
+		Where("status = ?", "pending").
 		Order("created_at DESC").
 		Find(&falsePositives).Error
 	return falsePositives, err
@@ -71,7 +71,7 @@ func (r *GormFalsePositiveRepository) CountUnresolved(ctx context.Context) (int6
 	var count int64
 	err := r.db.WithContext(ctx).
 		Model(&models.FalsePositive{}).
-		Where("resolved = ?", false).
+		Where("status = ?", "pending").
 		Count(&count).Error
 	return count, err
 }

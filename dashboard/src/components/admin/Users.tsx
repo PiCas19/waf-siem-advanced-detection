@@ -255,8 +255,10 @@ const Users: React.FC = () => {
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm text-gray-300 mb-2">Role</label>
+            <label htmlFor="role" className="block text-sm text-gray-300 mb-2">Role</label>
             <select
+              id="role"
+              data-testid="create-user-role"
               value={role}
               onChange={(e) => setRole(e.target.value)}
               className="w-full px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 outline-none"

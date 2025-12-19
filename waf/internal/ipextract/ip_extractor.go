@@ -179,7 +179,7 @@ func ExtractClientIP(
 	if remoteAddr != "" {
 		// Extract just the IP from "IP:port" format
 		ip := extractIPFromRemoteAddr(remoteAddr)
-		if ip != "" {
+		if ip != "" && isValidIP(ip) {
 			return &ClientIPInfo{
 				IP:             ip,
 				Source:         SourceRemoteAddr,
