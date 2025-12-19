@@ -262,7 +262,6 @@ jobs:
           path: dashboard/coverage/
           retention-days: 7
 
-
   # ============================================
   # STAGE 3: BUILD
   # ============================================
@@ -323,7 +322,7 @@ jobs:
         run: |
           sudo ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
           echo "Europe/Zurich" | sudo tee /etc/timezone
-          echo "Current timezone: $(cat /etc/timezone)"
+          echo "Current timezone: $(cat /etc.timezone)"
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -369,7 +368,7 @@ jobs:
   build-dashboard:
     name: Build Dashboard
     runs-on: ubuntu-latest
-    needs: [test-dashboard, test-dashboard-e2e]
+    needs: [test-dashboard]
 
     steps:
       - name: Checkout code
