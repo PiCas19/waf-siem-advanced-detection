@@ -1,0 +1,80 @@
+name: Dependency Management
+
+on:
+  schedule:
+    # Check for dependency updates weekly on Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  # ============================================
+  # Go Dependencies Update Check
+  # ============================================
+  go-deps-update:
+    name: Check Go Dependencies Updates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Check for outdated Go packages (API)
+        working-directory: ./api
+        run: |
+          echo "=== API Outdated Packages ==="
+          go list -u -m all | grep '\['
+
+      - name: Check for outdated Go packages (WAF)
+        working-directory: ./waf
+        run: |
+          echo "=== WAF Outdated Packages ==="
+          go list -u -m all | grep '\['
+
+  # ============================================
+  # Node.js Dependencies Update Check
+  # ============================================
+  npm-deps-update:
+    name: Check NPM Dependencies Updates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check for outdated NPM packages
+        working-directory: ./dashboard
+        run: |
+          npm outdated || true
+
+  # ============================================
+  # Dependency Graph Update
+  # ============================================
+  update-dependency-graph:
+    name: Update Dependency Graph
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Update Go dependencies graph
+        uses: advanced-security/go-dependency-submission-action@v1
+        with:
+          go-list: ./api/... ./waf/...
