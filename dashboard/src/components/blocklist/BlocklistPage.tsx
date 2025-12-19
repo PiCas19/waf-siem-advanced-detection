@@ -32,7 +32,7 @@ const validateReason = (reason: string): { valid: boolean; error?: string } => {
   if (trimmed.length > 500) return { valid: false, error: 'Reason cannot exceed 500 characters' };
 
   // Check for potentially dangerous characters
-  const validPattern = /^[a-zA-Z0-9\s\-_.(),;:'"\/\[\]]+$/;
+  const validPattern = /^[a-zA-Z0-9\s\-_.(),;:'"/[\]]+$/;
   if (!validPattern.test(trimmed)) {
     return { valid: false, error: 'Reason contains invalid characters' };
   }
@@ -797,7 +797,7 @@ const BlocklistPage: React.FC = () => {
                       if (validation.error) {
                         setBlockFormErrors({ ...blockFormErrors, ip: validation.error });
                       } else {
-                        const { ip, ...rest } = blockFormErrors;
+                        const { ip: _ip, ...rest } = blockFormErrors;
                         setBlockFormErrors(rest);
                       }
                     }}
@@ -824,7 +824,7 @@ const BlocklistPage: React.FC = () => {
                       if (validation.error) {
                         setBlockFormErrors({ ...blockFormErrors, reason: validation.error });
                       } else {
-                        const { reason, ...rest } = blockFormErrors;
+                        const { reason: _reason, ...rest } = blockFormErrors;
                         setBlockFormErrors(rest);
                       }
                     }}
@@ -1251,7 +1251,7 @@ const BlocklistPage: React.FC = () => {
                       if (validation.error) {
                         setWhiteFormErrors({ ...whiteFormErrors, ip: validation.error });
                       } else {
-                        const { ip, ...rest } = whiteFormErrors;
+                        const { ip: _ip, ...rest } = whiteFormErrors;
                         setWhiteFormErrors(rest);
                       }
                     }}
@@ -1278,7 +1278,7 @@ const BlocklistPage: React.FC = () => {
                       if (validation.error) {
                         setWhiteFormErrors({ ...whiteFormErrors, reason: validation.error });
                       } else {
-                        const { reason, ...rest } = whiteFormErrors;
+                        const { reason: _reason, ...rest } = whiteFormErrors;
                         setWhiteFormErrors(rest);
                       }
                     }}

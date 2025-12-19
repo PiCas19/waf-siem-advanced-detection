@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { WAFRule, getCreatedDate, getUpdatedDate } from '../../types/waf';
 
 interface RulesListProps {
@@ -31,12 +31,10 @@ export default function RulesList({
   const [searchTerm, setSearchTerm] = useState('');
   const [threatTypeFilter, setThreatTypeFilter] = useState('all');
   const [modeFilter, setModeFilter] = useState('all');
-  const [filteredDefaultRules, setFilteredDefaultRules] = useState<WAFRule[]>([]);
-  const [filteredCustomRules, setFilteredCustomRules] = useState<WAFRule[]>([]);
   const [defaultRulesExpanded, setDefaultRulesExpanded] = useState(true);
 
-  useEffect(() => {
-    // Filtra default rules
+  // Usa useMemo invece di useEffect + setState per evitare rendering cascading
+  const filteredDefaultRules = useMemo(() => {
     let filteredDefaults = [...allDefaultRules];
 
     if (searchTerm) {
@@ -53,9 +51,10 @@ export default function RulesList({
       );
     }
 
-    setFilteredDefaultRules(filteredDefaults);
+    return filteredDefaults;
+  }, [allDefaultRules, searchTerm, threatTypeFilter]);
 
-    // Filtra custom rules
+  const filteredCustomRules = useMemo(() => {
     let filteredCustom = [...allCustomRules];
 
     if (searchTerm) {
@@ -76,8 +75,8 @@ export default function RulesList({
       filteredCustom = filteredCustom.filter(rule => (rule.action || rule.mode) === modeFilter);
     }
 
-      setFilteredCustomRules(filteredCustom);
-  }, [allCustomRules, allDefaultRules, searchTerm, threatTypeFilter, modeFilter]);
+    return filteredCustom;
+  }, [allCustomRules, searchTerm, threatTypeFilter, modeFilter]);
 
   const threatTypes = useMemo(
     () =>

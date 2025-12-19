@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Shield } from 'lucide-react';
 import { useToast } from '@/contexts/SnackbarContext';
 
@@ -17,7 +17,6 @@ interface WAFRule {
 const Rules: React.FC = () => {
   const { showToast } = useToast();
   const [rules, setRules] = useState<WAFRule[]>([]);
-  const [filteredRules, setFilteredRules] = useState<WAFRule[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [threatTypeFilter, setThreatTypeFilter] = useState('all');
   const [modeFilter, setModeFilter] = useState('all');
@@ -34,13 +33,30 @@ const Rules: React.FC = () => {
     mode: 'block' as 'block' | 'detect',
   });
 
+  const loadRules = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch('/api/rules', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      // API returns: { default_rules: [...], custom_rules: { items: [...], pagination: {...} }, ... }
+      const rulesData = data.custom_rules?.items || data.rules || [];
+      setRules(rulesData);
+    } catch (error) {
+      console.error('Failed to load rules:', error);
+    }
+  };
+
   // Carica regole dal backend
   useEffect(() => {
     loadRules();
   }, []);
 
-  // Applica filtri e ricerca
-  useEffect(() => {
+  // Applica filtri e ricerca usando useMemo invece di useEffect
+  const filteredRules = useMemo(() => {
     let filtered = [...rules];
 
     // Ricerca per nome e descrizione
@@ -62,25 +78,8 @@ const Rules: React.FC = () => {
       filtered = filtered.filter(rule => rule.mode === modeFilter);
     }
 
-    setFilteredRules(filtered);
+    return filtered;
   }, [rules, searchTerm, threatTypeFilter, modeFilter]);
-
-  const loadRules = async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/rules', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      const data = await response.json();
-      // API returns: { default_rules: [...], custom_rules: { items: [...], pagination: {...} }, ... }
-      const rulesData = data.custom_rules?.items || data.rules || [];
-      setRules(rulesData);
-    } catch (error) {
-      console.error('Failed to load rules:', error);
-    }
-  };
 
   const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();

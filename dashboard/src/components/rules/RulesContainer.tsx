@@ -17,11 +17,6 @@ export default function RulesContainer() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
 
-  // Carica le regole dal backend
-  useEffect(() => {
-    loadRules();
-  }, []);
-
   const loadRules = async () => {
     try {
       const token = localStorage.getItem('authToken');
@@ -53,6 +48,11 @@ export default function RulesContainer() {
       console.error('Failed to load rules:', error);
     }
   };
+
+  // Carica le regole dal backend
+  useEffect(() => {
+    loadRules();
+  }, []);
 
   const handleAddRule = (rule: WAFRule) => {
     setCustomRules([...customRules, rule]);

@@ -54,19 +54,7 @@ interface FilterState {
 export default function LogsPage(): React.ReactElement {
   const { user } = useAuth();
 
-  // Block access if user doesn't have permission (analyst and above can view logs)
-  if (!user || !hasPermission(user.role as UserRole, 'logs_view')) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
-          <p className="text-gray-400">You do not have permission to view logs.</p>
-        </div>
-      </div>
-    );
-  }
-
+  // All hooks must be called before any conditional returns
   const [logs, setLogs] = useState<Log[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<Log[]>([]);
@@ -419,6 +407,19 @@ export default function LogsPage(): React.ReactElement {
       }, 250);
     }
   };
+
+  // Block access if user doesn't have permission (analyst and above can view logs)
+  if (!user || !hasPermission(user.role as UserRole, 'logs_view')) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-2">Access Denied</h1>
+          <p className="text-gray-400">You do not have permission to view logs.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

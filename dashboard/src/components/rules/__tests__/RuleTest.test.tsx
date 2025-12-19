@@ -13,28 +13,28 @@ const mockRuleWithPattern: WAFRule = {
   type: 'regex',
   severity: 'HIGH',
   enabled: true,
-  mode: 'block' as 'block',
-  action: 'block' as 'block',
+  mode: 'block' as const,
+  action: 'block' as const,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
 
 const mockRuleWithDetectMode: WAFRule = {
   ...mockRuleWithPattern,
-  mode: 'detect' as 'detect',
-  action: 'detect' as 'detect',
+  mode: 'detect' as const,
+  action: 'detect' as const,
 };
 
 const mockRuleWithOnlyActionBlock: WAFRule = {
   ...mockRuleWithPattern,
   mode: undefined,
-  action: 'block' as 'block',
+  action: 'block' as const,
 };
 
 const mockRuleWithOnlyActionDetect: WAFRule = {
   ...mockRuleWithPattern,
   mode: undefined,
-  action: 'detect' as 'detect',
+  action: 'detect' as const,
 };
 
 const mockRuleWithoutPattern: WAFRule = {
