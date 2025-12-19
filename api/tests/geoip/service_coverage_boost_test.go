@@ -429,13 +429,6 @@ func TestEnrichIPFromService_ReadAllError(t *testing.T) {
 	assert.Equal(t, "Unknown", country)
 }
 
-// errorReader always returns an error
-type errorReader struct{}
-
-func (e *errorReader) Read(p []byte) (n int, err error) {
-	return 0, io.ErrUnexpectedEOF
-}
-
 // roundTripperFunc allows using a function as an http.RoundTripper
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
