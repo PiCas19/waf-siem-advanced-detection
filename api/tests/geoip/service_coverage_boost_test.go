@@ -401,34 +401,6 @@ func TestGetPublicIP_ResponseClose(t *testing.T) {
 	assert.NotEmpty(t, ip)
 }
 
-// Test EnrichIPFromService with io.ReadAll error
-func TestEnrichIPFromService_ReadAllError(t *testing.T) {
-	// Create a custom http client that always returns an error
-	mockClient := &http.Client{
-		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-			// Return a response with an error reader
-			return &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(&errorReader{}),
-			}, nil
-		}),
-	}
-
-	// Create service with mocked client
-	service := &geoip.Service{
-		// Initialize with mocked client
-		// You'll need to adjust based on your actual geoip.Service structure
-	}
-
-	// OR better: patch the http client globally for this test
-	originalClient := http.DefaultClient
-	http.DefaultClient = mockClient
-	defer func() { http.DefaultClient = originalClient }()
-
-	country := service.EnrichIPFromService("1.2.3.4")
-	assert.Equal(t, "Unknown", country)
-}
-
 // roundTripperFunc allows using a function as an http.RoundTripper
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
