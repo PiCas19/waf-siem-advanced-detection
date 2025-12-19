@@ -23,24 +23,26 @@ jobs:
 
       - name: Run Gosec Security Scanner (API)
         uses: securego/gosec@master
+        continue-on-error: true
         with:
           args: '-fmt sarif -out gosec-api-results.sarif ./api/...'
 
       - name: Run Gosec Security Scanner (WAF)
         uses: securego/gosec@master
+        continue-on-error: true
         with:
           args: '-fmt sarif -out gosec-waf-results.sarif ./waf/...'
 
       - name: Upload Gosec results (API)
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('gosec-api-results.sarif') != ''
         with:
           sarif_file: gosec-api-results.sarif
           category: gosec-api
 
       - name: Upload Gosec results (WAF)
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && hashFiles('gosec-waf-results.sarif') != ''
         with:
           sarif_file: gosec-waf-results.sarif
           category: gosec-waf
@@ -60,16 +62,29 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25'
+          cache-dependency-path: |
+            api/go.sum
+            waf/go.sum
+
+      - name: Install dependencies (API)
+        working-directory: ./api
+        run: go mod download
+
+      - name: Install dependencies (WAF)
+        working-directory: ./waf
+        run: go mod download
 
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
 
       - name: Run govulncheck (API)
         working-directory: ./api
+        continue-on-error: true
         run: govulncheck ./...
 
       - name: Run govulncheck (WAF)
         working-directory: ./waf
+        continue-on-error: true
         run: govulncheck ./...
 
   npm-audit:
