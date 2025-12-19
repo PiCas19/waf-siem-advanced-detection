@@ -39,61 +39,23 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: |
-            api/go.sum
-            waf/go.sum
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Cache Go modules (API)
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            api/.cache/go-build
-          key: ${{ runner.os }}-go-api-${{ hashFiles('api/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-api-
-
-      - name: Cache Go modules (WAF)
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            waf/.cache/go-build
-          key: ${{ runner.os }}-go-waf-${{ hashFiles('waf/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-waf-
-
-      - name: Generate go.sum if missing (API)
+      - name: Tidy Go modules (API)
         working-directory: ./api
         run: |
-          if [ ! -f "go.sum" ]; then
-            echo "go.sum not found, generating with go mod tidy..."
-            go mod tidy
-            echo "go.sum generated successfully"
-          else
-            echo "go.sum exists, verifying..."
-            go mod tidy
-            go mod verify
-          fi
+          go mod tidy
+          go mod verify
 
-      - name: Generate go.sum if missing (WAF)
+      - name: Tidy Go modules (WAF)
         working-directory: ./waf
         run: |
-          if [ ! -f "go.sum" ]; then
-            echo "go.sum not found, generating with go mod tidy..."
-            go mod tidy
-            echo "go.sum generated successfully"
-          else
-            echo "go.sum exists, verifying..."
-            go mod tidy
-            go mod verify
-          fi
+          go mod tidy
+          go mod verify
 
       - name: Install Go dependencies (API)
         working-directory: ./api
@@ -110,6 +72,7 @@ jobs:
       - name: Check and create package-lock.json if missing
         working-directory: ./dashboard
         run: |
+          # Check if package-lock.json exists
           if [ ! -f "package-lock.json" ]; then
             echo "package-lock.json not found, generating..."
             npm install --package-lock-only --no-audit
@@ -118,6 +81,11 @@ jobs:
             echo "package-lock.json found, proceeding with npm ci"
           fi
 
+      - name: Install Node.js dependencies (Dashboard)
+        working-directory: ./dashboard
+        run: npm ci
+
+      # Cache npm dependencies
       - name: Cache npm dependencies
         uses: actions/cache@v4
         with:
@@ -125,10 +93,6 @@ jobs:
           key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-npm-
-
-      - name: Install Node.js dependencies (Dashboard)
-        working-directory: ./dashboard
-        run: npm ci
 
       - name: Lint Dashboard
         working-directory: ./dashboard
@@ -157,46 +121,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: api/go.sum
-
-      - name: Cache Go modules for API tests
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            api/.cache/go-build
-          key: ${{ runner.os }}-go-api-tests-${{ hashFiles('api/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-api-tests-
-
-      - name: Debug directory structure (API)
-        working-directory: ./api
-        run: |
-          echo "=== API Directory structure ==="
-          find . -type f -name "*.go" | head -20
-          echo "=== API Test files ==="
-          find . -name "*_test.go" | head -20
-          echo "=== go.mod content ==="
-          cat go.mod
-          echo "=== go.sum exists? ==="
-          ls -la go.sum 2>/dev/null || echo "go.sum not found"
-
-      - name: Verify go.sum exists (API)
-        working-directory: ./api
-        run: |
-          if [ ! -f "go.sum" ]; then
-            echo "ERROR: go.sum not found! Generating..."
-            go mod tidy
-            if [ ! -f "go.sum" ]; then
-              echo "CRITICAL ERROR: Failed to generate go.sum!"
-              exit 1
-            fi
-            echo "go.sum generated successfully"
-          else
-            echo "go.sum exists"
-            go mod verify
-          fi
 
       - name: Tidy Go modules
         working-directory: ./api
@@ -204,29 +128,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./api
-        run: |
-          go mod download
-          go mod verify
+        run: go mod download
 
       - name: Run API tests with coverage
         working-directory: ./api
-        env:
-          NODE_ENV: "test"
-          TZ: "Europe/Zurich"
-          DB_CONNECTION: "sqlite://:memory:"
-          TEST_MODE: "true"
-        run: |
-          echo "Running API tests..."
-          if [ -d "./tests" ]; then
-            echo "Running tests from ./tests/ directory..."
-            go test -coverprofile=coverage.out ./tests/... -coverpkg=./internal/... -v
-          elif [ -d "./test" ]; then
-            echo "Running tests from ./test/ directory..."
-            go test -coverprofile=coverage.out ./test/... -coverpkg=./internal/... -v
-          else
-            echo "No specific tests directory found, running all tests..."
-            go test -coverprofile=coverage.out ./... -v
-          fi
+        run: go test -coverprofile=coverage.out ./tests/... -coverpkg=./internal/... -v
 
       - name: Generate coverage report
         working-directory: ./api
@@ -259,46 +165,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: waf/go.sum
-
-      - name: Cache Go modules for WAF tests
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            waf/.cache/go-build
-          key: ${{ runner.os }}-go-waf-tests-${{ hashFiles('waf/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-waf-tests-
-
-      - name: Debug directory structure (WAF)
-        working-directory: ./waf
-        run: |
-          echo "=== WAF Directory structure ==="
-          find . -type f -name "*.go" | head -20
-          echo "=== WAF Test files ==="
-          find . -name "*_test.go" | head -20
-          echo "=== go.mod content ==="
-          cat go.mod
-          echo "=== go.sum exists? ==="
-          ls -la go.sum 2>/dev/null || echo "go.sum not found"
-
-      - name: Verify go.sum exists (WAF)
-        working-directory: ./waf
-        run: |
-          if [ ! -f "go.sum" ]; then
-            echo "ERROR: go.sum not found! Generating..."
-            go mod tidy
-            if [ ! -f "go.sum" ]; then
-              echo "CRITICAL ERROR: Failed to generate go.sum!"
-              exit 1
-            fi
-            echo "go.sum generated successfully"
-          else
-            echo "go.sum exists"
-            go mod verify
-          fi
 
       - name: Tidy Go modules
         working-directory: ./waf
@@ -306,28 +172,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./waf
-        run: |
-          go mod download
-          go mod verify
+        run: go mod download
 
       - name: Run WAF tests with coverage
         working-directory: ./waf
-        env:
-          NODE_ENV: "test"
-          TZ: "Europe/Zurich"
-          TEST_MODE: "true"
-        run: |
-          echo "Running WAF tests..."
-          if [ -d "./tests" ]; then
-            echo "Running tests from ./tests/ directory..."
-            go test -coverprofile=coverage.out ./tests/... -coverpkg=./internal/... -v
-          elif [ -d "./test" ]; then
-            echo "Running tests from ./test/ directory..."
-            go test -coverprofile=coverage.out ./test/... -coverpkg=./internal/... -v
-          else
-            echo "No specific tests directory found, running all tests..."
-            go test -coverprofile=coverage.out ./... -v
-          fi
+        run: go test -coverprofile=coverage.out ./tests/... -coverpkg=./internal/... -v
 
       - name: Generate coverage report
         working-directory: ./waf
@@ -343,7 +192,6 @@ jobs:
   test-dashboard:
     name: Test Dashboard
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     needs: install-and-lint
 
     steps:
@@ -357,112 +205,54 @@ jobs:
           echo "Current timezone: $(cat /etc/timezone)"
           echo "Current time: $(date)"
 
-      - name: Setup Node.js (SENZA CACHE)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # NIENTE CACHE - rimuoviamo il problema
+
+      # First restore npm cache
+      - name: Restore npm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Check package-lock.json
+        working-directory: ./dashboard
+        run: |
+          if [ ! -f "package-lock.json" ]; then
+            echo "Error: package-lock.json not found in test-dashboard"
+            echo "Generating package-lock.json..."
+            npm install --package-lock-only --no-audit
+          fi
 
       - name: Install dependencies
         working-directory: ./dashboard
+        run: npm ci
+
+      # Set timezone also for Node.js tests
+      - name: Set Node.js timezone environment
         run: |
-          # Pulisci cache manualmente
-          npm cache clean --force 2>/dev/null || true
-          
-          # Installa normalmente
-          npm ci
+          echo "NODE_TZ=Europe/Zurich" >> $GITHUB_ENV
+          echo "TZ=Europe/Zurich" >> $GITHUB_ENV
 
-      - name: Increase test timeout globally
-        working-directory: ./dashboard
-        run: |
-          # Aggiungi timeout globale nel package.json o crea file di configurazione
-          if [ -f "vitest.config.ts" ] || [ -f "vitest.config.js" ]; then
-            echo "Vitest config found, modifying..."
-            # Crea backup e modifica
-            cp vitest.config.ts vitest.config.ts.backup 2>/dev/null || cp vitest.config.js vitest.config.js.backup 2>/dev/null || true
-            
-            # Crea config temporaneo
-            cat > vitest.config.ci.ts << 'EOF'
-            import { defineConfig } from 'vitest/config';
-            import react from '@vitejs/plugin-react';
-
-            export default defineConfig({
-              plugins: [react()],
-              test: {
-                environment: 'jsdom',
-                globals: true,
-                testTimeout: 30000,
-                hookTimeout: 30000,
-                setupFiles: ['./src/test/setup.ts'],
-              },
-            });
-            EOF
-            
-            # Usa config CI
-            cp vitest.config.ci.ts vitest.config.ts 2>/dev/null || cp vitest.config.ci.ts vitest.config.js 2>/dev/null || true
-          else
-            echo "Creating vitest config for CI..."
-            cat > vitest.config.ts << 'EOF'
-            import { defineConfig } from 'vitest/config';
-            import react from '@vitejs/plugin-react';
-
-            export default defineConfig({
-              plugins: [react()],
-              test: {
-                environment: 'jsdom',
-                globals: true,
-                testTimeout: 30000,
-                hookTimeout: 30000,
-                setupFiles: ['./src/test/setup.ts'],
-              },
-            });
-            EOF
-          fi
-
-      - name: Run tests with increased timeout
+      - name: Run unit tests
         working-directory: ./dashboard
         env:
           TZ: Europe/Zurich
           NODE_TZ: Europe/Zurich
-          NODE_ENV: test
-          CI: true
-        run: |
-          # Aumenta memoria Node.js
-          export NODE_OPTIONS="--max-old-space-size=4096"
-          
-          echo "=== Running tests with 30s timeout ==="
-          
-          # Controlla quale comando esiste
-          if grep -q '"test"' package.json; then
-            echo "Running: npm test"
-            npm test -- --testTimeout=30000 --hookTimeout=30000 --no-watch --reporter=verbose 2>&1
-          elif grep -q '"test:run"' package.json; then
-            echo "Running: npm run test:run"
-            npm run test:run -- --testTimeout=30000 --hookTimeout=30000 --no-watch --reporter=verbose 2>&1
-          else
-            echo "Running: npx vitest run"
-            npx vitest run --testTimeout=30000 --hookTimeout=30000 --no-watch --reporter=verbose 2>&1
-          fi
+        run: npm run test:run
 
       - name: Generate coverage
-        if: success()
         working-directory: ./dashboard
         env:
           TZ: Europe/Zurich
           NODE_TZ: Europe/Zurich
-          NODE_ENV: test
-          CI: true
-        run: |
-          export NODE_OPTIONS="--max-old-space-size=4096"
-          
-          if grep -q '"test:coverage"' package.json; then
-            npm run test:coverage 2>&1
-          else
-            npx vitest run --coverage 2>&1
-          fi
+        run: npm run test:coverage
 
       - name: Upload coverage
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: dashboard-coverage
@@ -491,31 +281,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: api/go.sum
-
-      - name: Cache Go modules for API build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            api/.cache/go-build
-          key: ${{ runner.os }}-go-api-build-${{ hashFiles('api/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-api-build-
-
-      - name: Verify go.sum exists (API Build)
-        working-directory: ./api
-        run: |
-          if [ ! -f "go.sum" ]; then
-            echo "ERROR: go.sum not found! Generating..."
-            go mod tidy
-            if [ ! -f "go.sum" ]; then
-              echo "CRITICAL ERROR: Failed to generate go.sum!"
-              exit 1
-            fi
-            echo "go.sum generated successfully"
-          fi
 
       - name: Tidy Go modules
         working-directory: ./api
@@ -523,14 +288,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./api
-        run: |
-          go mod download
-          go mod verify
+        run: go mod download
 
       - name: Build API server
         working-directory: ./api
         run: |
-          mkdir -p bin
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/api-server-linux-amd64 ./cmd/api-server
           CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/api-server-darwin-amd64 ./cmd/api-server
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/api-server-darwin-arm64 ./cmd/api-server
@@ -562,31 +324,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: waf/go.sum
-
-      - name: Cache Go modules for WAF build
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            waf/.cache/go-build
-          key: ${{ runner.os }}-go-waf-build-${{ hashFiles('waf/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-waf-build-
-
-      - name: Verify go.sum exists (WAF Build)
-        working-directory: ./waf
-        run: |
-          if [ ! -f "go.sum" ]; then
-            echo "ERROR: go.sum not found! Generating..."
-            go mod tidy
-            if [ ! -f "go.sum" ]; then
-              echo "CRITICAL ERROR: Failed to generate go.sum!"
-              exit 1
-            fi
-            echo "go.sum generated successfully"
-          fi
 
       - name: Tidy Go modules
         working-directory: ./waf
@@ -594,9 +331,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./waf
-        run: |
-          go mod download
-          go mod verify
+        run: go mod download
 
       - name: Install xcaddy
         run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
@@ -645,6 +380,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # First restore npm cache
       - name: Restore npm cache
         uses: actions/cache@v4
         with:
@@ -719,20 +455,25 @@ jobs:
 
       - name: Copy configurations and scripts
         run: |
+          # Copy WAF configs
           mkdir -p ./release/waf/configs
           cp -r waf/configs/* ./release/waf/configs/ 2>/dev/null || true
 
+          # Copy WAF scripts
           mkdir -p ./release/waf/scripts
           cp -r waf/scripts/* ./release/waf/scripts/ 2>/dev/null || true
 
+          # Copy API scripts
           mkdir -p ./release/api/scripts
           cp -r api/scripts/* ./release/api/scripts/ 2>/dev/null || true
 
+          # Copy documentation
           mkdir -p ./release/docs
           cp -r docs/* ./release/docs/ 2>/dev/null || true
           cp README.md ./release/ 2>/dev/null || true
           cp LICENSE ./release/ 2>/dev/null || true
 
+          # Copy sample apps
           mkdir -p ./release/app
           cp -r app/* ./release/app/ 2>/dev/null || true
 
