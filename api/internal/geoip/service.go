@@ -26,10 +26,16 @@ type IPRangesData struct {
 	Ranges []IPRange `json:"ranges"`
 }
 
+// HTTPClientInterface allows mocking HTTP requests for testing
+type HTTPClientInterface interface {
+	Get(url string) (*http.Response, error)
+}
+
 type Service struct {
 	reader      *geoip2.Reader
 	ranges      []IPRange
 	publicIP    string
+	httpClient  HTTPClientInterface // Injected HTTP client for testing
 	mu          sync.RWMutex
 }
 
@@ -80,13 +86,31 @@ func GetInstance() (*Service, error) {
 	return instance, err
 }
 
+// NewServiceWithHTTPClient creates a service with custom HTTP client (for testing)
+func NewServiceWithHTTPClient(httpClient HTTPClientInterface) (*Service, error) {
+	s := &Service{
+		ranges:     []IPRange{},
+		publicIP:   GetPublicIP(), // Detect server's public IP for local IP mapping
+		httpClient: httpClient,
+	}
+
+	// Try to load MaxMind GeoLite2 database
+	return initializeService(s)
+}
+
 // NewService loads MaxMind database if available, otherwise uses JSON fallback
 func NewService() (*Service, error) {
 	s := &Service{
-		ranges:   []IPRange{},
-		publicIP: GetPublicIP(), // Detect server's public IP for local IP mapping
+		ranges:     []IPRange{},
+		publicIP:   GetPublicIP(), // Detect server's public IP for local IP mapping
+		httpClient: &http.Client{Timeout: 3 * time.Second}, // Default HTTP client
 	}
 
+	return initializeService(s)
+}
+
+// initializeService loads database and ranges
+func initializeService(s *Service) (*Service, error) {
 	// Try to load MaxMind GeoLite2 database
 	dbPaths := []string{
 		"geoip/GeoLite2-Country.mmdb",
@@ -286,15 +310,11 @@ func (s *Service) EnrichIPFromService(ipStr string) string {
 		return "Unknown"
 	}
 
-	client := &http.Client{
-		Timeout: 3 * time.Second,
-	}
-
 	// Use ipapi.co which is free and includes country info
 	// Format: https://ipapi.co/{ip}/json/
 	url := fmt.Sprintf("https://ipapi.co/%s/json/", ipStr)
 
-	resp, err := client.Get(url)
+	resp, err := s.httpClient.Get(url)
 	if err != nil {
 		duration := time.Since(startTime).Milliseconds()
 		logger.Log.WithFields(map[string]interface{}{

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { WAFRule, getCreatedDate, getUpdatedDate } from '../../types/waf';
 
 interface RulesListProps {
@@ -21,8 +21,12 @@ export default function RulesList({
   onViewDetails,
 }: RulesListProps) {
   // Se viene passato 'rules' per compatibilità, usalo
-  const allCustomRules = customRules.length > 0 ? customRules : rules;
-  const allDefaultRules = defaultRules;
+  // useMemo previene il loop infinito mantenendo la stessa reference
+  const allCustomRules = useMemo(
+    () => (customRules.length > 0 ? customRules : rules),
+    [customRules, rules]
+  );
+  const allDefaultRules = useMemo(() => defaultRules, [defaultRules]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [threatTypeFilter, setThreatTypeFilter] = useState('all');
@@ -72,14 +76,18 @@ export default function RulesList({
       filteredCustom = filteredCustom.filter(rule => (rule.action || rule.mode) === modeFilter);
     }
 
-    setFilteredCustomRules(filteredCustom);
+      setFilteredCustomRules(filteredCustom);
   }, [allCustomRules, allDefaultRules, searchTerm, threatTypeFilter, modeFilter]);
 
-  const threatTypes = Array.from(
-    new Set(
-      [...allDefaultRules, ...allCustomRules].map(r => r.type || r.threatType || '')
-    )
-  ).filter(t => t !== '');
+  const threatTypes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          [...allDefaultRules, ...allCustomRules].map(r => r.type || r.threatType || '')
+        )
+      ).filter(t => t !== ''),
+    [allDefaultRules, allCustomRules]
+  );
 
   return (
     <div className="space-y-6">

@@ -26,6 +26,8 @@ interface AuthContextType {
   setToken: (token: string | null) => void
   setUser: (user: User | null) => void
   setRequiresTwoFASetup: (requires: boolean) => void
+  setRequiresTwoFA: (requires: boolean) => void
+  setCurrentUserEmail: (email: string | null) => void
 }
 
 interface TwoFASetup {
@@ -202,6 +204,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setToken,
         setUser,
         setRequiresTwoFASetup,
+        setRequiresTwoFA, 
+        setCurrentUserEmail, 
       }}
     >
       {children}

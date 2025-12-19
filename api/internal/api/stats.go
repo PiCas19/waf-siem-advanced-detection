@@ -414,6 +414,29 @@ func WAFStatsHandler(c *gin.Context) {
 	c.JSON(200, stats)
 }
 
+// Package-level variables for testing
+var (
+	turnstileVerifyURL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+	httpClient         = &http.Client{Timeout: 10 * time.Second}
+)
+
+// Test helper functions to override HTTP client and URL
+func SetTurnstileVerifyURL(url string) {
+	turnstileVerifyURL = url
+}
+
+func GetTurnstileVerifyURL() string {
+	return turnstileVerifyURL
+}
+
+func SetHTTPClient(client *http.Client) {
+	httpClient = client
+}
+
+func GetHTTPClient() *http.Client {
+	return httpClient
+}
+
 // verifyTurnstileToken verifies a Cloudflare Turnstile token
 func verifyTurnstileToken(token string) bool {
 	// Get Turnstile secret key from environment
@@ -422,9 +445,6 @@ func verifyTurnstileToken(token string) bool {
 		logger.Log.Warn("TURNSTILE_SECRET_KEY not set in environment")
 		return false
 	}
-
-	// Prepare request to Cloudflare Turnstile verification API
-	verifyURL := "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
 	// Create request body
 	requestBody := map[string]string{
@@ -439,7 +459,7 @@ func verifyTurnstileToken(token string) bool {
 	}
 
 	// Make request to Cloudflare
-	resp, err := http.Post(verifyURL, "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := httpClient.Post(turnstileVerifyURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		logger.Log.WithError(err).Error("Failed to verify Turnstile token")
 		return false

@@ -81,8 +81,13 @@ func ValidateDuration(durationHours int) error {
 		return nil
 	}
 
-	if durationHours <= 0 {
-		return fmt.Errorf("duration must be positive or -1 for permanent")
+	if durationHours == 0 {
+		// 0 significa usa il default (24 hours), è ok
+		return nil
+	}
+
+	if durationHours < 0 {
+		return fmt.Errorf("duration must be positive, 0 for default, or -1 for permanent")
 	}
 
 	// Max 10 years

@@ -89,6 +89,13 @@ func ValidateHeaderSignature(
 	xTimestamp := r.Header.Get(config.TimestampHeaderName)
 	xSignature := r.Header.Get(config.HeaderName)
 
+	// Se la firma è richiesta e X-Public-IP è presente, la firma deve esserci
+	if config.RequireSignature && xPublicIP != "" && xSignature == "" {
+		result.IsValid = false
+		result.ErrorMessage = "Signature required but missing"
+		return result
+	}
+
 	// Se c'è firma, deve essere valida
 	if xSignature != "" {
 		// Validazione timestamp
