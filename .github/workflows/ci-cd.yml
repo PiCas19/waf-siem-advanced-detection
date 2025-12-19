@@ -3,6 +3,8 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main, dev, feature/* ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ main, dev ]
   release:
