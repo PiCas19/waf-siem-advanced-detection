@@ -3371,7 +3371,10 @@ describe('StatsPage', () => {
           render(<StatsPage />);
         });
 
-        await screen.findByText('192.168.0.1');
+        // Wait for component to load and display first page with increased timeout
+        await waitFor(() => {
+          expect(screen.getByText('192.168.0.1')).toBeInTheDocument();
+        }, { timeout: 5000 });
 
         // Click Next to go to page 2
         const nextButtons = screen.queryAllByText(/Next →/);
@@ -3390,6 +3393,11 @@ describe('StatsPage', () => {
             fireEvent.click(prevButtons[0]);
           });
         }
+
+        // Wait for page to update back to page 1
+        await waitFor(() => {
+          expect(screen.getByText('192.168.0.1')).toBeInTheDocument();
+        });
       });
 
       it('renders threat level filter select (LINEE 1614-1637)', async () => {

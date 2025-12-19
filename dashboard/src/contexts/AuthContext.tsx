@@ -51,9 +51,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const storedToken = localStorage.getItem('authToken')
     const storedUser = localStorage.getItem('authUser')
 
+    // React 18 automatic batching handles these setState calls efficiently
+    // This initialization effect only runs once on mount
     if (storedToken && storedUser) {
+      const parsedUser = JSON.parse(storedUser)
       setToken(storedToken)
-      setUser(JSON.parse(storedUser))
+      setUser(parsedUser)
       // Set default auth header
       axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
     }
