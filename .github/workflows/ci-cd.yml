@@ -1,0 +1,535 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, dev, feature/* ]
+  pull_request:
+    branches: [ main, dev ]
+  release:
+    types: [ created ]
+
+env:
+  GO_VERSION: '1.25'
+  NODE_VERSION: '20'
+
+jobs:
+  # ============================================
+  # STAGE 1: INSTALL & LINT
+  # ============================================
+  install-and-lint:
+    name: Install Dependencies & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: |
+            api/go.sum
+            waf/go.sum
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install Go dependencies (API)
+        working-directory: ./api
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Install Go dependencies (WAF)
+        working-directory: ./waf
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Install Node.js dependencies (Dashboard)
+        working-directory: ./dashboard
+        run: npm ci
+
+      - name: Lint Dashboard
+        working-directory: ./dashboard
+        run: npm run lint
+
+  # ============================================
+  # STAGE 2: TESTS
+  # ============================================
+  test-api:
+    name: Test API
+    runs-on: ubuntu-latest
+    needs: install-and-lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: api/go.sum
+
+      - name: Install dependencies
+        working-directory: ./api
+        run: go mod download
+
+      - name: Run API tests
+        working-directory: ./api
+        run: go test ./... -v -race -coverprofile=coverage.out -covermode=atomic
+
+      - name: Generate coverage report
+        working-directory: ./api
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: api/coverage.html
+          retention-days: 7
+
+  test-waf:
+    name: Test WAF
+    runs-on: ubuntu-latest
+    needs: install-and-lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: waf/go.sum
+
+      - name: Install dependencies
+        working-directory: ./waf
+        run: go mod download
+
+      - name: Run WAF tests
+        working-directory: ./waf
+        run: go test ./... -v -race -coverprofile=coverage.out -covermode=atomic
+
+      - name: Generate coverage report
+        working-directory: ./waf
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: waf-coverage
+          path: waf/coverage.html
+          retention-days: 7
+
+  test-dashboard:
+    name: Test Dashboard
+    runs-on: ubuntu-latest
+    needs: install-and-lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./dashboard
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: ./dashboard
+        run: npm run test:run
+
+      - name: Generate coverage
+        working-directory: ./dashboard
+        run: npm run test:coverage
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-coverage
+          path: dashboard/coverage/
+          retention-days: 7
+
+  # test-dashboard-e2e:
+  #   name: Test Dashboard E2E (Cypress)
+  #   runs-on: ubuntu-latest
+  #   needs: install-and-lint
+  #
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: 'npm'
+  #         cache-dependency-path: dashboard/package-lock.json
+  #
+  #     - name: Install dependencies
+  #       working-directory: ./dashboard
+  #       run: npm ci
+  #
+  #     - name: Run Cypress E2E tests
+  #       working-directory: ./dashboard
+  #       run: npm run test:e2e
+  #
+  #     - name: Upload Cypress screenshots
+  #       if: failure()
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: cypress-screenshots
+  #         path: dashboard/cypress/screenshots
+  #         retention-days: 7
+
+  # ============================================
+  # STAGE 3: BUILD
+  # ============================================
+  build-api:
+    name: Build API
+    runs-on: ubuntu-latest
+    needs: [test-api]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: api/go.sum
+
+      - name: Install dependencies
+        working-directory: ./api
+        run: go mod download
+
+      - name: Build API server
+        working-directory: ./api
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/api-server-linux-amd64 ./cmd/api-server
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/api-server-darwin-amd64 ./cmd/api-server
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/api-server-darwin-arm64 ./cmd/api-server
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/api-server-windows-amd64.exe ./cmd/api-server
+
+      - name: Upload API binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-binaries
+          path: api/bin/
+          retention-days: 7
+
+  build-waf:
+    name: Build WAF
+    runs-on: ubuntu-latest
+    needs: [test-waf]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: waf/go.sum
+
+      - name: Install dependencies
+        working-directory: ./waf
+        run: go mod download
+
+      - name: Install xcaddy
+        run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+
+      - name: Build Caddy with WAF plugin
+        working-directory: ./waf
+        run: |
+          mkdir -p bin
+          xcaddy build --output bin/caddy-waf-linux-amd64
+          GOOS=darwin GOARCH=amd64 xcaddy build --output bin/caddy-waf-darwin-amd64
+          GOOS=darwin GOARCH=arm64 xcaddy build --output bin/caddy-waf-darwin-arm64
+          GOOS=windows GOARCH=amd64 xcaddy build --output bin/caddy-waf-windows-amd64.exe
+
+      - name: Build Coraza Forwarder
+        working-directory: ./waf
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/coraza-forwarder-linux-amd64 ./cmd/coraza-forwarder
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/coraza-forwarder-darwin-amd64 ./cmd/coraza-forwarder
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/coraza-forwarder-darwin-arm64 ./cmd/coraza-forwarder
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/coraza-forwarder-windows-amd64.exe ./cmd/coraza-forwarder
+
+      - name: Upload WAF binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: waf-binaries
+          path: waf/bin/
+          retention-days: 7
+
+  build-dashboard:
+    name: Build Dashboard
+    runs-on: ubuntu-latest
+    needs: [test-dashboard]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./dashboard
+        run: npm ci
+
+      - name: Build dashboard
+        working-directory: ./dashboard
+        run: npm run build
+
+      - name: Upload dashboard build
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-build
+          path: dashboard/dist/
+          retention-days: 7
+
+  # ============================================
+  # STAGE 4: PACKAGE
+  # ============================================
+  package:
+    name: Package Release
+    runs-on: ubuntu-latest
+    needs: [build-api, build-waf, build-dashboard]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download API binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: api-binaries
+          path: ./release/api/bin
+
+      - name: Download WAF binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: waf-binaries
+          path: ./release/waf/bin
+
+      - name: Download Dashboard build
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboard-build
+          path: ./release/dashboard
+
+      - name: Copy configurations and scripts
+        run: |
+          # Copy WAF configs
+          mkdir -p ./release/waf/configs
+          cp -r waf/configs/* ./release/waf/configs/
+
+          # Copy WAF scripts
+          mkdir -p ./release/waf/scripts
+          cp -r waf/scripts/* ./release/waf/scripts/
+
+          # Copy API scripts
+          mkdir -p ./release/api/scripts
+          cp -r api/scripts/* ./release/api/scripts/ 2>/dev/null || true
+
+          # Copy documentation
+          mkdir -p ./release/docs
+          cp -r docs/* ./release/docs/ 2>/dev/null || true
+          cp README.md ./release/
+          cp LICENSE ./release/ 2>/dev/null || true
+
+          # Copy sample apps
+          mkdir -p ./release/app
+          cp -r app/* ./release/app/ 2>/dev/null || true
+
+      - name: Create deployment README
+        run: |
+          cat > ./release/DEPLOYMENT.md << 'EOF'
+          # WAF SIEM Advanced Detection - Deployment Package
+
+          ## Package Contents
+
+          - `api/bin/` - API server binaries for multiple platforms
+          - `waf/bin/` - WAF binaries (Caddy + Coraza Forwarder) for multiple platforms
+          - `dashboard/` - Pre-built dashboard (static files)
+          - `waf/configs/` - WAF configuration files
+          - `waf/scripts/` - Deployment and management scripts
+          - `docs/` - Documentation
+          - `app/` - Sample applications
+
+          ## Quick Start
+
+          ### 1. API Server
+          ```bash
+          # Linux
+          cd api/bin
+          chmod +x api-server-linux-amd64
+          ./api-server-linux-amd64
+
+          # macOS (Intel)
+          chmod +x api-server-darwin-amd64
+          ./api-server-darwin-amd64
+
+          # macOS (Apple Silicon)
+          chmod +x api-server-darwin-arm64
+          ./api-server-darwin-arm64
+          ```
+
+          ### 2. WAF
+          ```bash
+          # Linux
+          cd waf/bin
+          chmod +x caddy-waf-linux-amd64
+          chmod +x coraza-forwarder-linux-amd64
+
+          # Start Caddy WAF
+          ./caddy-waf-linux-amd64 run --config ../configs/Caddyfile
+
+          # Start Coraza Forwarder
+          ./coraza-forwarder-linux-amd64
+          ```
+
+          ### 3. Dashboard
+          Serve the `dashboard/` directory with any web server:
+          ```bash
+          # Using Python
+          cd dashboard
+          python3 -m http.server 3000
+
+          # Using Node.js
+          npx serve -s . -p 3000
+
+          # Using Nginx (copy to /var/www/html)
+          ```
+
+          ## Configuration
+
+          1. Configure API connection in dashboard
+          2. Update WAF configs in `waf/configs/`
+          3. Run firewall setup scripts if needed (see `waf/scripts/`)
+
+          ## Platform Selection
+
+          - Linux: `*-linux-amd64`
+          - macOS Intel: `*-darwin-amd64`
+          - macOS Apple Silicon: `*-darwin-arm64`
+          - Windows: `*-windows-amd64.exe`
+
+          For detailed instructions, see `docs/installation.md`
+          EOF
+
+      - name: Set permissions for scripts
+        run: |
+          find ./release -name "*.sh" -type f -exec chmod +x {} \;
+          find ./release -type f -name "*-linux-*" -exec chmod +x {} \;
+          find ./release -type f -name "*-darwin-*" -exec chmod +x {} \;
+
+      - name: Create release archive
+        run: |
+          cd release
+          tar -czf ../waf-siem-advanced-detection.tar.gz .
+          cd ..
+          zip -r waf-siem-advanced-detection.zip release/
+
+      - name: Generate checksums
+        run: |
+          sha256sum waf-siem-advanced-detection.tar.gz > checksums.txt
+          sha256sum waf-siem-advanced-detection.zip >> checksums.txt
+
+      - name: Upload release package (tar.gz)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package-tar
+          path: waf-siem-advanced-detection.tar.gz
+          retention-days: 30
+
+      - name: Upload release package (zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package-zip
+          path: waf-siem-advanced-detection.zip
+          retention-days: 30
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: checksums.txt
+          retention-days: 30
+
+  # ============================================
+  # STAGE 5: DEPLOY (GitHub Release)
+  # ============================================
+  deploy:
+    name: Deploy to GitHub Releases
+    runs-on: ubuntu-latest
+    needs: [package]
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-package-*
+          merge-multiple: true
+
+      - name: Download checksums
+        uses: actions/download-artifact@v4
+        with:
+          name: checksums
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            waf-siem-advanced-detection.tar.gz
+            waf-siem-advanced-detection.zip
+            checksums.txt
+          body: |
+            ## WAF SIEM Advanced Detection Release
+
+            ### Installation
+
+            Download the appropriate archive for your platform:
+            - `waf-siem-advanced-detection.tar.gz` (recommended for Linux/macOS)
+            - `waf-siem-advanced-detection.zip` (recommended for Windows)
+
+            Extract and follow instructions in `DEPLOYMENT.md`
+
+            ### Checksums
+            See `checksums.txt` for SHA256 verification
+
+            ### What's Included
+            - API Server (multi-platform binaries)
+            - WAF with Caddy + Coraza (multi-platform binaries)
+            - Pre-built Dashboard
+            - Configuration files
+            - Deployment scripts
+            - Documentation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

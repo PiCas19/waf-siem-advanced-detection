@@ -1,0 +1,16 @@
+# Act configuration for local testing
+# Install act: https://github.com/nektos/act
+
+# Default platforms
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+-P ubuntu-22.04=catthehacker/ubuntu:act-22.04
+
+# Secrets (add your own)
+# -s GITHUB_TOKEN=your_token_here
+
+# Environment variables
+--env GO_VERSION=1.25
+--env NODE_VERSION=20
+
+# Artifact server (optional)
+# --artifact-server-path /tmp/artifacts
