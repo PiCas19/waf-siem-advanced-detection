@@ -36,8 +36,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: dashboard/package-lock.json
+          # Rimuoviamo le opzioni di cache da qui per evitare l'errore
 
       - name: Install Go dependencies (API)
         working-directory: ./api
@@ -54,6 +53,15 @@ jobs:
       - name: Install Node.js dependencies (Dashboard)
         working-directory: ./dashboard
         run: npm ci
+
+      # Aggiungiamo cache npm DOPO l'installazione delle dipendenze
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
       - name: Lint Dashboard
         working-directory: ./dashboard
@@ -143,8 +151,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: dashboard/package-lock.json
+
+      # Prima ripristiniamo la cache npm
+      - name: Restore npm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
       - name: Install dependencies
         working-directory: ./dashboard
@@ -178,8 +193,14 @@ jobs:
   #       uses: actions/setup-node@v4
   #       with:
   #         node-version: ${{ env.NODE_VERSION }}
-  #         cache: 'npm'
-  #         cache-dependency-path: dashboard/package-lock.json
+  #
+  #     - name: Restore npm cache
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: ~/.npm
+  #         key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-npm-
   #
   #     - name: Install dependencies
   #       working-directory: ./dashboard
@@ -293,8 +314,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: dashboard/package-lock.json
+
+      # Prima ripristiniamo la cache npm
+      - name: Restore npm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
       - name: Install dependencies
         working-directory: ./dashboard
