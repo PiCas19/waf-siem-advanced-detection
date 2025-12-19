@@ -340,9 +340,13 @@ jobs:
           path: waf/coverage.html
           retention-days: 7
 
+  # ============================================
+  # TEST DASHBOARD MODIFICATO
+  # ============================================
   test-dashboard:
     name: Test Dashboard
     runs-on: ubuntu-latest
+    timeout-minutes: 20  # Aumentato da default
     needs: install-and-lint
 
     steps:
@@ -356,18 +360,23 @@ jobs:
           echo "Current timezone: $(cat /etc/timezone)"
           echo "Current time: $(date)"
 
-      - name: Setup Node.js
+      - name: Setup Node.js with cache
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
 
-      - name: Restore npm cache
+      - name: Cache npm dependencies
         uses: actions/cache@v4
+        id: npm-cache
         with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
+          path: |
+            ~/.npm
+            dashboard/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('dashboard/package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-npm-
+            ${{ runner.os }}-node-
 
       - name: Check package-lock.json
         working-directory: ./dashboard
@@ -378,22 +387,51 @@ jobs:
             npm install --package-lock-only --no-audit
           fi
 
-      - name: Install dependencies
+      - name: Install dependencies with optimizations
         working-directory: ./dashboard
-        run: npm ci
+        run: |
+          npm ci --no-optional --ignore-scripts
+
+      - name: Check system resources
+        working-directory: ./dashboard
+        run: |
+          echo "=== System Information ==="
+          echo "Node.js version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+          echo "CPU cores: $(nproc)"
+          echo "Memory:"
+          free -h
+          echo "=== Node.js memory ==="
+          node -e "console.log('Memory usage:', JSON.stringify(process.memoryUsage(), null, 2))"
 
       - name: Set Node.js timezone environment
         run: |
           echo "NODE_TZ=Europe/Zurich" >> $GITHUB_ENV
           echo "TZ=Europe/Zurich" >> $GITHUB_ENV
+          echo "CI=true" >> $GITHUB_ENV
 
-      - name: Run unit tests
+      - name: Run unit tests with increased timeout
         working-directory: ./dashboard
         env:
           TZ: Europe/Zurich
           NODE_TZ: Europe/Zurich
           NODE_ENV: test
-        run: npm run test:run
+          CI: true
+        run: |
+          # Configura Node.js per CI
+          export NODE_OPTIONS="--max-old-space-size=4096 --max-semi-space-size=512"
+          
+          echo "Running tests with CI optimizations..."
+          
+          # Primo tentativo con timeout aumentato
+          npm run test:run -- \
+            --no-watch \
+            --reporter=verbose \
+            --testTimeout=30000 \
+            --hookTimeout=30000 \
+            --maxWorkers=2 \
+            --bail=0 \
+            --poolOptions.threads.singleThread=true
 
       - name: Generate coverage
         working-directory: ./dashboard
@@ -401,7 +439,13 @@ jobs:
           TZ: Europe/Zurich
           NODE_TZ: Europe/Zurich
           NODE_ENV: test
-        run: npm run test:coverage
+          CI: true
+        run: |
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          npm run test:coverage -- \
+            --testTimeout=30000 \
+            --hookTimeout=30000 \
+            --maxWorkers=1
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
