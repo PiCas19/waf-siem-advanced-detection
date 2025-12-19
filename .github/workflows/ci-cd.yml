@@ -36,7 +36,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # Rimuoviamo le opzioni di cache da qui per evitare l'errore
 
       - name: Install Go dependencies (API)
         working-directory: ./api
@@ -50,11 +49,23 @@ jobs:
           go mod download
           go mod verify
 
+      - name: Check and create package-lock.json if missing
+        working-directory: ./dashboard
+        run: |
+          # Check if package-lock.json exists
+          if [ ! -f "package-lock.json" ]; then
+            echo "package-lock.json not found, generating..."
+            npm install --package-lock-only --no-audit
+            echo "package-lock.json generated successfully"
+          else
+            echo "package-lock.json found, proceeding with npm ci"
+          fi
+
       - name: Install Node.js dependencies (Dashboard)
         working-directory: ./dashboard
         run: npm ci
 
-      # Aggiungiamo cache npm DOPO l'installazione delle dipendenze
+      # Cache npm dependencies
       - name: Cache npm dependencies
         uses: actions/cache@v4
         with:
@@ -152,7 +163,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Prima ripristiniamo la cache npm
+      # First restore npm cache
       - name: Restore npm cache
         uses: actions/cache@v4
         with:
@@ -160,6 +171,15 @@ jobs:
           key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-npm-
+
+      - name: Check package-lock.json
+        working-directory: ./dashboard
+        run: |
+          if [ ! -f "package-lock.json" ]; then
+            echo "Error: package-lock.json not found in test-dashboard"
+            echo "Generating package-lock.json..."
+            npm install --package-lock-only --no-audit
+          fi
 
       - name: Install dependencies
         working-directory: ./dashboard
@@ -180,43 +200,94 @@ jobs:
           path: dashboard/coverage/
           retention-days: 7
 
-  # test-dashboard-e2e:
-  #   name: Test Dashboard E2E (Cypress)
-  #   runs-on: ubuntu-latest
-  #   needs: install-and-lint
-  #
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: ${{ env.NODE_VERSION }}
-  #
-  #     - name: Restore npm cache
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: ~/.npm
-  #         key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-npm-
-  #
-  #     - name: Install dependencies
-  #       working-directory: ./dashboard
-  #       run: npm ci
-  #
-  #     - name: Run Cypress E2E tests
-  #       working-directory: ./dashboard
-  #       run: npm run test:e2e
-  #
-  #     - name: Upload Cypress screenshots
-  #       if: failure()
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: cypress-screenshots
-  #         path: dashboard/cypress/screenshots
-  #         retention-days: 7
+  test-dashboard-e2e:
+    name: Test Dashboard E2E (Cypress)
+    runs-on: ubuntu-latest
+    needs: install-and-lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore npm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Check package-lock.json
+        working-directory: ./dashboard
+        run: |
+          if [ ! -f "package-lock.json" ]; then
+            echo "Error: package-lock.json not found in test-dashboard-e2e"
+            echo "Generating package-lock.json..."
+            npm install --package-lock-only --no-audit
+          fi
+
+      - name: Install dependencies
+        working-directory: ./dashboard
+        run: npm ci
+
+      - name: Install Cypress dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3 libxss1 libasound2 libxtst6 xauth xvfb
+
+      # Cache for Cypress binaries to speed up subsequent builds
+      - name: Cache Cypress
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Cypress
+          key: ${{ runner.os }}-cypress-${{ hashFiles('dashboard/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-cypress-
+
+      # Run Cypress tests in headless mode
+      - name: Run Cypress E2E tests
+        working-directory: ./dashboard
+        env:
+          CYPRESS_baseUrl: http://localhost:3000
+        run: |
+          # Modify this command based on your Cypress configuration
+          # If you have a specific npm script
+          if grep -q '"test:e2e"' package.json; then
+            npm run test:e2e
+          else
+            npx cypress run --browser chrome --headless
+          fi
+
+      - name: Upload Cypress videos (if failed)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-videos
+          path: dashboard/cypress/videos
+          retention-days: 7
+
+      - name: Upload Cypress screenshots (if failed)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots
+          path: dashboard/cypress/screenshots
+          retention-days: 7
+
+      - name: Upload Cypress reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-reports
+          path: |
+            dashboard/cypress/reports
+            dashboard/cypress/results
+          retention-days: 7
 
   # ============================================
   # STAGE 3: BUILD
@@ -315,7 +386,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # Prima ripristiniamo la cache npm
+      # First restore npm cache
       - name: Restore npm cache
         uses: actions/cache@v4
         with:
@@ -323,6 +394,15 @@ jobs:
           key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-npm-
+
+      - name: Check package-lock.json
+        working-directory: ./dashboard
+        run: |
+          if [ ! -f "package-lock.json" ]; then
+            echo "Error: package-lock.json not found in build-dashboard"
+            echo "Generating package-lock.json..."
+            npm install --package-lock-only --no-audit
+          fi
 
       - name: Install dependencies
         working-directory: ./dashboard
