@@ -39,9 +39,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: |
-            api/go.sum
-            waf/go.sum
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -124,7 +121,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: api/go.sum
 
       - name: Tidy Go modules
         working-directory: ./api
@@ -169,7 +165,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: waf/go.sum
 
       - name: Tidy Go modules
         working-directory: ./waf
@@ -286,7 +281,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: api/go.sum
 
       - name: Tidy Go modules
         working-directory: ./api
@@ -330,7 +324,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-dependency-path: waf/go.sum
 
       - name: Tidy Go modules
         working-directory: ./waf
