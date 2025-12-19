@@ -22,10 +22,6 @@ class MockWebSocket {
     }, 0);
   }
 
-  send(data: string) {
-    // Mock send
-  }
-
   close() {
     if (this.onclose) {
       setTimeout(() => {
@@ -50,8 +46,6 @@ global.WebSocket = MockWebSocket as any;
 import { connectWebSocket, onWAFEvent } from '../websocket';
 
 describe('websocket', () => {
-  let mockWebSocket: MockWebSocket;
-
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();

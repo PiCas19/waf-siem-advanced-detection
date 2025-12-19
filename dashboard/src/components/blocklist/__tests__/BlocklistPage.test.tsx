@@ -1607,7 +1607,7 @@ describe('BlocklistPage', () => {
 
   // 28. FIX: handles permission checks for all actions
   it('handles permission checks for all actions', async () => {
-    vi.mocked((await import('@/types/rbac')).hasPermission).mockImplementation((role, permission) => {
+    vi.mocked((await import('@/types/rbac')).hasPermission).mockImplementation((_role, permission) => {
       // Simula diversi permessi
       if (permission === 'blocklist_add') return false;
       if (permission === 'blocklist_remove') return false;
@@ -4490,7 +4490,7 @@ describe('BlocklistPage', () => {
 
   // 28. FIX: handles permission checks for all actions
   it('handles permission checks for all actions', async () => {
-    vi.mocked((await import('@/types/rbac')).hasPermission).mockImplementation((role, permission) => {
+    vi.mocked((await import('@/types/rbac')).hasPermission).mockImplementation((_role, permission) => {
       // Simula diversi permessi
       if (permission === 'blocklist_add') return false;
       if (permission === 'blocklist_remove') return false;
@@ -5824,7 +5824,7 @@ describe('BlocklistPage', () => {
   // Test per coprire linea 1580 (condizione di permesso specifica)
   it('handles permission-based UI for whitelist action', async () => {
     // Simula permesso per whitelist ma non per delete
-    vi.mocked((await import('@/types/rbac')).hasPermission).mockImplementation((role, permission) => {
+    vi.mocked((await import('@/types/rbac')).hasPermission).mockImplementation((_role, permission) => {
       if (permission === 'false_positives_resolve') return true;
       if (permission === 'false_positives_delete') return false;
       return false;
@@ -6653,7 +6653,7 @@ describe('BlocklistPage', () => {
   });
 
   it('covers line 1580 - permission check for false positive actions', async () => {
-    vi.mocked((await import('@/types/rbac')).hasPermission).mockImplementation((role, permission) => {
+    vi.mocked((await import('@/types/rbac')).hasPermission).mockImplementation((_role, permission) => {
       if (permission === 'false_positives_resolve') return true;
       if (permission === 'false_positives_delete') return false;
       return true;

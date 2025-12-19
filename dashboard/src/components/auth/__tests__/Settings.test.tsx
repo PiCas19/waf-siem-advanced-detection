@@ -607,7 +607,7 @@ it('should successfully change password', async () => {
       .filter(button => button.textContent !== '← Back');
 
     // Per ogni bottone di toggle, clicca e verifica che l'icona cambi
-    toggleButtons.forEach((button, index) => {
+    toggleButtons.forEach((button) => {
       // Verifica l'icona iniziale (Eye)
       const icon = button.querySelector('svg');
       expect(icon).toBeInTheDocument();
@@ -620,7 +620,7 @@ it('should successfully change password', async () => {
     });
 
     // Clicca di nuovo per tornare allo stato nascosto
-    toggleButtons.forEach((button, index) => {
+    toggleButtons.forEach((button) => {
       fireEvent.click(button);
       expect(button).toHaveAttribute('title', expect.stringContaining('Show password'));
     });

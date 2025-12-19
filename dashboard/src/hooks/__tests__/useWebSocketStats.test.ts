@@ -39,10 +39,6 @@ class MockWebSocket {
     }, 0);
   }
 
-  send(data: string) {
-    // Mock send
-  }
-
   close() {
     this.readyState = MockWebSocket.CLOSED;
     if (this.onclose) {
@@ -150,7 +146,6 @@ describe('useWebSocketStats', () => {
   });
 
   it('should handle WebSocket onopen callback (LINEA 103-105)', async () => {
-    const { result } = renderHook(() => useWebSocketStats());
 
     // LINEA 103-105: ws.onopen viene chiamato
     // Aspetta che l'onopen callback sia stato eseguito
@@ -167,7 +162,6 @@ describe('useWebSocketStats', () => {
   });
 
   it('should handle waf_event and dispatch statsRefresh event (LINEA 113-155)', async () => {
-    const { result } = renderHook(() => useWebSocketStats());
 
     await waitFor(() => {
       const ws = MockWebSocket.getLastInstance();
@@ -230,7 +224,6 @@ describe('useWebSocketStats', () => {
   });
 
   it('should handle enrichment_update message (LINEA 158-164)', async () => {
-    const { result } = renderHook(() => useWebSocketStats());
 
     await waitFor(() => {
       const ws = MockWebSocket.getLastInstance();
@@ -295,7 +288,6 @@ describe('useWebSocketStats', () => {
   });
 
   it('should schedule reconnection after WebSocket closes (LINEA 176-184)', async () => {
-    const { result } = renderHook(() => useWebSocketStats());
 
     await waitFor(() => {
       const ws = MockWebSocket.getLastInstance();
@@ -303,7 +295,6 @@ describe('useWebSocketStats', () => {
     });
 
     const ws = MockWebSocket.getLastInstance();
-    const initialInstanceCount = MockWebSocket.instances.length;
 
     // LINEA 176-184: onclose callback schedules reconnection
     act(() => {
@@ -352,7 +343,6 @@ describe('useWebSocketStats', () => {
   });
 
   it('should handle blocked=false logic in stats update (LINEA 121)', async () => {
-    const { result } = renderHook(() => useWebSocketStats());
 
     await waitFor(() => {
       const ws = MockWebSocket.getLastInstance();

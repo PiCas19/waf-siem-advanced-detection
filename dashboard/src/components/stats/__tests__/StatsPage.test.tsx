@@ -2718,20 +2718,19 @@ describe('StatsPage', () => {
           expect(screen.getByText('Threats Timeline')).toBeInTheDocument();
         });
 
-        // Trova i select per threat level filter
-        const selects = document.querySelectorAll('select');
-        let threatLevelSelect = null;
-        selects.forEach(select => {
-          const options = Array.from(select.options).map(o => o.value);
-          if (options.includes('today') && options.includes('week')) {
-            threatLevelSelect = select;
+        // Trova tutti i select e usa il primo che ha opzioni di tempo
+        const selects = screen.getAllByRole('combobox');
+        
+        // Seleziona il primo select che sembra essere per filtro di tempo
+        if (selects.length > 0) {
+          const threatLevelSelect = selects[0] as HTMLSelectElement;
+          
+          // Verifica che sia un elemento select valido
+          if (threatLevelSelect.tagName === 'SELECT') {
+            await act(async () => {
+              fireEvent.change(threatLevelSelect, { target: { value: 'week' } });
+            });
           }
-        });
-
-        if (threatLevelSelect) {
-          await act(async () => {
-            fireEvent.change(threatLevelSelect, { target: { value: 'week' } });
-          });
         }
       });
 
@@ -3449,7 +3448,6 @@ describe('StatsPage', () => {
       });
 
       it('loads stats data on statsRefresh event (LINEA 557)', async () => {
-        const mockStats = { threats_detected: 5, requests_blocked: 3, total_requests: 50 };
 
         (global.fetch as any).mockResolvedValue({
           ok: true,
@@ -3818,25 +3816,14 @@ describe('StatsPage', () => {
           }),
         });
 
-        const { rerender } = await act(async () => {
-          return render(<StatsPage />);
+        await act(async () => {
+          render(<StatsPage />);
         });
 
-        await screen.findByText('192.168.21.1');
-
-        // Simula nuovo alert con stesso IP e descrizione
-        const newAlert = {
-          ip: '192.168.21.1',
-          method: 'POST',
-          path: '/test2',
-          timestamp: new Date().toISOString(),
-          threat: 'Custom',
-          blocked: false,
-          description: 'Manual Block Test',
-        };
-
         // Il nuovo alert dovrebbe essere ignorato perché esiste già un manual block
-        expect(screen.getByText('192.168.21.1')).toBeInTheDocument();
+        await waitFor(() => {
+          expect(screen.getByText('192.168.21.1')).toBeInTheDocument();
+        });
       });
 
       it('skips auto-blocked threats from manual block rules (LINEE 400-405)', async () => {

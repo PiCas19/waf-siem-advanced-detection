@@ -312,7 +312,7 @@ describe('WorldMapOL', () => {
       getViewport: vi.fn(() => ({ style: { cursor: '' } })),
       getEventPixel: vi.fn(() => [100, 100]),
       hasFeatureAtPixel: vi.fn(() => true),
-      forEachFeatureAtPixel: vi.fn((pixel, callback) => callback(mockFeature)),
+      forEachFeatureAtPixel: vi.fn((callback) => callback(mockFeature)),
     };
     MockMap.mockReturnValueOnce(mockMapInstance);
 
@@ -360,7 +360,7 @@ describe('WorldMapOL', () => {
       getViewport: vi.fn(() => ({ style: { cursor: '' } })),
       getEventPixel: vi.fn(() => [100, 100]),
       hasFeatureAtPixel: vi.fn(() => true),
-      forEachFeatureAtPixel: vi.fn((pixel, callback) => callback(mockFeatureNoGeom)),
+      forEachFeatureAtPixel: vi.fn((callback) => callback(mockFeatureNoGeom)),
     };
     MockMap.mockReturnValueOnce(mockMapInstance);
 
@@ -403,7 +403,7 @@ describe('WorldMapOL', () => {
       getViewport: vi.fn(() => ({ style: { cursor: '' } })),
       getEventPixel: vi.fn(() => [100, 100]),
       hasFeatureAtPixel: vi.fn(() => true),
-      forEachFeatureAtPixel: vi.fn((pixel, callback) => callback(mockFeatureNonPoint)),
+      forEachFeatureAtPixel: vi.fn((callback) => callback(mockFeatureNonPoint)),
     };
     MockMap.mockReturnValueOnce(mockMapInstance);
 
@@ -443,7 +443,7 @@ describe('WorldMapOL', () => {
       getViewport: vi.fn(() => ({ style: { cursor: '' } })),
       getEventPixel: vi.fn(() => [100, 100]),
       hasFeatureAtPixel: vi.fn(() => true),
-      forEachFeatureAtPixel: vi.fn((pixel, callback) => callback(mockFeature)),
+      forEachFeatureAtPixel: vi.fn((callback) => callback(mockFeature)),
     };
     MockMap.mockReturnValueOnce(mockMapInstance);
 
@@ -734,11 +734,6 @@ it('handles geometry instance check correctly', () => {
     getCoordinates: vi.fn(() => [100, 200]),
   };
 
-  const nonPointGeometry = {
-    type: 'LineString',
-    getCoordinates: vi.fn(() => [[100, 200], [150, 250]]),
-  };
-
   // Simula la logica del componente
   const geometry = pointGeometry;
   if (geometry) {
@@ -752,7 +747,7 @@ it('handles geometry instance check correctly', () => {
 
 it('sets popup display to block when hovering feature with Point geometry (LINEA 152)', () => {
   // Import Point per instanceof check
-  const Point = vi.fn(function(coords: any) {
+  const Point = vi.fn(function(this: any, coords: any) {
     this.coords = coords;
     this.getCoordinates = () => coords;
   });
@@ -777,7 +772,7 @@ it('sets popup display to block when hovering feature with Point geometry (LINEA
     getViewport: vi.fn(() => ({ style: { cursor: '' } })),
     getEventPixel: vi.fn(() => [100, 100]),
     hasFeatureAtPixel: vi.fn(() => true),
-    forEachFeatureAtPixel: vi.fn((pixel, callback) => callback(mockFeature)),
+    forEachFeatureAtPixel: vi.fn((callback) => callback(mockFeature)),
   };
   MockMap.mockReturnValueOnce(mockMapInstance);
 
@@ -800,7 +795,6 @@ it('sets popup display to block when hovering feature with Point geometry (LINEA
     };
 
     // Initially popup should be hidden or not set
-    const initialDisplay = popupContainer.style.display;
 
     pointerMoveHandler(mockEvent);
 
@@ -846,7 +840,7 @@ it('sets popup display to none when not hovering feature (LINEA 157)', () => {
 });
 
 it('updates popup content with country, count, and formatted coordinates (LINEE 141-151)', () => {
-  const Point = vi.fn(function(coords: any) {
+  const Point = vi.fn(function(this: any, coords: any) {
     this.coords = coords;
     this.getCoordinates = () => coords;
   });
@@ -871,7 +865,7 @@ it('updates popup content with country, count, and formatted coordinates (LINEE 
     getViewport: vi.fn(() => ({ style: { cursor: '' } })),
     getEventPixel: vi.fn(() => [150, 150]),
     hasFeatureAtPixel: vi.fn(() => true),
-    forEachFeatureAtPixel: vi.fn((pixel, callback) => callback(mockFeature)),
+    forEachFeatureAtPixel: vi.fn((callback) => callback(mockFeature)),
   };
   MockMap.mockReturnValueOnce(mockMapInstance);
 
@@ -977,7 +971,7 @@ it('changes cursor to pointer when feature is hit (LINEA 124)', () => {
     getViewport: vi.fn(() => ({ style: viewportStyle })),
     getEventPixel: vi.fn(() => [100, 100]),
     hasFeatureAtPixel: vi.fn(() => true),
-    forEachFeatureAtPixel: vi.fn((pixel, callback) => callback(mockFeature)),
+    forEachFeatureAtPixel: vi.fn((callback) => callback(mockFeature)),
   };
   MockMap.mockReturnValueOnce(mockMapInstance);
 
@@ -1049,7 +1043,7 @@ it('retrieves feature properties country, count, geometry, color (LINEE 132-135)
     getViewport: vi.fn(() => ({ style: { cursor: '' } })),
     getEventPixel: vi.fn(() => [100, 100]),
     hasFeatureAtPixel: vi.fn(() => true),
-    forEachFeatureAtPixel: vi.fn((pixel, callback) => callback(mockFeature)),
+    forEachFeatureAtPixel: vi.fn((callback) => callback(mockFeature)),
   };
   MockMap.mockReturnValueOnce(mockMapInstance);
 
@@ -1075,7 +1069,7 @@ it('retrieves feature properties country, count, geometry, color (LINEE 132-135)
 });
 
 it('checks if geometry is instanceof Point (LINEA 137)', () => {
-  const Point = vi.fn(function(coords: any) {
+  const Point = vi.fn(function(this: any, coords: any) {
     this.coords = coords;
     this.getCoordinates = () => coords;
   });
@@ -1099,7 +1093,7 @@ it('checks if geometry is instanceof Point (LINEA 137)', () => {
     getViewport: vi.fn(() => ({ style: { cursor: '' } })),
     getEventPixel: vi.fn(() => [100, 100]),
     hasFeatureAtPixel: vi.fn(() => true),
-    forEachFeatureAtPixel: vi.fn((pixel, callback) => callback(mockFeature)),
+    forEachFeatureAtPixel: vi.fn((callback) => callback(mockFeature)),
   };
   MockMap.mockReturnValueOnce(mockMapInstance);
 
@@ -1130,9 +1124,9 @@ it('checks if geometry is instanceof Point (LINEA 137)', () => {
 
 it('calls getCoordinates on Point geometry (LINEA 138)', () => {
   const mockCoords = [88.5, 44.5];
-  const Point = vi.fn(function(coords: any) {
+  const Point = vi.fn(function(this: any, coords: any) {
     this.coords = coords;
-    this.getCoordinates = vi.fn(() => coords);
+    this.getCoordinates = () => coords;
   });
 
   const mockPointGeometry = new (Point as any)(mockCoords);
@@ -1154,7 +1148,7 @@ it('calls getCoordinates on Point geometry (LINEA 138)', () => {
     getViewport: vi.fn(() => ({ style: { cursor: '' } })),
     getEventPixel: vi.fn(() => [100, 100]),
     hasFeatureAtPixel: vi.fn(() => true),
-    forEachFeatureAtPixel: vi.fn((pixel, callback) => callback(mockFeature)),
+    forEachFeatureAtPixel: vi.fn((callback) => callback(mockFeature)),
   };
   MockMap.mockReturnValueOnce(mockMapInstance);
 
@@ -1183,7 +1177,7 @@ it('calls getCoordinates on Point geometry (LINEA 138)', () => {
 
 it('calls popup.setPosition with coordinates (LINEA 139)', () => {
   const mockCoords = [75.25, 30.75];
-  const Point = vi.fn(function(coords: any) {
+  const Point = vi.fn(function(this: any, coords: any) {
     this.coords = coords;
     this.getCoordinates = () => coords;
   });
@@ -1207,7 +1201,7 @@ it('calls popup.setPosition with coordinates (LINEA 139)', () => {
     getViewport: vi.fn(() => ({ style: { cursor: '' } })),
     getEventPixel: vi.fn(() => [100, 100]),
     hasFeatureAtPixel: vi.fn(() => true),
-    forEachFeatureAtPixel: vi.fn((pixel, callback) => callback(mockFeature)),
+    forEachFeatureAtPixel: vi.fn((callback) => callback(mockFeature)),
   };
   MockMap.mockReturnValueOnce(mockMapInstance);
 

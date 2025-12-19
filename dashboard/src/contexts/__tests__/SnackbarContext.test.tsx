@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach} from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { ToastProvider, useToast, useSnackbar } from '../SnackbarContext';
 
@@ -48,7 +48,7 @@ describe('SnackbarContext', () => {
       });
 
       act(() => {
-        result.current.showToast('Test message');
+        result.current.showToast('Test message', 'info');
       });
 
       expect(result.current.toasts).toHaveLength(1);
@@ -90,9 +90,9 @@ describe('SnackbarContext', () => {
       });
 
       act(() => {
-        result.current.showToast('First toast');
-        result.current.showToast('Second toast');
-        result.current.showToast('Third toast');
+        result.current.showToast('First toast', 'info');
+        result.current.showToast('Second toast', 'info');
+        result.current.showToast('Third toast', 'info');
       });
 
       expect(result.current.toasts).toHaveLength(3);
@@ -107,8 +107,8 @@ describe('SnackbarContext', () => {
       });
 
       act(() => {
-        result.current.showToast('Toast 1');
-        result.current.showToast('Toast 2');
+        result.current.showToast('Toast 1', 'info');
+        result.current.showToast('Toast 2', 'info');
       });
 
       expect(result.current.toasts[0].id).not.toBe(result.current.toasts[1].id);
@@ -148,7 +148,7 @@ describe('SnackbarContext', () => {
       });
 
       act(() => {
-        result.current.showToast('Toast to remove');
+        result.current.showToast('Toast to remove','info');
       });
 
       const toastId = result.current.toasts[0].id;
@@ -166,9 +166,9 @@ describe('SnackbarContext', () => {
       });
 
       act(() => {
-        result.current.showToast('Toast 1');
-        result.current.showToast('Toast 2');
-        result.current.showToast('Toast 3');
+        result.current.showToast('Toast 1', 'info');
+        result.current.showToast('Toast 2', 'info');
+        result.current.showToast('Toast 3', 'info');
       });
 
       const toast2Id = result.current.toasts[1].id;
@@ -188,8 +188,8 @@ describe('SnackbarContext', () => {
       });
 
       act(() => {
-        result.current.showToast('Toast 1');
-        result.current.showToast('Toast 2');
+        result.current.showToast('Toast 1', 'info');
+        result.current.showToast('Toast 2', 'info');
       });
 
       act(() => {
@@ -205,9 +205,9 @@ describe('SnackbarContext', () => {
       });
 
       act(() => {
-        result.current.showToast('Toast 1');
-        result.current.showToast('Toast 2');
-        result.current.showToast('Toast 3');
+        result.current.showToast('Toast 1', 'info');
+        result.current.showToast('Toast 2', 'info');
+        result.current.showToast('Toast 3', 'info');
       });
 
       const ids = result.current.toasts.map((t) => t.id);
@@ -229,7 +229,7 @@ describe('SnackbarContext', () => {
       expect(result.current.toasts).toEqual([]);
 
       act(() => {
-        result.current.showToast('Test with useSnackbar');
+        result.current.showToast('Test with useSnackbar', 'info');
       });
 
       expect(result.current.toasts).toHaveLength(1);
@@ -261,7 +261,7 @@ describe('SnackbarContext', () => {
 
       // Add first toast
       act(() => {
-        result.current.showToast('Toast 1');
+        result.current.showToast('Toast 1', 'info');
       });
       expect(result.current.toasts).toHaveLength(1);
 
@@ -269,7 +269,7 @@ describe('SnackbarContext', () => {
 
       // Add second toast
       act(() => {
-        result.current.showToast('Toast 2');
+        result.current.showToast('Toast 2', 'info');
       });
       expect(result.current.toasts).toHaveLength(2);
 
@@ -282,7 +282,7 @@ describe('SnackbarContext', () => {
 
       // Add third toast
       act(() => {
-        result.current.showToast('Toast 3');
+        result.current.showToast('Toast 3', 'info');
       });
       expect(result.current.toasts).toHaveLength(2);
 

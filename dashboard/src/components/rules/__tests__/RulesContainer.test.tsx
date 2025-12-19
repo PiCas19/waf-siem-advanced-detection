@@ -279,10 +279,6 @@ describe('RulesContainer Component', () => {
 
       await renderComponent()
       await new Promise((resolve) => setTimeout(resolve, 200))
-
-      // Delete should not proceed if user cancels
-      const fetchCallsBefore = (global.fetch as any).mock.calls.length
-
       // Would need to trigger delete, but confirm will prevent it
       expect(global.confirm).toBeDefined()
 

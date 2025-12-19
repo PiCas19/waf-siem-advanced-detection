@@ -64,7 +64,7 @@ describe('AvatarMenu', () => {
       logout: mockLogout,
     });
 
-    const { container } = render(<AvatarMenu />);
+    render(<AvatarMenu />);
 
     // Open menu
     const avatarButton = screen.getByRole('button');

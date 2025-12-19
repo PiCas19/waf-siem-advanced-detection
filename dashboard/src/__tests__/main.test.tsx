@@ -191,14 +191,8 @@ describe('Main.tsx', () => {
       vi.spyOn(document, 'getElementById').mockReturnValue(null)
 
       // Mock createRoot per accettare null e lanciare un errore
-      mockCreateRoot.mockImplementationOnce((element) => {
-        if (element === null) {
-          throw new Error('Cannot create root on null element')
-        }
-        return {
-          render: mockRender,
-          unmount: mockUnmount,
-        }
+      mockCreateRoot.mockImplementationOnce(() => {
+        throw new Error('Cannot create root on null element')
       })
 
       // Il codice usa l'operatore !, quindi passerà null a createRoot
@@ -486,8 +480,6 @@ describe('Main.tsx', () => {
     it('should work when called multiple times', async () => {
       // Prima importazione
       await import('../main')
-      const firstCallCount = mockCreateRoot.mock.calls.length
-
       // Reset
       vi.resetModules()
       vi.clearAllMocks()
