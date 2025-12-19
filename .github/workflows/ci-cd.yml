@@ -262,115 +262,175 @@ jobs:
           path: dashboard/coverage/
           retention-days: 7
 
-  test-dashboard-e2e:
-    name: Test Dashboard E2E (Cypress)
-    runs-on: ubuntu-latest
-    needs: install-and-lint
+test-dashboard-e2e:
+  name: Test Dashboard E2E (Cypress)
+  runs-on: ubuntu-latest
+  needs: install-and-lint
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set timezone to Europe/Zurich
-        run: |
-          sudo ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
-          echo "Europe/Zurich" | sudo tee /etc/timezone
-          echo "Current timezone: $(cat /etc/timezone)"
-          echo "Current time: $(date)"
+    - name: Set timezone to Europe/Zurich
+      run: |
+        sudo ln -sf /usr/share/zoneinfo/Europe/Zurich /etc/localtime
+        echo "Europe/Zurich" | sudo tee /etc/timezone
+        echo "Current timezone: $(cat /etc/timezone)"
+        echo "Current time: $(date)"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
 
-      - name: Restore npm cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-
+    - name: Restore npm cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-npm-${{ hashFiles('dashboard/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-npm-
 
-      - name: Check package-lock.json
-        working-directory: ./dashboard
-        run: |
-          if [ ! -f "package-lock.json" ]; then
-            echo "Error: package-lock.json not found in test-dashboard-e2e"
-            echo "Generating package-lock.json..."
-            npm install --package-lock-only --no-audit
-          fi
+    - name: Install dashboard dependencies
+      working-directory: ./dashboard
+      run: |
+        if [ ! -f "package-lock.json" ]; then
+          npm install --package-lock-only --no-audit
+        fi
+        npm ci
 
-      - name: Install dependencies
-        working-directory: ./dashboard
-        run: npm ci
+    # Updated Cypress dependencies
+    - name: Install Cypress dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libgtk-3-0 \
+          libgbm-dev \
+          libnotify-dev \
+          libnss3 \
+          libxss1 \
+          libxtst6 \
+          xvfb \
+          xauth \
+          libasound2-tools \
+          libasound2-plugins \
+          libasound2-data
 
-      # Updated Cypress dependencies for newer Ubuntu versions
-      - name: Install Cypress dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-3-0 \
-            libgbm-dev \
-            libnotify-dev \
-            libnss3 \
-            libxss1 \
-            libxtst6 \
-            xvfb \
-            xauth \
-            libasound2-tools \
-            libasound2-plugins \
-            libasound2-data
+    # Cache for Cypress binaries
+    - name: Cache Cypress
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/Cypress
+        key: ${{ runner.os }}-cypress-${{ hashFiles('dashboard/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-cypress-
 
-      # Cache for Cypress binaries to speed up subsequent builds
-      - name: Cache Cypress
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/Cypress
-          key: ${{ runner.os }}-cypress-${{ hashFiles('dashboard/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-cypress-
+    # IMPORTANTE: Avvia il server React in background
+    - name: Start React development server
+      working-directory: ./dashboard
+      env:
+        NODE_ENV: development
+        PORT: 3000
+      run: |
+        # Avvia il server in background
+        npm start > server.log 2>&1 &
+        SERVER_PID=$!
+        echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+        
+        # Attendi che il server sia pronto
+        echo "Waiting for React server to start..."
+        sleep 10
+        
+        # Controlla se il server è in esecuzione
+        if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200\|30"; then
+          echo "React server is running"
+        else
+          echo "React server failed to start"
+          cat server.log
+          exit 1
+        fi
 
-      # Run Cypress tests in headless mode
-      - name: Run Cypress E2E tests
-        working-directory: ./dashboard
-        env:
-          TZ: Europe/Zurich
-          NODE_TZ: Europe/Zurich
-          CYPRESS_baseUrl: http://localhost:3000
-        run: |
-          # Modify this command based on your Cypress configuration
-          # If you have a specific npm script
-          if grep -q '"test:e2e"' package.json; then
-            npm run test:e2e
-          else
-            npx cypress run --browser chrome --headless
-          fi
+    # Opzionale: Avvia anche l'API backend se necessario
+    - name: Start API backend (if needed)
+      working-directory: ./api
+      run: |
+        # Se hai bisogno dell'API, avviala in background
+        # npm run dev > api.log 2>&1 &
+        # API_PID=$!
+        # echo "API_PID=$API_PID" >> $GITHUB_ENV
+        # sleep 5
+        echo "API not started in this example"
 
-      - name: Upload Cypress videos (if failed)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cypress-videos
-          path: dashboard/cypress/videos
-          retention-days: 7
+    # Run Cypress tests
+    - name: Run Cypress E2E tests
+      working-directory: ./dashboard
+      env:
+        TZ: Europe/Zurich
+        NODE_TZ: Europe/Zurich
+        CYPRESS_baseUrl: http://localhost:3000
+        # Aggiungi altre variabili d'ambiente necessarie
+        # CYPRESS_apiUrl: http://localhost:8080
+      run: |
+        # Verifica che il server sia attivo
+        curl -f http://localhost:3000 || exit 1
+        
+        # Esegui Cypress
+        if grep -q '"cypress:run"' dashboard/package.json; then
+          npm run cypress:run
+        elif grep -q '"test:e2e"' dashboard/package.json; then
+          npm run test:e2e
+        else
+          # Modalità interattiva per debugging
+          echo "No specific Cypress script found, running default command"
+          npx cypress run --browser chrome --headless
+        fi
 
-      - name: Upload Cypress screenshots (if failed)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cypress-screenshots
-          path: dashboard/cypress/screenshots
-          retention-days: 7
+    # Pulisci: ferma i server dopo i test
+    - name: Stop servers
+      if: always()
+      run: |
+        if [ -n "$SERVER_PID" ]; then
+          kill $SERVER_PID 2>/dev/null || true
+        fi
+        if [ -n "$API_PID" ]; then
+          kill $API_PID 2>/dev/null || true
+        fi
 
-      - name: Upload Cypress reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cypress-reports
-          path: |
-            dashboard/cypress/reports
-            dashboard/cypress/results
-          retention-days: 7
+    - name: Upload Cypress videos (if failed)
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cypress-videos
+        path: dashboard/cypress/videos
+        retention-days: 7
+
+    - name: Upload Cypress screenshots (if failed)
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cypress-screenshots
+        path: dashboard/cypress/screenshots
+        retention-days: 7
+
+    - name: Upload Cypress reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cypress-reports
+        path: |
+          dashboard/cypress/reports
+          dashboard/cypress/results
+        retention-days: 7
+
+    - name: Upload server logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: server-logs
+        path: |
+          dashboard/server.log
+          # api/api.log (se attivo)
+        retention-days: 7
 
   # ============================================
   # STAGE 3: BUILD
