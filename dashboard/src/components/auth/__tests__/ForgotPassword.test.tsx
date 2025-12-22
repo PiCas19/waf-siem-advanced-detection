@@ -338,18 +338,22 @@ describe('ForgotPassword', () => {
       const passwordInputs = screen.getAllByPlaceholderText('••••••••');
       const newPasswordInput = passwordInputs[0] as HTMLInputElement;
 
-      // Trova i bottoni di toggle (emoji occhio)
-      const toggleButtons = screen.getAllByText('👁️');
+      // Cerchiamo i bottoni di toggle tramite aria-label (che abbiamo aggiunto nel componente)
+      const toggleButtons = screen.getAllByLabelText('Show password');
 
+      // Inizialmente è nascosto
       expect(newPasswordInput.type).toBe('password');
 
       await act(async () => {
         fireEvent.click(toggleButtons[0]);
       });
 
+      // Ora dovrebbe essere visibile
       expect(newPasswordInput.type).toBe('text');
-    });
 
+      // Il bottone ora dovrebbe avere aria-label "Hide password"
+      expect(toggleButtons[0]).toHaveAttribute('aria-label', 'Hide password');
+    });
     // TEST PER COPRIRE LINEA 193: toggle visibility del confirm password (secondo input)
     it('should toggle confirm password visibility', async () => {
       render(
@@ -361,24 +365,19 @@ describe('ForgotPassword', () => {
       const passwordInputs = screen.getAllByPlaceholderText('••••••••');
       const confirmPasswordInput = passwordInputs[1] as HTMLInputElement;
 
-      // Trova i bottoni di toggle (emoji occhio) - ci dovrebbero essere 2
-      const toggleButtons = screen.getAllByText('👁️');
-      expect(toggleButtons).toHaveLength(2);
+      const toggleButtons = screen.getAllByLabelText('Show password');
 
-      // Inizialmente è di tipo password
+      expect(toggleButtons).toHaveLength(2);
       expect(confirmPasswordInput.type).toBe('password');
 
-      // LINEA 193: Clicca sul SECONDO bottone di toggle (per confirm password)
       await act(async () => {
-        fireEvent.click(toggleButtons[1]);
+        fireEvent.click(toggleButtons[1]); // secondo bottone = confirm password
       });
 
-      // Dovrebbe diventare text
       expect(confirmPasswordInput.type).toBe('text');
 
-      // Verifica che ora mostri l'emoji 🙈
-      const hideButtons = screen.getAllByText('🙈');
-      expect(hideButtons.length).toBeGreaterThanOrEqual(1);
+      // Dopo il click, il secondo bottone dovrebbe mostrare "Hide password"
+      expect(toggleButtons[1]).toHaveAttribute('aria-label', 'Hide password');
     });
 
     it('should show error when fields are empty', async () => {
@@ -395,6 +394,35 @@ describe('ForgotPassword', () => {
       });
 
       expect(screen.getByText(/Please fill all fields/i)).toBeInTheDocument();
+    });
+
+    it('should toggle both password fields independently', async () => {
+      render(
+        <MemoryRouter initialEntries={['/forgot-password?token=abc123']}>
+          <ForgotPassword />
+        </MemoryRouter>
+      );
+
+      const [newPassInput, confirmPassInput] = screen
+        .getAllByPlaceholderText('••••••••')
+        .map(input => input as HTMLInputElement);
+
+      const toggleButtons = screen.getAllByLabelText('Show password');
+
+      // Toggle solo il primo
+      await act(async () => fireEvent.click(toggleButtons[0]));
+      expect(newPassInput.type).toBe('text');
+      expect(confirmPassInput.type).toBe('password');
+
+      // Toggle solo il secondo
+      await act(async () => fireEvent.click(toggleButtons[1]));
+      expect(newPassInput.type).toBe('text');
+      expect(confirmPassInput.type).toBe('text');
+
+      // Toggle di nuovo il primo per nasconderlo
+      await act(async () => fireEvent.click(toggleButtons[0]));
+      expect(newPassInput.type).toBe('password');
+      expect(confirmPassInput.type).toBe('text');
     });
 
 
@@ -446,10 +474,8 @@ describe('ForgotPassword', () => {
           <ForgotPassword />
         </BrowserRouter>
       );
-
       const backButton = screen.getByText('Back to Login');
       fireEvent.click(backButton);
-
       expect(mockNavigate).toHaveBeenCalledWith('/login');
     });
   });

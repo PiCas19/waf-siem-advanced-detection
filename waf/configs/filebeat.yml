@@ -34,7 +34,7 @@ filebeat.inputs:
 output.elasticsearch:
   hosts: ["https://10.246.50.82:9200"]
   username: "elastic"
-  password: "KWZNH8hg3GQ64Sf"
+  password: "changeme"
   ssl:
     enabled: true
     verification_mode: none

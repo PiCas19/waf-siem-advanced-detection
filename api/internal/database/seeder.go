@@ -39,7 +39,7 @@ func SeedDefaultUsers(db *gorm.DB) error {
 		Active:       true,
 		PasswordHash: string(passwordHash),
 		TwoFAEnabled: false,
-		MustSetup2FA: true,  // Force 2FA setup on first login
+		MustSetup2FA: true, 
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
@@ -47,11 +47,6 @@ func SeedDefaultUsers(db *gorm.DB) error {
 	if err := db.Create(&rootUser).Error; err != nil {
 		return err
 	}
-
-	log.Println("[INFO] ✅ Root admin user created successfully!")
-	log.Println("[INFO] Email: root@admin.local")
-	log.Println("[INFO] Password: RootAdmin123!")
-	log.Println("[INFO] ⚠️  Please change the password after first login!")
 
 	return nil
 }
