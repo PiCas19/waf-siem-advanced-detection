@@ -124,10 +124,11 @@ node server.js
 
 ## 📖 Documentation
 
-- [Architecture](docs/architecture.md)
-- [Installation Guide](docs/installation.md)
-- [API Reference](docs/api-reference.md)
-- [Configuration](docs/configuration.md)
+- [Architecture](docs/architecture.md) - System architecture and design
+- [Installation Guide](docs/installation.md) - Setup and installation
+- [API Reference](docs/api-reference.md) - API endpoints documentation
+- [Configuration](docs/configuration.md) - Configuration options
+- [Deployment Guide](DEPLOYMENT.md) - Production deployment
 
 ## 🔒 Security
 

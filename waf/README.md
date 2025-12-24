@@ -60,7 +60,7 @@ Enterprise-grade Web Application Firewall with dual-layer protection: OWASP ModS
 - Blocking actions (block, drop, redirect, challenge)
 - Dashboard integration
 
-**See [ARCHITECTURE.md](ARCHITECTURE.md) for complete details.**
+**See [Architecture Documentation](../docs/architecture.md) for complete details.**
 
 ## Features
 
@@ -248,9 +248,10 @@ Features:
 
 ## Documentation
 
-- **Architecture Overview**: [ARCHITECTURE.md](ARCHITECTURE.md) - Complete dual-layer architecture explanation
-- **Quick Start**: [DUAL-WAF-QUICKSTART.md](DUAL-WAF-QUICKSTART.md) - Deploy in 3 steps
-- **Full Deployment Guide**: [CORAZA-DEPLOYMENT.md](CORAZA-DEPLOYMENT.md) - Detailed deployment instructions
+- **Architecture Overview**: [Architecture Guide](../docs/architecture.md) - Complete dual-layer architecture explanation
+- **Installation Guide**: [Installation Guide](../docs/installation.md) - Setup and installation instructions
+- **Configuration Guide**: [Configuration Guide](../docs/configuration.md) - Configuration details
+- **Deployment Guide**: [Deployment Guide](../DEPLOYMENT.md) - Production deployment instructions
 
 ## Project Structure
 
