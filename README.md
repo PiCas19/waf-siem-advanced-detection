@@ -85,14 +85,6 @@ This project implements Zero Trust Network Access (ZTNA) principles:
 - **Database**: SQLite/PostgreSQL
 - **Deployment**: Docker, Kubernetes
 
-
-## 🧪 Testing
-```bash
-# Run WAF tests
-cd waf && go test ./...
-
-# Run integration tests
-./scripts/test.sh
 ```
 ## 📝 License
 
