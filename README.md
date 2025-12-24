@@ -28,10 +28,7 @@ waf-siem-advanced-detection/
 ├── waf/              # WAF core module (Go)
 ├── dashboard/        # React dashboard (TypeScript)
 ├── api/              # Backend API (Go + JWT)
-├── deployment/       # Docker, Kubernetes configs
-├── docs/             # Documentation
-├── scripts/          # Build and deployment scripts
-└── examples/         # Example configurations
+└── docs/             # Documentation
 ```
 
 ## 🚀 Quick Start
