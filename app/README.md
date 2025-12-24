@@ -290,9 +290,13 @@ curl 'http://localhost:3000/api/search?q=<script>alert(1)</script>'
 
 ## 🔗 Related Documentation
 
-- [WAF Architecture](../waf/ARCHITECTURE.md)
-- [WAF Deployment Guide](../waf/CORAZA-DEPLOYMENT.md)
+- [Architecture Guide](../docs/architecture.md)
+- [Installation Guide](../docs/installation.md)
+- [Configuration Guide](../docs/configuration.md)
+- [Deployment Guide](../DEPLOYMENT.md)
+- [WAF Documentation](../waf/README.md)
 - [API Documentation](../api/README.md)
+- [Dashboard Documentation](../dashboard/README.md)
 - [Main Project README](../README.md)
 
 ---
