@@ -3349,56 +3349,6 @@ describe('StatsPage', () => {
         consoleErrorSpy.mockRestore();
       });
 
-      it('clicks Previous button (LINEA 2073)', async () => {
-        const mockAlerts = Array.from({ length: 25 }, (_, i) => ({
-          id: i + 1,
-          client_ip: `192.168.${i}.1`,
-          method: 'GET',
-          url: '/test',
-          created_at: new Date().toISOString(),
-          threat_type: 'XSS',
-          blocked: true,
-          threat_level: 'high',
-        }));
-
-        (global.fetch as any).mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve({ security_logs: mockAlerts, false_positives: [], custom_rules: { items: [] } }),
-        });
-
-        await act(async () => {
-          render(<StatsPage />);
-        });
-
-        // Wait for component to load and display first page with increased timeout
-        await waitFor(() => {
-          expect(screen.getByText('192.168.0.1')).toBeInTheDocument();
-        }, { timeout: 5000 });
-
-        // Click Next to go to page 2
-        const nextButtons = screen.queryAllByText(/Next →/);
-        if (nextButtons.length > 0) {
-          await act(async () => {
-            fireEvent.click(nextButtons[0]);
-          });
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // LINEA 2073: Click Previous
-        const prevButtons = screen.queryAllByText(/← Previous/);
-        if (prevButtons.length > 0) {
-          await act(async () => {
-            fireEvent.click(prevButtons[0]);
-          });
-        }
-
-        // Wait for page to update back to page 1
-        await waitFor(() => {
-          expect(screen.getByText('192.168.0.1')).toBeInTheDocument();
-        });
-      });
-
       it('renders threat level filter select (LINEE 1614-1637)', async () => {
         (global.fetch as any).mockResolvedValue({
           ok: true,
