@@ -27,13 +27,15 @@ jobs:
         working-directory: ./api
         run: |
           echo "=== API Outdated Packages ==="
-          go list -u -m all | grep '\['
+          go mod download
+          go list -u -m all | grep '\[' || echo "All packages are up to date"
 
       - name: Check for outdated Go packages (WAF)
         working-directory: ./waf
         run: |
           echo "=== WAF Outdated Packages ==="
-          go list -u -m all | grep '\['
+          go mod download
+          go list -u -m all | grep '\[' || echo "All packages are up to date"
 
   # ============================================
   # Node.js Dependencies Update Check
