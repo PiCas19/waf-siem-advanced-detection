@@ -74,7 +74,12 @@ jobs:
         with:
           go-version: '1.25'
 
-      - name: Update Go dependencies graph
-        uses: advanced-security/go-dependency-submission-action@v1
+      - name: Update Go dependencies graph (API)
+        uses: actions/go-dependency-submission@v1
         with:
-          go-list: ./api/... ./waf/...
+          go-mod-path: ./api/go.mod
+
+      - name: Update Go dependencies graph (WAF)
+        uses: actions/go-dependency-submission@v1
+        with:
+          go-mod-path: ./waf/go.mod
