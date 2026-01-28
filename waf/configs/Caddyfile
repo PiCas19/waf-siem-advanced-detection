@@ -205,115 +205,7 @@
         }
     }
 
-    # Block everything else
-    handle {
-        respond "Not Found" 404
-    }
-
-    # Logging
-    log {
-        output file /var/log/caddy/access_wan.log
-        format json
-    }
-}
-
-# ==============================================================================
-# LAN - Port 8080 (HTTP) - Full Dashboard Access
-# ==============================================================================
-
-:8080 {
-    bind 0.0.0.0
-
-    # WebSocket
-    handle /ws {
-        reverse_proxy {
-            lb_policy least_conn
-            health_uri /health
-            health_interval 10s
-            health_timeout 2s
-            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
-            header_up Connection "Upgrade"
-            header_up Upgrade "websocket"
-            transport http {
-                read_timeout 0s
-                write_timeout 0s
-                dial_timeout 2s
-                keepalive 30s
-            }
-        }
-    }
-
-    # API
-    handle /api* {
-        reverse_proxy {
-            lb_policy least_conn
-            health_uri /health
-            health_interval 10s
-            health_timeout 2s
-            to 127.0.0.1:8081 127.0.0.1:8082 127.0.0.1:8083
-            transport http {
-                read_timeout 30s
-                write_timeout 30s
-                dial_timeout 2s
-                keepalive 30s
-            }
-        }
-    }
-
-    # Static Files
-    handle /assets/* {
-        root * /var/www/html
-        file_server
-        header Cache-Control "public, max-age=31536000"
-    }
-
-    handle /favicon.ico {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /manifest.json {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /robots.txt {
-        root * /var/www/html
-        file_server
-    }
-
-    handle /vite.svg {
-        root * /var/www/html
-        file_server
-    }
-
-    # SPA Routing with WAF
-    handle {
-        import coraza_layer
-        import waf_wan_full
-
-        root * /var/www/html
-        try_files {path} /index.html
-        file_server
-        encode gzip zstd
-    }
-
-    # Logging
-    log {
-        output file /var/log/caddy/access_lan_http.log
-        format json
-    }
-}
-
-# ==============================================================================
-# LAN - Port 8443 (HTTPS) - Full Dashboard Access
-# ==============================================================================
-
-:8443 {
-    bind 0.0.0.0
-    tls /etc/caddy/certs/cert.pem /etc/caddy/certs/privkey.pem
-
-    # WebSocket
+    # Dashboard - WebSocket
     handle /ws {
         reverse_proxy {
             lb_policy least_conn
@@ -333,8 +225,10 @@
         }
     }
 
-    # API
+    # Dashboard - API
     handle /api* {
+        import coraza_layer
+        import waf_wan
         reverse_proxy {
             lb_policy least_conn
             health_uri /health
@@ -351,7 +245,7 @@
         }
     }
 
-    # Static Files
+    # Dashboard - Static Files
     handle /assets/* {
         root * /var/www/html
         file_server
@@ -378,10 +272,10 @@
         file_server
     }
 
-    # SPA Routing with WAF
+    # Dashboard - SPA Routing with WAF
     handle {
         import coraza_layer
-        import waf_lan
+        import waf_wan
 
         root * /var/www/html
         try_files {path} /index.html
@@ -391,13 +285,13 @@
 
     # Logging
     log {
-        output file /var/log/caddy/access_lan_https.log
+        output file /var/log/caddy/access_wan.log
         format json
     }
 }
 
 # ==============================================================================
-# LAN - HTTP on IP:80 - Full Dashboard Access
+# LAN - Port 80 (HTTP) - Full Dashboard Access
 # ==============================================================================
 
 http://172.16.216.10 {
