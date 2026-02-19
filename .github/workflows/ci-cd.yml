@@ -340,10 +340,26 @@ jobs:
         working-directory: ./waf
         run: |
           mkdir -p bin
-          xcaddy build --output bin/caddy-waf-linux-amd64
-          GOOS=darwin GOARCH=amd64 xcaddy build --output bin/caddy-waf-darwin-amd64
-          GOOS=darwin GOARCH=arm64 xcaddy build --output bin/caddy-waf-darwin-arm64
-          GOOS=windows GOARCH=amd64 xcaddy build --output bin/caddy-waf-windows-amd64.exe
+          xcaddy build v2.10.2 \
+            --with github.com/corazawaf/coraza-caddy/v2@latest \
+            --with github.com/PiCas19/waf-siem-advanced-detection/waf=./ \
+            --with github.com/tailscale/caddy-tailscale \
+            --output bin/caddy-waf-linux-amd64
+          GOOS=darwin GOARCH=amd64 xcaddy build v2.10.2 \
+            --with github.com/corazawaf/coraza-caddy/v2@latest \
+            --with github.com/PiCas19/waf-siem-advanced-detection/waf=./ \
+            --with github.com/tailscale/caddy-tailscale \
+            --output bin/caddy-waf-darwin-amd64
+          GOOS=darwin GOARCH=arm64 xcaddy build v2.10.2 \
+            --with github.com/corazawaf/coraza-caddy/v2@latest \
+            --with github.com/PiCas19/waf-siem-advanced-detection/waf=./ \
+            --with github.com/tailscale/caddy-tailscale \
+            --output bin/caddy-waf-darwin-arm64
+          GOOS=windows GOARCH=amd64 xcaddy build v2.10.2 \
+            --with github.com/corazawaf/coraza-caddy/v2@latest \
+            --with github.com/PiCas19/waf-siem-advanced-detection/waf=./ \
+            --with github.com/tailscale/caddy-tailscale \
+            --output bin/caddy-waf-windows-amd64.exe
 
       - name: Build Coraza Forwarder
         working-directory: ./waf
