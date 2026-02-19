@@ -290,13 +290,13 @@ jobs:
         working-directory: ./api
         run: go mod download
 
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y gcc
+
       - name: Build API server
         working-directory: ./api
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/api-server-linux-amd64 ./cmd/api-server
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/api-server-darwin-amd64 ./cmd/api-server
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/api-server-darwin-arm64 ./cmd/api-server
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/api-server-windows-amd64.exe ./cmd/api-server
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/api-server-linux-amd64 ./cmd/api-server
 
       - name: Upload API binaries
         uses: actions/upload-artifact@v4
