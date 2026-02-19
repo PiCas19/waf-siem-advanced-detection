@@ -1,8 +1,6 @@
 name: Dependency Management
-
 on:
   schedule:
-    # Check for dependency updates weekly on Monday at 9 AM UTC
     - cron: '0 9 * * 1'
   workflow_dispatch:
 
@@ -13,7 +11,6 @@ jobs:
   go-deps-update:
     name: Check Go Dependencies Updates
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -43,7 +40,6 @@ jobs:
   npm-deps-update:
     name: Check NPM Dependencies Updates
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -66,7 +62,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -76,10 +71,18 @@ jobs:
         with:
           go-version: '1.25'
 
+      - name: Tidy Go modules (API)
+        working-directory: ./api
+        run: go mod tidy
+
       - name: Update Go dependencies graph (API)
         uses: actions/go-dependency-submission@v1
         with:
           go-mod-path: ./api/go.mod
+
+      - name: Tidy Go modules (WAF)
+        working-directory: ./waf
+        run: go mod tidy
 
       - name: Update Go dependencies graph (WAF)
         uses: actions/go-dependency-submission@v1
