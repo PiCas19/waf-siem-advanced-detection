@@ -567,6 +567,61 @@ describe('BlocklistPage - New Tests', () => {
     expect(deleteButtons.length).toBeGreaterThan(0);
   });
 
+  it('shows error when Review PATCH request fails', async () => {
+    const mockFP = [
+      { id: 1, threat_type: 'XSS', client_ip: '172.16.9.1', method: 'GET', url: '/test', status: 'pending', created_at: '2024-01-01' },
+    ];
+
+    (global.fetch as any).mockImplementation((url: string) => {
+      if (url.includes('/api/false-positives')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ false_positives: mockFP }),
+        });
+      }
+      if (url.includes('/api/blocklist')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ items: [] }),
+        });
+      }
+      if (url.includes('/api/whitelist')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ items: [] }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [] }) });
+    });
+
+    render(<BrowserRouter><BlocklistPage /></BrowserRouter>);
+
+    fireEvent.click(screen.getByText(/False Positives/));
+
+    await waitFor(() => {
+      expect(screen.getByText('172.16.9.1')).toBeInTheDocument();
+    });
+
+    // Mock PATCH to return failure
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: false,
+      json: () => Promise.resolve({ error: 'Permission denied' }),
+    });
+
+    const reviewButton = screen.getByText('Review');
+    fireEvent.click(reviewButton);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/false-positives/1',
+        expect.objectContaining({ method: 'PATCH' })
+      );
+    });
+
+    // Status should remain pending (state not updated on failure)
+    expect(screen.getByText('172.16.9.1')).toBeInTheDocument();
+  });
+
   it('handles false positives pagination Next button (LINEA 1755)', async () => {
     const mockFP = Array.from({ length: 25 }, (_, i) => ({
       id: i + 1,

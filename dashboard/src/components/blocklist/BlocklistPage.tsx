@@ -532,6 +532,7 @@ const BlocklistPage: React.FC = () => {
         setFalsePositives(falsePositives.map(fp =>
           fp.id === id ? { ...fp, status } : fp
         ));
+        showToast(status === 'reviewed' ? 'Marked as reviewed' : 'Added to whitelist', 'success', 3000);
         // Auto-navigate to whitelist tab if whitelisted
         // Note: whitelist was already loaded above and marked with whitelistJustLoadedRef,
         // so the useEffect won't reload it when activeTab changes
@@ -540,6 +541,9 @@ const BlocklistPage: React.FC = () => {
             setActiveTab('whitelist');
           }, 100);
         }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        showToast(errorData.error || errorData.message || 'Failed to update status', 'error', 4000);
       }
     } catch (error) {
       showToast('Failed to update status', 'error', 4000);
