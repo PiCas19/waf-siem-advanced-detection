@@ -430,6 +430,17 @@ func TestNewUpdateFalsePositiveStatusHandler_Success(t *testing.T) {
 	mockFPRepo := new(MockFalsePositiveRepository)
 	fpService := service.NewFalsePositiveService(mockFPRepo)
 
+	existingFP := &models.FalsePositive{
+		ID:          1,
+		ThreatType:  "XSS",
+		Description: "Test false positive",
+		ClientIP:    "1.2.3.4",
+		Method:      "GET",
+		URL:         "/test",
+		Status:      "pending",
+	}
+
+	mockFPRepo.On("FindByID", mock.Anything, uint(1)).Return(existingFP, nil)
 	mockFPRepo.On("Update", mock.Anything, mock.MatchedBy(func(fp *models.FalsePositive) bool {
 		return fp.ID == 1 &&
 			fp.Status == "reviewed" &&
@@ -567,6 +578,37 @@ func TestNewUpdateFalsePositiveStatusHandler_InvalidReviewNotes(t *testing.T) {
 	assert.Contains(t, resp["code"], "INVALID_REQUEST")
 }
 
+// TestNewUpdateFalsePositiveStatusHandler_FetchError tests when fetching the existing record fails
+func TestNewUpdateFalsePositiveStatusHandler_FetchError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockFPRepo := new(MockFalsePositiveRepository)
+	fpService := service.NewFalsePositiveService(mockFPRepo)
+
+	mockFPRepo.On("FindByID", mock.Anything, uint(1)).Return((*models.FalsePositive)(nil), fmt.Errorf("database error"))
+
+	handler := internalapi.NewUpdateFalsePositiveStatusHandler(fpService)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "id", Value: "1"}}
+	c.Request = httptest.NewRequest("PATCH", "/false-positives/1", bytes.NewBufferString(`{
+		"status": "reviewed"
+	}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	handler(c)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+
+	var resp map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Contains(t, resp["message"], "Failed to fetch false positive")
+
+	mockFPRepo.AssertExpectations(t)
+}
+
 // TestNewUpdateFalsePositiveStatusHandler_ServiceError tests service error
 func TestNewUpdateFalsePositiveStatusHandler_ServiceError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -574,6 +616,12 @@ func TestNewUpdateFalsePositiveStatusHandler_ServiceError(t *testing.T) {
 	mockFPRepo := new(MockFalsePositiveRepository)
 	fpService := service.NewFalsePositiveService(mockFPRepo)
 
+	existingFP := &models.FalsePositive{
+		ID:     1,
+		Status: "pending",
+	}
+
+	mockFPRepo.On("FindByID", mock.Anything, uint(1)).Return(existingFP, nil)
 	mockFPRepo.On("Update", mock.Anything, mock.Anything).
 		Return(fmt.Errorf("database error"))
 

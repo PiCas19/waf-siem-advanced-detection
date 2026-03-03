@@ -194,15 +194,19 @@ func NewUpdateFalsePositiveStatusHandler(falsePositiveService *service.FalsePosi
 
 		ctx := c.Request.Context()
 
-		update := models.FalsePositive{
-			ID:          uint(idUint),
-			Status:      req.Status,
-			ReviewNotes: req.ReviewNotes,
+		// Load the existing record first to avoid overwriting all fields with empty values
+		existing, err := falsePositiveService.GetFalsePositiveByID(ctx, uint(idUint))
+		if err != nil {
+			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to fetch false positive")
+			return
 		}
-		now := time.Now()
-		update.ReviewedAt = &now
 
-		if err := falsePositiveService.UpdateFalsePositive(ctx, &update); err != nil {
+		existing.Status = req.Status
+		existing.ReviewNotes = req.ReviewNotes
+		now := time.Now()
+		existing.ReviewedAt = &now
+
+		if err := falsePositiveService.UpdateFalsePositive(ctx, existing); err != nil {
 			InternalServerErrorWithCode(c, ErrDatabaseError, "Failed to update false positive")
 			return
 		}
