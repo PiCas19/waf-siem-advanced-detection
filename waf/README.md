@@ -11,7 +11,7 @@ Enterprise-grade Web Application Firewall with dual-layer protection: OWASP ModS
        │
        v
 ┌────────────────────────────────────────────┐
-│ LAYER 1: Coraza WAF (OWASP CRS)           │
+│ LAYER 1: Coraza WAF (OWASP CRS)            │
 │ - 200+ OWASP rules                         │
 │ - Evasion techniques                       │
 │ - Scanner detection                        │
@@ -20,22 +20,22 @@ Enterprise-grade Web Application Firewall with dual-layer protection: OWASP ModS
        │ PASS
        v
 ┌────────────────────────────────────────────┐
-│ LAYER 2: Custom WAF (Business Logic)      │
+│ LAYER 2: Custom WAF (Business Logic)       │
 │                                            │
-│ ┌────────────────────────────────────┐    │
-│ │ 1. Whitelist Check                 │    │
-│ │    → Bypass all if whitelisted     │    │
-│ └────────────────────────────────────┘    │
-│ ┌────────────────────────────────────┐    │
-│ │ 2. Blocklist Check                 │    │
-│ │    → Block if blocklisted          │    │
-│ └────────────────────────────────────┘    │
-│ ┌────────────────────────────────────┐    │
-│ │ 3. Threat Detection (3 types)      │    │
-│ │    a) Default Rules (~100 builtin) │    │
-│ │    b) Custom Rules (database)      │    │
-│ │    c) Manual Block (priority)      │    │
-│ └────────────────────────────────────┘    │
+│ ┌────────────────────────────────────┐     │
+│ │ 1. Whitelist Check                 │     │
+│ │    → Bypass all if whitelisted     │     │
+│ └────────────────────────────────────┘     │
+│ ┌────────────────────────────────────┐     │
+│ │ 2. Blocklist Check                 │     │
+│ │    → Block if blocklisted          │     │
+│ └────────────────────────────────────┘     │
+│ ┌────────────────────────────────────┐     │
+│ │ 3. Threat Detection (3 types)      │     │ 
+│ │    a) Default Rules (~100 builtin) │     │
+│ │    b) Custom Rules (database)      │     │
+│ │    c) Manual Block (priority)      │     │
+│ └────────────────────────────────────┘     │
 └──────┬─────────────────────────────────────┘
        │ PASS
        v
