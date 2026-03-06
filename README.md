@@ -175,7 +175,7 @@ See [LICENSE](LICENSE) file for details.
 
 ## 👥 Author
 
-Project developed by Pierpaolo Casati – contact: [pierpaolo.casati@bluewin.ch].
+Project developed by Pierpaolo Casati – contact: pierpaolo.casati@bluewin.ch
 
 ## 🤝 Contributing
 
