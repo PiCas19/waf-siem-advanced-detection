@@ -179,5 +179,5 @@ Project developed by Pierpaolo Casati – contact: pierpaolo.casati@bluewin.ch
 
 ## 🤝 Contributing
 
-This is an academic project. Contributions are welcome for educational purposes.
+This project is developed for educational and learning purposes. Contributions are welcome to improve and enhance the solution.
 
