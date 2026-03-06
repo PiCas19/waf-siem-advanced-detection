@@ -175,7 +175,7 @@ See [LICENSE](LICENSE) file for details.
 
 ## 👥 Author
 
-Project developed as part of MSE (Master of Science in Engineering) coursework.
+Project developed by Pierpaolo Casati – contact: [pierpaolo.casati@bluewin.ch].
 
 ## 🤝 Contributing
 
