@@ -11,6 +11,7 @@ waf/caddy-waf
 *.test
 *.out
 go.work
+go.sum
 vendor/
 
 # IDE
