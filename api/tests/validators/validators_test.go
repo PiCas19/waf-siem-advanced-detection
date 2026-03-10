@@ -523,8 +523,9 @@ func TestValidateRequired(t *testing.T) {
 		"field4": "value4",
 	})
 	assert.Len(t, errors, 2)
-	assert.Contains(t, errors[0].Error(), "field2")
-	assert.Contains(t, errors[1].Error(), "field3")
+	allErrs := errors[0].Error() + " " + errors[1].Error()
+	assert.Contains(t, allErrs, "field2")
+	assert.Contains(t, allErrs, "field3")
 
 	// Test with all empty fields
 	errors = validators.ValidateRequired(map[string]string{

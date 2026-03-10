@@ -136,6 +136,8 @@ jobs:
 
       - name: Run API tests with coverage
         working-directory: ./api
+        env:
+          GIN_MODE: test
         run: go test -coverprofile=coverage.out ./tests/... -coverpkg=./internal/... -v
 
       - name: Generate coverage report
