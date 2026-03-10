@@ -17,12 +17,11 @@ Cypress.Commands.add('clearStorage', () => {
   });
 });
 
-// Custom command to set auth token (corrected key: authToken)
+// Custom command to set auth token (also persists refresh token)
 Cypress.Commands.add('setAuthToken', (token: string) => {
-  // Get the current location or visit about:blank if needed
   cy.document({ log: false }).then((doc) => {
-    // We have a document, so we can set localStorage
     doc.defaultView?.localStorage.setItem('authToken', token);
+    doc.defaultView?.localStorage.setItem('authRefreshToken', 'fake-refresh-token');
     doc.defaultView?.localStorage.setItem('authUser', JSON.stringify({
       id: 1,
       email: 'test@example.com',
@@ -84,6 +83,16 @@ Cypress.Commands.add('mockDashboardAPIs', () => {
     statusCode: 200,
     body: { data: [] },
   }).as('getUsers');
+
+  // Mock the token refresh endpoint so the 401 interceptor never
+  // causes unexpected redirects during tests
+  cy.intercept('POST', '/api/auth/refresh', {
+    statusCode: 200,
+    body: {
+      token: 'refreshed-access-token',
+      refresh_token: 'new-refresh-token',
+    },
+  }).as('refreshToken');
 });
 
 // Custom command to visit dashboard with auth already set
@@ -102,6 +111,7 @@ Cypress.Commands.add('visitDashboardAuthenticated', (options?: {
   cy.visit('/dashboard', {
     onBeforeLoad: (win) => {
       win.localStorage.setItem('authToken', token);
+      win.localStorage.setItem('authRefreshToken', 'fake-refresh-token');
       win.localStorage.setItem('authUser', JSON.stringify({
         id: 1,
         email,

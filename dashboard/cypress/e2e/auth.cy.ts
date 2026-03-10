@@ -19,15 +19,18 @@ describe('Authentication', () => {
     });
 
     it('should login with valid credentials', () => {
+      // Mock dashboard APIs before login so they are ready when the app
+      // redirects to /dashboard after a successful login
+      cy.mockDashboardAPIs();
       cy.visit('/login');
       cy.get('input[placeholder="you@example.com"]').type('admin@test.com');
       cy.get('input[placeholder="••••••••"]').type('password123');
 
-      // Intercept login API call
       cy.intercept('POST', '/api/auth/login', {
         statusCode: 200,
         body: {
           token: 'fake-jwt-token',
+          refresh_token: 'fake-refresh-token',
           user: {
             id: 1,
             email: 'admin@test.com',
@@ -40,7 +43,6 @@ describe('Authentication', () => {
 
       cy.contains('button', 'Login').click();
 
-      // Wait for API call
       cy.wait('@loginRequest');
 
       // Should redirect to dashboard
@@ -53,7 +55,6 @@ describe('Authentication', () => {
       cy.get('input[placeholder="you@example.com"]').type('wronguser@test.com');
       cy.get('input[placeholder="••••••••"]').type('wrongpass');
 
-      // Intercept failed login
       cy.intercept('POST', '/api/auth/login', {
         statusCode: 401,
         body: { error: 'Invalid credentials' },
@@ -93,7 +94,6 @@ describe('Authentication', () => {
       cy.get('input[placeholder="you@example.com"]').type('user@test.com');
       cy.get('input[placeholder="••••••••"]').type('password123');
 
-      // Mock login response that requires 2FA
       cy.intercept('POST', '/api/auth/login', {
         statusCode: 200,
         body: {
@@ -113,6 +113,7 @@ describe('Authentication', () => {
     });
 
     it('should verify 2FA code successfully', () => {
+      cy.mockDashboardAPIs();
       cy.visit('/login');
       cy.get('input[placeholder="you@example.com"]').type('user@test.com');
       cy.get('input[placeholder="••••••••"]').type('password123');
@@ -128,13 +129,13 @@ describe('Authentication', () => {
       cy.contains('button', 'Login').click();
       cy.wait('@loginWith2FA');
 
-      // Enter 2FA code (6 digits)
       cy.get('input[placeholder="000000"]').type('123456');
 
       cy.intercept('POST', '/api/auth/verify-otp', {
         statusCode: 200,
         body: {
           token: 'final-auth-token',
+          refresh_token: 'final-refresh-token',
           user: {
             id: 1,
             email: 'user@test.com',
@@ -154,6 +155,7 @@ describe('Authentication', () => {
     });
 
     it('should verify using backup code', () => {
+      cy.mockDashboardAPIs();
       cy.visit('/login');
       cy.get('input[placeholder="you@example.com"]').type('user@test.com');
       cy.get('input[placeholder="••••••••"]').type('password123');
@@ -169,13 +171,13 @@ describe('Authentication', () => {
       cy.contains('button', 'Login').click();
       cy.wait('@loginWith2FA');
 
-      // Enter backup code (8 digits)
       cy.get('input[placeholder="12345678"]').type('87654321');
 
       cy.intercept('POST', '/api/auth/verify-otp', {
         statusCode: 200,
         body: {
           token: 'final-auth-token',
+          refresh_token: 'final-refresh-token',
           user: { id: 1, email: 'user@test.com', name: 'User', role: 'analyst' },
         },
       }).as('verify2FA');
@@ -252,13 +254,12 @@ describe('Authentication', () => {
 
   describe('Logout', () => {
     it('should logout user and redirect to login', () => {
-      // Mock dashboard APIs
       cy.mockDashboardAPIs();
 
-      // Visit dashboard with auth token set before load
       cy.visit('/dashboard', {
         onBeforeLoad: (win) => {
           win.localStorage.setItem('authToken', 'fake-token');
+          win.localStorage.setItem('authRefreshToken', 'fake-refresh-token');
           win.localStorage.setItem('authUser', JSON.stringify({
             id: 1,
             email: 'admin@test.com',
@@ -279,9 +280,10 @@ describe('Authentication', () => {
       // Should redirect to login page
       cy.url().should('include', '/login');
 
-      // Token should be removed
+      // Both tokens should be removed
       cy.window().then((win) => {
         expect(win.localStorage.getItem('authToken')).to.be.null;
+        expect(win.localStorage.getItem('authRefreshToken')).to.be.null;
       });
     });
   });
@@ -298,6 +300,7 @@ describe('Authentication', () => {
       cy.visit('/dashboard', {
         onBeforeLoad: (win) => {
           win.localStorage.setItem('authToken', 'valid-token');
+          win.localStorage.setItem('authRefreshToken', 'valid-refresh-token');
           win.localStorage.setItem('authUser', JSON.stringify({
             id: 1,
             email: 'user@test.com',

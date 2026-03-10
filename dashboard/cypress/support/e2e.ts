@@ -1,14 +1,14 @@
 // Import commands.ts using ES2015 syntax:
 import './commands';
 
-// Alternatively you can use CommonJS syntax:
-// require('./commands')
-
-// Hide fetch/XHR requests from command log to reduce noise
-Cypress.on('uncaught:exception', (err, runnable) => {
-  // Returning false here prevents Cypress from failing the test
-  // You might want to customize this based on your needs
+// Suppress specific uncaught exceptions that should not fail tests
+Cypress.on('uncaught:exception', (err) => {
+  // ResizeObserver errors are benign browser implementation details
   if (err.message.includes('ResizeObserver')) {
+    return false;
+  }
+  // Suppress navigation-related errors from the 401 interceptor logout redirect
+  if (err.message.includes('No refresh token available')) {
     return false;
   }
   return true;
