@@ -87,11 +87,12 @@ describe('AuthContext', () => {
       const testUser = { id: 1, email: 'test@example.com', name: 'Test', role: 'user', two_fa_enabled: false };
 
       mockedAxios.post.mockResolvedValueOnce({
-        data: { 
-          token: 'new-token', 
+        data: {
+          token: 'new-token',
+          refresh_token: 'new-refresh-token',
           user: testUser,
           requires_2fa: false,
-          requires_2fa_setup: false 
+          requires_2fa_setup: false
         },
       });
 
@@ -103,12 +104,14 @@ describe('AuthContext', () => {
 
       // Verifica lo stato
       expect(result.current.token).toBe('new-token');
+      expect(result.current.refreshToken).toBe('new-refresh-token');
       expect(result.current.user).toEqual(testUser);
       expect(result.current.requiresTwoFA).toBe(false);
       expect(result.current.requiresTwoFASetup).toBe(false);
-      
+
       // Verifica localStorage
       expect(localStorage.getItem('authToken')).toBe('new-token');
+      expect(localStorage.getItem('authRefreshToken')).toBe('new-refresh-token');
       expect(localStorage.getItem('authUser')).toBe(JSON.stringify(testUser));
       expect(axios.defaults.headers.common['Authorization']).toBe('Bearer new-token');
     });
@@ -206,10 +209,11 @@ describe('AuthContext', () => {
   });
 
   describe('logout', () => {
-    it('should clear user and token on logout', async () => {
+    it('should clear user, token and refresh token on logout', async () => {
       const testUser = { id: 1, email: 'test@example.com', name: 'Test', role: 'user', two_fa_enabled: false };
       localStorage.setItem('authToken', 'test-token');
       localStorage.setItem('authUser', JSON.stringify(testUser));
+      localStorage.setItem('authRefreshToken', 'test-refresh-token');
 
       const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 
@@ -219,8 +223,10 @@ describe('AuthContext', () => {
 
       expect(result.current.user).toBeNull();
       expect(result.current.token).toBeNull();
+      expect(result.current.refreshToken).toBeNull();
       expect(localStorage.getItem('authToken')).toBeNull();
       expect(localStorage.getItem('authUser')).toBeNull();
+      expect(localStorage.getItem('authRefreshToken')).toBeNull();
       expect(axios.defaults.headers.common['Authorization']).toBeUndefined();
     });
   });
@@ -282,6 +288,37 @@ describe('AuthContext', () => {
       mockedAxios.post.mockRejectedValueOnce(new Error('Disable failed'));
       const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
       await expect(result.current.disableTwoFA('wrong')).rejects.toThrow('Disable failed');
+    });
+  });
+
+  describe('refresh', () => {
+    it('should refresh tokens successfully', async () => {
+      localStorage.setItem('authRefreshToken', 'old-refresh-token');
+
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { token: 'new-access-token', refresh_token: 'new-refresh-token' },
+      });
+
+      const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      let newToken: string;
+      await act(async () => {
+        newToken = await result.current.refresh();
+      });
+
+      expect(newToken!).toBe('new-access-token');
+      expect(result.current.token).toBe('new-access-token');
+      expect(result.current.refreshToken).toBe('new-refresh-token');
+      expect(localStorage.getItem('authToken')).toBe('new-access-token');
+      expect(localStorage.getItem('authRefreshToken')).toBe('new-refresh-token');
+    });
+
+    it('should throw when no refresh token is stored', async () => {
+      localStorage.removeItem('authRefreshToken');
+      const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      await expect(result.current.refresh()).rejects.toThrow('No refresh token available');
     });
   });
 

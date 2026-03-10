@@ -57,9 +57,10 @@ type DatabaseConfig struct {
 //
 // Thread Safety: Read-only after initialization, safe for concurrent use.
 type AuthConfig struct {
-	JWTSecret       string
-	TokenExpiration time.Duration
-	OTPWindow       time.Duration
+	JWTSecret              string
+	TokenExpiration        time.Duration
+	RefreshTokenExpiration time.Duration
+	OTPWindow              time.Duration
 }
 
 // LoggerConfig contains logger configuration.
@@ -108,9 +109,10 @@ func LoadFromEnv() *Config {
 			LogQueries:      getEnvAsBool("DB_LOG_QUERIES", false),
 		},
 		Auth: AuthConfig{
-			JWTSecret:       getEnvAsString("JWT_SECRET", "your-secret-key"),
-			TokenExpiration: getEnvAsDuration("TOKEN_EXPIRATION", 24*time.Hour),
-			OTPWindow:       getEnvAsDuration("OTP_WINDOW", 30*time.Second),
+			JWTSecret:              getEnvAsString("JWT_SECRET", "your-secret-key"),
+			TokenExpiration:        getEnvAsDuration("TOKEN_EXPIRATION", 24*time.Hour),
+			RefreshTokenExpiration: getEnvAsDuration("REFRESH_TOKEN_EXPIRATION", 7*24*time.Hour),
+			OTPWindow:              getEnvAsDuration("OTP_WINDOW", 30*time.Second),
 		},
 		Logger: LoggerConfig{
 			Level:      getEnvAsString("LOG_LEVEL", "info"),

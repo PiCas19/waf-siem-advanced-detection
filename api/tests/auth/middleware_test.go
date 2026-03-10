@@ -400,6 +400,24 @@ func TestRolePermissions_AllRolesExist(t *testing.T) {
 	}
 }
 
+func TestAuthMiddleware_RefreshTokenRejected(t *testing.T) {
+	router := gin.New()
+	router.Use(auth.AuthMiddleware())
+	router.GET("/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "success"})
+	})
+
+	token, _, _ := auth.GenerateRefreshToken(1, "test@example.com", "admin")
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/test", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code, "Refresh token must not be accepted as a bearer access token")
+}
+
 func TestRolePermissions_Consistency(t *testing.T) {
 	// Verify that all admin permissions are also valid permission names
 	adminPerms := auth.RolePermissions["admin"]

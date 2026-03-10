@@ -12,10 +12,12 @@ interface User {
 interface AuthContextType {
   user: User | null
   token: string | null
+  refreshToken: string | null
   isLoading: boolean
   login: (email: string, password: string) => Promise<void>
   verifyOTP: (email: string, otpCode: string, backupCode?: string) => Promise<void>
   logout: () => void
+  refresh: () => Promise<string>
   setupTwoFA: () => Promise<TwoFASetup>
   completeTwoFASetup: (secret: string, otpCode: string) => Promise<void>
   disableTwoFA: (password: string) => Promise<void>
@@ -41,6 +43,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
+  const [refreshToken, setRefreshToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [requiresTwoFA, setRequiresTwoFA] = useState(false)
   const [requiresTwoFASetup, setRequiresTwoFASetup] = useState(false)
@@ -50,15 +53,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const storedToken = localStorage.getItem('authToken')
     const storedUser = localStorage.getItem('authUser')
+    const storedRefreshToken = localStorage.getItem('authRefreshToken')
 
-    // React 18 automatic batching handles these setState calls efficiently
-    // This initialization effect only runs once on mount
     if (storedToken && storedUser) {
       const parsedUser = JSON.parse(storedUser)
       setToken(storedToken)
       setUser(parsedUser)
-      // Set default auth header
       axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
+    }
+    if (storedRefreshToken) {
+      setRefreshToken(storedRefreshToken)
     }
 
     setIsLoading(false)
@@ -98,6 +102,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(response.data.user)
       localStorage.setItem('authToken', response.data.token)
       localStorage.setItem('authUser', JSON.stringify(response.data.user))
+      if (response.data.refresh_token) {
+        setRefreshToken(response.data.refresh_token)
+        localStorage.setItem('authRefreshToken', response.data.refresh_token)
+      }
       axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`
       setRequiresTwoFA(false)
       setRequiresTwoFASetup(false)
@@ -119,6 +127,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(response.data.user)
       localStorage.setItem('authToken', response.data.token)
       localStorage.setItem('authUser', JSON.stringify(response.data.user))
+      if (response.data.refresh_token) {
+        setRefreshToken(response.data.refresh_token)
+        localStorage.setItem('authRefreshToken', response.data.refresh_token)
+      }
       axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`
       setRequiresTwoFA(false)
       setCurrentUserEmail(null)
@@ -133,9 +145,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     setUser(null)
     setToken(null)
+    setRefreshToken(null)
     localStorage.removeItem('authToken')
     localStorage.removeItem('authUser')
+    localStorage.removeItem('authRefreshToken')
     delete axios.defaults.headers.common['Authorization']
+  }
+
+  const refresh = async (): Promise<string> => {
+    const storedRefresh = localStorage.getItem('authRefreshToken')
+    if (!storedRefresh) throw new Error('No refresh token available')
+    const response = await axios.post('/api/auth/refresh', { refresh_token: storedRefresh })
+    const { token: newAccessToken, refresh_token: newRefreshToken } = response.data
+    setToken(newAccessToken)
+    localStorage.setItem('authToken', newAccessToken)
+    if (newRefreshToken) {
+      setRefreshToken(newRefreshToken)
+      localStorage.setItem('authRefreshToken', newRefreshToken)
+    }
+    axios.defaults.headers.common['Authorization'] = `Bearer ${newAccessToken}`
+    return newAccessToken
   }
 
   const setupTwoFA = async (): Promise<TwoFASetup> => {
@@ -192,11 +221,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       value={{
         user,
         token,
+        refreshToken,
         isLoading,
         login,
         verifyOTP,
-  // register removed: admin should create users
         logout,
+        refresh,
         setupTwoFA,
         completeTwoFASetup,
         disableTwoFA,
@@ -207,8 +237,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setToken,
         setUser,
         setRequiresTwoFASetup,
-        setRequiresTwoFA, 
-        setCurrentUserEmail, 
+        setRequiresTwoFA,
+        setCurrentUserEmail,
       }}
     >
       {children}

@@ -190,14 +190,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Generate token if 2FA is not enabled
+	// Generate token pair if 2FA is not enabled
 	logger.Log.WithFields(map[string]interface{}{
 		"operation": "token_generation",
 		"user_id": user.ID,
 		"email": user.Email,
 	}).Info("Generating authentication token")
 
-	token, err := GenerateToken(user.ID, user.Email, user.Role)
+	accessToken, refreshToken, err := h.issueTokenPair(user.ID, user.Email, user.Role)
 	if err != nil {
 		logger.Log.WithFields(map[string]interface{}{
 			"operation": "token_generation",
@@ -231,7 +231,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	h.db.Create(&auditLog)
 
 	c.JSON(http.StatusOK, gin.H{
-		"token": token,
+		"token":         accessToken,
+		"refresh_token": refreshToken,
 		"user": gin.H{
 			"id":    user.ID,
 			"email": user.Email,
@@ -335,8 +336,8 @@ func (h *AuthHandler) VerifyOTPLogin(c *gin.Context) {
 		return
 	}
 
-	// Generate token
-	token, err := GenerateToken(user.ID, user.Email, user.Role)
+	// Generate token pair after 2FA success
+	accessToken, refreshToken, err := h.issueTokenPair(user.ID, user.Email, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return
@@ -358,7 +359,8 @@ func (h *AuthHandler) VerifyOTPLogin(c *gin.Context) {
 	h.db.Create(&auditLog)
 
 	c.JSON(http.StatusOK, gin.H{
-		"token": token,
+		"token":         accessToken,
+		"refresh_token": refreshToken,
 		"user": gin.H{
 			"id":    user.ID,
 			"email": user.Email,
@@ -954,4 +956,96 @@ func generateRandomToken(length int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+// issueTokenPair generates an access token and a refresh token, stores the refresh token
+// JTI hash in the database for rotation detection, and returns both tokens.
+func (h *AuthHandler) issueTokenPair(userID uint, email, role string) (accessToken, refreshToken string, err error) {
+	accessToken, err = GenerateToken(userID, email, role)
+	if err != nil {
+		return
+	}
+	var jti string
+	refreshToken, jti, err = GenerateRefreshToken(userID, email, role)
+	if err != nil {
+		return
+	}
+	jtiHash, hashErr := bcrypt.GenerateFromPassword([]byte(jti), bcrypt.DefaultCost)
+	if hashErr != nil {
+		err = hashErr
+		return
+	}
+	err = h.db.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"refresh_token_hash":   string(jtiHash),
+		"refresh_token_expiry": time.Now().Add(refreshTokenExpiration),
+	}).Error
+	return
+}
+
+// RefreshToken handles access token refresh using a valid refresh token.
+// On success it rotates the refresh token (issues a new pair and invalidates the old one).
+func (h *AuthHandler) RefreshToken(c *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate JWT signature and token_type
+	claims, err := ValidateRefreshToken(req.RefreshToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		return
+	}
+
+	// Load user
+	var user models.User
+	if err := h.db.First(&user, claims.UserID).Error; err != nil || !user.Active {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		return
+	}
+
+	// Verify stored JTI hash matches the presented token's JTI
+	if err := bcrypt.CompareHashAndPassword([]byte(user.RefreshTokenHash), []byte(claims.ID)); err != nil {
+		// Token reuse detected after rotation – revoke all refresh tokens
+		h.db.Model(&user).Updates(map[string]interface{}{
+			"refresh_token_hash":   "",
+			"refresh_token_expiry": time.Now(),
+		})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		return
+	}
+
+	// Belt-and-suspenders expiry check
+	if time.Now().After(user.RefreshTokenExpiry) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token expired"})
+		return
+	}
+
+	// Rotate: issue new token pair (old JTI hash is overwritten)
+	accessToken, refreshToken, err := h.issueTokenPair(user.ID, user.Email, user.Role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		return
+	}
+
+	h.db.Create(&models.AuditLog{
+		UserID:       user.ID,
+		UserEmail:    user.Email,
+		Action:       "TOKEN_REFRESH",
+		Category:     "AUTH",
+		ResourceType: "user",
+		ResourceID:   fmt.Sprintf("%d", user.ID),
+		Description:  "Access token refreshed",
+		Status:       "success",
+		IPAddress:    c.ClientIP(),
+		CreatedAt:    time.Now(),
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"token":         accessToken,
+		"refresh_token": refreshToken,
+	})
 }

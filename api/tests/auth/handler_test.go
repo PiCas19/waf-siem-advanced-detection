@@ -1119,6 +1119,199 @@ func TestResetPassword_MissingPassword(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
+// TestRefreshToken_Success tests successful token refresh and rotation
+func TestRefreshToken_Success(t *testing.T) {
+	db := setupTestDB(t)
+
+	var mailerInterface *mailer.Mailer
+	handler := auth.NewAuthHandler(db, mailerInterface)
+
+	user := createTestUser(t, db, "test@example.com", "password123", "user", true, false)
+
+	// Pre-generate a refresh token and store its JTI hash in the DB
+	refreshToken, jti, err := auth.GenerateRefreshToken(user.ID, user.Email, user.Role)
+	require.NoError(t, err)
+	jtiHash, _ := bcrypt.GenerateFromPassword([]byte(jti), bcrypt.DefaultCost)
+	db.Model(&user).Updates(map[string]interface{}{
+		"refresh_token_hash":   string(jtiHash),
+		"refresh_token_expiry": time.Now().Add(7 * 24 * time.Hour),
+	})
+
+	router := gin.New()
+	router.POST("/auth/refresh", handler.RefreshToken)
+
+	w := httptest.NewRecorder()
+	reqBody, _ := json.Marshal(map[string]string{"refresh_token": refreshToken})
+	req, _ := http.NewRequest("POST", "/auth/refresh", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response map[string]interface{}
+	err = json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, response["token"])
+	assert.NotEmpty(t, response["refresh_token"])
+	assert.NotEqual(t, refreshToken, response["refresh_token"], "Refresh token should be rotated")
+}
+
+// TestRefreshToken_TokenRotation verifies that a used refresh token is rejected after rotation
+func TestRefreshToken_TokenRotation(t *testing.T) {
+	db := setupTestDB(t)
+
+	var mailerInterface *mailer.Mailer
+	handler := auth.NewAuthHandler(db, mailerInterface)
+
+	user := createTestUser(t, db, "test@example.com", "password123", "user", true, false)
+
+	// Store a refresh token
+	refreshToken, jti, err := auth.GenerateRefreshToken(user.ID, user.Email, user.Role)
+	require.NoError(t, err)
+	jtiHash, _ := bcrypt.GenerateFromPassword([]byte(jti), bcrypt.DefaultCost)
+	db.Model(&user).Updates(map[string]interface{}{
+		"refresh_token_hash":   string(jtiHash),
+		"refresh_token_expiry": time.Now().Add(7 * 24 * time.Hour),
+	})
+
+	router := gin.New()
+	router.POST("/auth/refresh", handler.RefreshToken)
+
+	// First refresh: should succeed
+	w1 := httptest.NewRecorder()
+	body1, _ := json.Marshal(map[string]string{"refresh_token": refreshToken})
+	req1, _ := http.NewRequest("POST", "/auth/refresh", bytes.NewBuffer(body1))
+	req1.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w1, req1)
+	assert.Equal(t, http.StatusOK, w1.Code)
+
+	// Second refresh with same token: must be rejected (token was rotated)
+	w2 := httptest.NewRecorder()
+	body2, _ := json.Marshal(map[string]string{"refresh_token": refreshToken})
+	req2, _ := http.NewRequest("POST", "/auth/refresh", bytes.NewBuffer(body2))
+	req2.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w2, req2)
+	assert.Equal(t, http.StatusUnauthorized, w2.Code)
+}
+
+// TestRefreshToken_InvalidJWT tests rejection of garbage token
+func TestRefreshToken_InvalidJWT(t *testing.T) {
+	db := setupTestDB(t)
+
+	var mailerInterface *mailer.Mailer
+	handler := auth.NewAuthHandler(db, mailerInterface)
+
+	router := gin.New()
+	router.POST("/auth/refresh", handler.RefreshToken)
+
+	w := httptest.NewRecorder()
+	reqBody, _ := json.Marshal(map[string]string{"refresh_token": "not.a.valid.jwt"})
+	req, _ := http.NewRequest("POST", "/auth/refresh", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+// TestRefreshToken_AccessTokenRejected tests that an access token cannot be used as refresh token
+func TestRefreshToken_AccessTokenRejected(t *testing.T) {
+	db := setupTestDB(t)
+
+	var mailerInterface *mailer.Mailer
+	handler := auth.NewAuthHandler(db, mailerInterface)
+
+	router := gin.New()
+	router.POST("/auth/refresh", handler.RefreshToken)
+
+	accessToken, _ := auth.GenerateToken(1, "test@example.com", "user")
+
+	w := httptest.NewRecorder()
+	reqBody, _ := json.Marshal(map[string]string{"refresh_token": accessToken})
+	req, _ := http.NewRequest("POST", "/auth/refresh", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+// TestRefreshToken_InactiveUser tests that an inactive user's refresh token is rejected
+func TestRefreshToken_InactiveUser(t *testing.T) {
+	db := setupTestDB(t)
+
+	var mailerInterface *mailer.Mailer
+	handler := auth.NewAuthHandler(db, mailerInterface)
+
+	user := createTestUser(t, db, "test@example.com", "password123", "user", false, false)
+
+	refreshToken, jti, err := auth.GenerateRefreshToken(user.ID, user.Email, user.Role)
+	require.NoError(t, err)
+	jtiHash, _ := bcrypt.GenerateFromPassword([]byte(jti), bcrypt.DefaultCost)
+	db.Model(&user).Updates(map[string]interface{}{
+		"refresh_token_hash":   string(jtiHash),
+		"refresh_token_expiry": time.Now().Add(7 * 24 * time.Hour),
+	})
+
+	router := gin.New()
+	router.POST("/auth/refresh", handler.RefreshToken)
+
+	w := httptest.NewRecorder()
+	reqBody, _ := json.Marshal(map[string]string{"refresh_token": refreshToken})
+	req, _ := http.NewRequest("POST", "/auth/refresh", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
+
+// TestRefreshToken_MissingBody tests missing request body
+func TestRefreshToken_MissingBody(t *testing.T) {
+	db := setupTestDB(t)
+
+	var mailerInterface *mailer.Mailer
+	handler := auth.NewAuthHandler(db, mailerInterface)
+
+	router := gin.New()
+	router.POST("/auth/refresh", handler.RefreshToken)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/auth/refresh", bytes.NewBufferString("{}"))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// TestLogin_Success_ReturnsRefreshToken verifies login returns both tokens
+func TestLogin_Success_ReturnsRefreshToken(t *testing.T) {
+	db := setupTestDB(t)
+
+	var mailerInterface *mailer.Mailer
+	handler := auth.NewAuthHandler(db, mailerInterface)
+
+	createTestUser(t, db, "test2@example.com", "password123", "user", true, false)
+
+	router := gin.New()
+	router.POST("/auth/login", handler.Login)
+
+	w := httptest.NewRecorder()
+	reqBody, _ := json.Marshal(map[string]string{"email": "test2@example.com", "password": "password123"})
+	req, _ := http.NewRequest("POST", "/auth/login", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var response map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NotEmpty(t, response["token"])
+	assert.NotEmpty(t, response["refresh_token"])
+}
+
 // Helper function to generate TOTP code for tests
 func generateTOTPCodeForTest(secret string, counter int64) string {
 	return generateTOTPCode(secret, counter)

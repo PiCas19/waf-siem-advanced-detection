@@ -60,4 +60,8 @@ type User struct {
 	// Password reset / invite token (admin-created users)
 	PasswordResetToken  string    `gorm:"index;size:128" json:"-"`
 	PasswordResetExpiry time.Time `json:"-"`
+
+	// Refresh token (bcrypt hash of JTI for rotation detection)
+	RefreshTokenHash   string    `gorm:"index;size:256" json:"-"`
+	RefreshTokenExpiry time.Time `json:"-"`
 }

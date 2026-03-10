@@ -186,6 +186,27 @@ describe('api service', () => {
     expect(mockConfig.headers.Authorization).toBe('Bearer test-bearer-token-123');
   });
 
+  it('should register a response interceptor for 401 handling', async () => {
+    const mockInstance = {
+      get: mockGet,
+      post: mockPost,
+      put: mockPut,
+      delete: mockDelete,
+      patch: mockPatch,
+      interceptors: {
+        request: { use: vi.fn() },
+        response: { use: vi.fn() },
+      },
+    };
+    (axios.create as any).mockReturnValue(mockInstance);
+
+    await import('../api');
+
+    // Both interceptors should have been registered
+    expect(mockInstance.interceptors.request.use).toHaveBeenCalled();
+    expect(mockInstance.interceptors.response.use).toHaveBeenCalled();
+  });
+
   it('should not add Authorization header when token is absent', () => {
     // Ensure no token in localStorage
     localStorage.removeItem('authToken');

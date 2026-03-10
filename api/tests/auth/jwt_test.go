@@ -10,6 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	// Initialize JWT config with known secret so tests can verify token signatures
+	auth.InitJWTConfig("your-secret-key-change-in-production", 24*time.Hour, 7*24*time.Hour)
+}
+
 func TestGenerateToken(t *testing.T) {
 	userID := uint(1)
 	email := "test@example.com"
@@ -218,4 +223,71 @@ func TestValidateToken_ValidTokenStaysValid(t *testing.T) {
 		assert.NotNil(t, claims)
 		assert.Equal(t, uint(1), claims.UserID)
 	}
+}
+
+func TestGenerateRefreshToken_Success(t *testing.T) {
+	token, jti, err := auth.GenerateRefreshToken(1, "test@example.com", "admin")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, token)
+	assert.NotEmpty(t, jti)
+	assert.Len(t, jti, 32, "JTI should be 32 hex chars (16 bytes)")
+}
+
+func TestGenerateRefreshToken_DifferentJTIEachTime(t *testing.T) {
+	token1, jti1, err1 := auth.GenerateRefreshToken(1, "test@example.com", "admin")
+	token2, jti2, err2 := auth.GenerateRefreshToken(1, "test@example.com", "admin")
+	assert.NoError(t, err1)
+	assert.NoError(t, err2)
+	assert.NotEqual(t, token1, token2, "Refresh tokens should be unique")
+	assert.NotEqual(t, jti1, jti2, "JTIs should be unique")
+}
+
+func TestValidateRefreshToken_Success(t *testing.T) {
+	token, jti, err := auth.GenerateRefreshToken(1, "test@example.com", "admin")
+	require.NoError(t, err)
+
+	claims, err := auth.ValidateRefreshToken(token)
+	assert.NoError(t, err)
+	require.NotNil(t, claims)
+	assert.Equal(t, uint(1), claims.UserID)
+	assert.Equal(t, "test@example.com", claims.Email)
+	assert.Equal(t, "admin", claims.Role)
+	assert.Equal(t, "refresh", claims.TokenType)
+	assert.Equal(t, jti, claims.ID)
+}
+
+func TestValidateRefreshToken_WithAccessToken_Fails(t *testing.T) {
+	token, err := auth.GenerateToken(1, "test@example.com", "admin")
+	require.NoError(t, err)
+
+	claims, err := auth.ValidateRefreshToken(token)
+	assert.Error(t, err)
+	assert.Nil(t, claims)
+}
+
+func TestValidateToken_WithRefreshToken_Fails(t *testing.T) {
+	token, _, err := auth.GenerateRefreshToken(1, "test@example.com", "admin")
+	require.NoError(t, err)
+
+	claims, err := auth.ValidateToken(token)
+	assert.Error(t, err)
+	assert.Nil(t, claims)
+	assert.Contains(t, err.Error(), "invalid token type")
+}
+
+func TestRefreshToken_ExpiresLaterThanAccessToken(t *testing.T) {
+	accessToken, err := auth.GenerateToken(1, "test@example.com", "admin")
+	require.NoError(t, err)
+
+	refreshToken, _, err := auth.GenerateRefreshToken(1, "test@example.com", "admin")
+	require.NoError(t, err)
+
+	accessClaims, err := auth.ValidateToken(accessToken)
+	require.NoError(t, err)
+
+	refreshClaims, err := auth.ValidateRefreshToken(refreshToken)
+	require.NoError(t, err)
+
+	assert.True(t, refreshClaims.ExpiresAt.Time.After(accessClaims.ExpiresAt.Time),
+		"Refresh token should expire after access token")
 }

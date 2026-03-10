@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseJWT } from '../jwt';
+import { parseJWT, isTokenExpired } from '../jwt';
 
 describe('jwt', () => {
   describe('parseJWT', () => {
@@ -107,6 +107,37 @@ describe('jwt', () => {
       const result = parseJWT(token);
       expect(result).toEqual(payload);
       expect(result.value).toBeNull();
+    });
+  });
+
+  describe('isTokenExpired', () => {
+    it('should return true for an expired token', () => {
+      const payload = { exp: Math.floor(Date.now() / 1000) - 100 };
+      const token = `header.${btoa(JSON.stringify(payload))}.sig`;
+      expect(isTokenExpired(token)).toBe(true);
+    });
+
+    it('should return false for a valid token with plenty of time left', () => {
+      const payload = { exp: Math.floor(Date.now() / 1000) + 3600 };
+      const token = `header.${btoa(JSON.stringify(payload))}.sig`;
+      expect(isTokenExpired(token)).toBe(false);
+    });
+
+    it('should return true for a token expiring within the 30-second buffer', () => {
+      const payload = { exp: Math.floor(Date.now() / 1000) + 10 };
+      const token = `header.${btoa(JSON.stringify(payload))}.sig`;
+      expect(isTokenExpired(token)).toBe(true);
+    });
+
+    it('should return true for a malformed token', () => {
+      expect(isTokenExpired('invalid')).toBe(true);
+      expect(isTokenExpired('')).toBe(true);
+    });
+
+    it('should return true when exp claim is missing', () => {
+      const payload = { user_id: 1 };
+      const token = `header.${btoa(JSON.stringify(payload))}.sig`;
+      expect(isTokenExpired(token)).toBe(true);
     });
   });
 });

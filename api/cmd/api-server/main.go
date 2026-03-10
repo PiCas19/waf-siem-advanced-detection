@@ -14,6 +14,7 @@ import (
 	"github.com/swaggo/gin-swagger"
 	"github.com/swaggo/files"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/api"
+	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/auth"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/config"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/database"
 	"github.com/PiCas19/waf-siem-advanced-detection/api/internal/geoip"
@@ -32,6 +33,9 @@ func main() {
 
 	// Carica configurazione centralizzata
 	cfg := config.LoadFromEnv()
+
+	// Inizializza configurazione JWT
+	auth.InitJWTConfig(cfg.Auth.JWTSecret, cfg.Auth.TokenExpiration, cfg.Auth.RefreshTokenExpiration)
 
 	// Inizializza logger strutturato
 	if err := logger.InitLogger(cfg.Logger.Level, cfg.Logger.OutputPath); err != nil {
