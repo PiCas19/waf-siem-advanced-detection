@@ -60,6 +60,9 @@ api.interceptors.response.use(
     const storedRefresh = localStorage.getItem('authRefreshToken');
     if (!storedRefresh) {
       isRefreshing = false;
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('authUser');
+      localStorage.removeItem('authRefreshToken');
       window.location.href = '/login';
       return Promise.reject(error);
     }

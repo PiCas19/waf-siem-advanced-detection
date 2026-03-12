@@ -225,4 +225,52 @@ describe('api service', () => {
     // Verify the Authorization header was NOT added
     expect(mockConfig.headers.Authorization).toBeUndefined();
   });
+
+  it('should clear authToken, authUser and authRefreshToken from localStorage when no refresh token on 401', async () => {
+    localStorage.setItem('authToken', 'expired-token');
+    localStorage.setItem('authUser', JSON.stringify({ id: 1, email: 'test@test.com' }));
+    // authRefreshToken deliberately absent
+
+    let responseErrorHandler: ((error: any) => Promise<any>) | undefined;
+
+    const mockInstance = {
+      get: mockGet,
+      post: mockPost,
+      put: mockPut,
+      delete: mockDelete,
+      patch: mockPatch,
+      interceptors: {
+        request: { use: vi.fn() },
+        response: {
+          use: vi.fn((_ok: any, errHandler: any) => {
+            responseErrorHandler = errHandler;
+          }),
+        },
+      },
+    };
+    (axios.create as any).mockReturnValue(mockInstance);
+
+    // Save and mock window.location
+    const originalLocation = window.location;
+    delete (window as any).location;
+    (window as any).location = { href: '' };
+
+    await import('../api');
+
+    expect(responseErrorHandler).toBeDefined();
+
+    const error = {
+      config: { url: '/stats', _retry: false },
+      response: { status: 401 },
+    };
+
+    await responseErrorHandler!(error).catch(() => {});
+
+    expect(localStorage.getItem('authToken')).toBeNull();
+    expect(localStorage.getItem('authUser')).toBeNull();
+    expect(localStorage.getItem('authRefreshToken')).toBeNull();
+    expect((window as any).location.href).toBe('/login');
+
+    (window as any).location = originalLocation;
+  });
 });
